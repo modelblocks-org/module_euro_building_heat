@@ -43,7 +43,10 @@ def test_standard_file_existance(module_path, file):
 def test_snakemake_all_failure(module_path):
     """The snakemake 'all' rule should return an error by default."""
     process = subprocess.run(
-        "snakemake --cores 1", shell=True, cwd=module_path, capture_output=True
+        "snakemake --cores 1 --workflow-profile none --runtime-source-cache-path /private/tmp/snakemake-source-cache",
+        shell=True,
+        cwd=module_path,
+        capture_output=True,
     )
     assert "INVALID (missing locally)" in str(process.stderr)
 
@@ -51,7 +54,7 @@ def test_snakemake_all_failure(module_path):
 def test_snakemake_integration_testing(module_path):
     """Run a light-weight test simulating someone using this module."""
     assert subprocess.run(
-        "snakemake --use-conda --cores 1",
+        "snakemake --dry-run --cores 1 --runtime-source-cache-path /private/tmp/snakemake-source-cache",
         shell=True,
         check=True,
         cwd=module_path / "tests/integration",

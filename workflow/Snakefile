@@ -10,9 +10,11 @@ min_version("9.19")
 # This allows users to re-wire how the module is used in their workflow with ease.
 pathvars:
     # User resources
-    user_message="<resources>/user/user_message.md",
+    shapes="<resources>/user/{shapes}/shapes.parquet",
     # Module results
-    combined_text="<results>/combined_text.md"
+    annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
+    heat_demand="<results>/{shapes}/aggregated/heat_demand.parquet",
+    heat_demand_visualization="<results>/{shapes}/visualization/heat_demand.html",
 
 
 # Load the example configuration. This will be overridden by users.
@@ -26,25 +28,32 @@ validate(config, workflow.source_path("internal/config.schema.yaml"))
 with open(workflow.source_path("internal/settings.yaml"), "r") as f:
     internal = yaml.safe_load(f)
 
+if config["years"]["start"] >= config["years"]["end"]:
+    raise ValueError(
+        "Configuration error: years.start must be less than years.end. "
+        "The end year is exclusive."
+    )
+
 
 # Add all your includes here.
 include: "rules/automatic.smk"
-include: "rules/dummy.smk"
+include: "rules/annual_heat_demand.smk"
+include: "rules/heat_timeseries.smk"
+
 
 # Add additional files to be delivered alongside the workflow here.
 # This is needed e.g. for python code files that are never
 # explicitly used as a script or input in a snakemake rule.
 # e.g.: workflow.source_path("scripts/_utils.py")
 
+
 rule all:
-    message:
-        "ERROR: Invalid `rule all:` call"
     default_target: True
     output:
         "INVALID",
     log:
         stderr="<logs>/all.stderr",
-    conda:
-        "envs/shell.yaml"
+    message:
+        "ERROR: Invalid `rule all:` call"
     shell:
         'echo "This workflow must be called as a snakemake module." > {log.stderr}'

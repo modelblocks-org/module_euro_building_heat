@@ -1,8 +1,59 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
-description: "Schema for user-provided configuration files."
+description: "Schema for user-provided heat demand configuration."
 type: object
 additionalProperties: false
+required:
+  - years
+  - threads
+  - scaling
+  - heat
 properties:
-  dummy_text:
-    description: A template example. Should be deleted in real applications.
-    type: string
+  years:
+    type: object
+    additionalProperties: false
+    required: [start, end]
+    properties:
+      start:
+        type: integer
+      end:
+        type: integer
+  threads:
+    type: object
+    additionalProperties: false
+    required: [aggregation]
+    properties:
+      aggregation:
+        type: integer
+        minimum: 1
+  scaling:
+    type: object
+    additionalProperties: false
+    required: [power]
+    properties:
+      power:
+        type: number
+        exclusiveMinimum: 0
+  heat:
+    type: object
+    additionalProperties: false
+    required: [tech_efficiencies, sfh_mfh_shares]
+    properties:
+      tech_efficiencies:
+        type: object
+        additionalProperties:
+          type: object
+          additionalProperties:
+            type: number
+      sfh_mfh_shares:
+        type: object
+        additionalProperties: false
+        required: [MFH, SFH]
+        properties:
+          MFH:
+            type: number
+            minimum: 0
+            maximum: 1
+          SFH:
+            type: number
+            minimum: 0
+            maximum: 1

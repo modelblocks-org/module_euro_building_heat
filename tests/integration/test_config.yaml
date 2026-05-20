@@ -1,4 +1,33 @@
 module_euro_building_heat:
-  dummy_text: >-
-    Configuration values (like this one) are also external to the module!
-    This gives users a lot of flexibility in how they apply your methodology to solve their particular needs.
+  years:
+    start: 2018
+    end: 2019
+  threads:
+    aggregation: 1
+  scaling:
+    power: 0.00001
+  heat:
+    tech_efficiencies:
+      space_heat:
+        gas-eff: 0.97
+        oil-eff: 0.9
+        solid-fossil-eff: 0.8
+        biofuel-eff: 0.8
+        solar-thermal-eff: 1
+        electricity-eff: 1
+      hot_water:
+        gas-eff: 0.97
+        oil-eff: 0.9
+        solid-fossil-eff: 0.8
+        biofuel-eff: 0.8
+        solar-thermal-eff: 1
+        electricity-eff: 1
+      cooking:
+        gas-eff: 0.28
+        oil-eff: 0.28
+        solid-fossil-eff: 0.15
+        biofuel-eff: 0.1
+        electricity-eff: 0.5
+    sfh_mfh_shares:
+      MFH: 0.45
+      SFH: 0.55
