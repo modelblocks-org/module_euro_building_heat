@@ -43,7 +43,7 @@ def process_jrc_heat_tertiary_sector_data(
         df_final_energy = _clean_df(df_final_energy, "final_energy")
         df_useful_energy = _clean_df(df_useful_energy, "useful_energy")
 
-        df = pd.concat([df_final_energy, df_useful_energy])
+        df = pd.concat([df_final_energy, df_useful_energy]).sort_index()
 
         df_elec = (
             df_summary.loc[

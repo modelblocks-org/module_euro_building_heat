@@ -106,9 +106,11 @@ def get_heat_demand(
         [electricity_demand, national_useful_heat_demand],
         [path_to_electricity_demand, path_to_output],
     ):
-        df.stack([0, 1]).squeeze().loc[country_codes].rename("value").pipe(
-            _fill_remaining_missing_values
-        ).to_csv(path)
+        result = df.stack([0, 1]).squeeze()
+        result = result.loc[
+            result.index.get_level_values("country_code").isin(country_codes)
+        ]
+        result.rename("value").pipe(_fill_remaining_missing_values).to_csv(path)
 
 
 def _get_energy_balances(
@@ -144,7 +146,29 @@ def _slice_energy_balance_by_sector(
     cat_codes: list[str],
     sector_code: str,
 ) -> pd.DataFrame:
-    df = df.loc[cat_codes]  # cat_code is always the first element
+    relevant_carriers = (
+        carrier_names_df[f"{sector_code}_carrier_name"].dropna().drop_duplicates()
+    )
+    countries = df.index.get_level_values("country").unique()
+    years = df.index.get_level_values("year").unique().sort_values()
+    relevant_index = pd.MultiIndex.from_product(
+        [relevant_carriers, countries],
+        names=["carrier_code", "country"],
+    )
+
+    available_cat_codes = [
+        cat_code
+        for cat_code in cat_codes
+        if cat_code in df.index.get_level_values("cat_code")
+    ]
+    if not available_cat_codes:
+        return (
+            pd.DataFrame(0, index=relevant_index, columns=years)
+            .rename_axis(["carrier_name", "country_code"], axis=0)
+            .rename_axis("year", axis=1)
+        )
+
+    df = df.loc[available_cat_codes]  # cat_code is always the first element
 
     assert df.index.get_level_values("unit").unique().tolist() == [
         "TJ"
@@ -160,9 +184,8 @@ def _slice_energy_balance_by_sector(
         )
         .groupby(by=["carrier_code", "country"], level=["carrier_code", "country"])
         .sum()
-        .loc[
-            list(set(carrier_names_df[f"{sector_code}_carrier_name"].dropna()))
-        ]  # remove carriers that are not relevant
+        .reindex(relevant_index, fill_value=0)
+        .reindex(columns=years, fill_value=0)
         .rename_axis(["carrier_name", "country_code"], axis=0)
     )
     return df
@@ -205,7 +228,7 @@ def _get_household_final_energy_demand(
     )
 
     # clean up renewables info
-    update_final_renewable_energy_demand(hh_end_use_df)
+    hh_end_use_df = update_final_renewable_energy_demand(hh_end_use_df)
 
     country_codes_ = {
         c: eurostat_to_alpha3(c)
@@ -229,7 +252,7 @@ def _get_household_final_energy_demand(
 
     # Add Swiss data
     ch_hh_end_use_df = read_ch_hh_final_demand(path_to_ch_end_use)
-    hh_end_use_df = hh_end_use_df.append(ch_hh_end_use_df, sort=True)
+    hh_end_use_df = pd.concat([hh_end_use_df, ch_hh_end_use_df], sort=True)
 
     # Clean up data
     hh_end_use_df = (
@@ -244,19 +267,34 @@ def _get_household_final_energy_demand(
 
 
 def _check_units_removed(df: pd.DataFrame, carrier_names_df: pd.DataFrame) -> bool:
+    cat_codes = [
+        cat_code
+        for cat_code in END_USE_CAT_NAMES
+        if cat_code in df.index.get_level_values("cat_code")
+    ]
+    carrier_codes = [
+        carrier_code
+        for carrier_code in carrier_names_df["hh_carrier_name"].dropna().index
+        if carrier_code in df.index.get_level_values("carrier_code")
+    ]
+    if not cat_codes or not carrier_codes:
+        return True
+
     df = (  # first re-organise df
         df.stack("year")
         .unstack("unit")
         .loc[
             idx[
-                list(END_USE_CAT_NAMES),
-                carrier_names_df["hh_carrier_name"].dropna().index,
+                cat_codes,
+                carrier_codes,
                 :,
                 :,
             ],
             :,
         ]
     )
+    if "TJ" not in df.columns:
+        return len(df) == 0
 
     # check that when 'TJ' is NaN, the other values are also NaN.
     # Otherwise, we are missing some data. Print the df below to check.
@@ -265,7 +303,7 @@ def _check_units_removed(df: pd.DataFrame, carrier_names_df: pd.DataFrame) -> bo
     return len(df) == 0
 
 
-def update_final_renewable_energy_demand(df: pd.DataFrame) -> None:
+def update_final_renewable_energy_demand(df: pd.DataFrame) -> pd.DataFrame:
     """Rescale renewable carrier sum so that it matches demand.
 
     Some household final energy data has a higher overall renewables energy demand
@@ -281,7 +319,11 @@ def update_final_renewable_energy_demand(df: pd.DataFrame) -> None:
             .where(lambda x: x > 0)
             .dropna(how="all")
         )
-        renewables_carriers = renewables.drop("RA000", axis=1).sum(axis=1, min_count=1)
+        if renewables.empty or "RA000" not in renewables.columns:
+            return renewables.iloc[0:0], pd.Series(dtype=float)
+        renewables_carriers = renewables.drop(
+            "RA000", axis=1, errors="ignore"
+        ).sum(axis=1, min_count=1)
         renewables_all = renewables.xs("RA000", axis=1)
         # Only update those rows where the sum of renewable energy carriers != RA000
         return (
@@ -308,11 +350,14 @@ def update_final_renewable_energy_demand(df: pd.DataFrame) -> None:
 
     updated_reordered = updated.stack().unstack("year").reorder_levels(df.index.names)
     # Add new rows
-    df = df.append(updated_reordered.loc[updated_reordered.index.difference(df.index)])
+    df = pd.concat(
+        [df, updated_reordered.loc[updated_reordered.index.difference(df.index)]]
+    )
     # Update existing rows
     df.update(updated_reordered)
     # Ensure everything has been updated as expected
     assert _get_rows_to_update(df)[0].empty
+    return df
 
 
 def read_ch_hh_final_demand(path_to_ch_end_use: str) -> pd.DataFrame:
@@ -367,13 +412,6 @@ def get_commercial_final_energy_demand(
     space heating and hot water in the commercial sector across all countries.
     Add Swiss data from Swiss govt. stats.
     """
-    # 'fuel' is just generic non-electric energy, which we distribute based on
-    # household data
-    ch_con_fuel = _read_ch_non_hh_non_electricity_demand(
-        path_to_ch_end_use, "Tabelle 25", annual_final_energy_demand
-    )
-    ch_con_elec = _read_ch_non_hh_electricity_demand(path_to_ch_end_use, "Tabelle26")
-
     jrc_end_use_df = (
         pd.read_csv(
             path_to_jrc_end_use,
@@ -395,37 +433,49 @@ def get_commercial_final_energy_demand(
         energy_balance, jrc_end_use_df, fill_missing_values, country_codes
     )
 
-    # Add Swiss data and ambient heat from heat pumps
-    mapped_end_uses = (
-        mapped_end_uses.append(
-            ch_con_fuel.rename({"process_heat": "cooking"}).reorder_levels(
-                mapped_end_uses.index.names
-            )
+    # Add Swiss data when Switzerland is in scope and ambient heat from heat pumps.
+    mapped_end_use_parts = [mapped_end_uses]
+    if "CHE" in country_codes:
+        # 'fuel' is just generic non-electric energy, which we distribute based on
+        # household data
+        ch_con_fuel = _read_ch_non_hh_non_electricity_demand(
+            path_to_ch_end_use, "Tabelle 25", annual_final_energy_demand
         )
-        .append(
-            ch_con_elec.rename({"process_heat": "cooking"}).reorder_levels(
-                mapped_end_uses.index.names
-            )
-        )
-        .append(
-            energy_balance.loc[  # JRC data only refers to heat pumps for heating in space heating  # noqa: E501
-                ["ambient_heat"]
+        ch_con_elec = _read_ch_non_hh_electricity_demand(path_to_ch_end_use, "Tabelle26")
+        mapped_end_use_parts.extend(
+            [
+                ch_con_fuel.rename({"process_heat": "cooking"}).reorder_levels(
+                    mapped_end_uses.index.names
+                ),
+                ch_con_elec.rename({"process_heat": "cooking"}).reorder_levels(
+                    mapped_end_uses.index.names
+                ),
             ]
-            .assign(end_use="space_heat")
-            .set_index("end_use", append=True)
-            .stack()
-            .reorder_levels(mapped_end_uses.index.names)
         )
+
+    mapped_end_use_parts.append(
+        energy_balance.loc[  # JRC data only refers to heat pumps for heating in space heating  # noqa: E501
+            ["ambient_heat"]
+        ]
+        .assign(end_use="space_heat")
+        .set_index("end_use", append=True)
+        .stack()
+        .reorder_levels(mapped_end_uses.index.names)
     )
+    mapped_end_uses = pd.concat(mapped_end_use_parts)
     mapped_end_uses.index = mapped_end_uses.index.remove_unused_levels()
 
-    annual_final_energy_demand = annual_final_energy_demand.append(
-        mapped_end_uses.where(mapped_end_uses > 0)
-        .dropna()
-        .unstack("year")[annual_final_energy_demand.columns]
-        .assign(cat_name="commercial")
-        .set_index("cat_name", append=True)
-        .reorder_levels(annual_final_energy_demand.index.names)
+    annual_final_energy_demand = pd.concat(
+        [
+            annual_final_energy_demand,
+            mapped_end_uses.where(mapped_end_uses > 0)
+            .dropna()
+            .unstack("year")
+            .reindex(columns=annual_final_energy_demand.columns)
+            .assign(cat_name="commercial")
+            .set_index("cat_name", append=True)
+            .reorder_levels(annual_final_energy_demand.index.names),
+        ]
     ).sort_index()
 
     return annual_final_energy_demand
@@ -454,6 +504,9 @@ def _map_jrc_to_eurostat(
         fill_missing_values=fill_missing_values,
         country_codes=country_codes,
     )
+    jrc_end_use_percent = _extend_jrc_share_years(
+        jrc_end_use_percent, energy_balance.columns
+    )
 
     mapped_end_uses = (
         jrc_end_use_percent.align(energy_balance.stack())[1]
@@ -462,6 +515,25 @@ def _map_jrc_to_eurostat(
     )
 
     return mapped_end_uses
+
+
+def _extend_jrc_share_years(
+    jrc_end_use_percent: pd.DataFrame, target_years: pd.Index
+) -> pd.DataFrame:
+    """Copy the latest available JRC end-use shares to missing target years."""
+    jrc_end_use_percent = jrc_end_use_percent.unstack("year")
+    available_years = sorted(jrc_end_use_percent.columns)
+    if not available_years:
+        return jrc_end_use_percent.stack()
+
+    for target_year in target_years:
+        if target_year in jrc_end_use_percent.columns:
+            continue
+        fallback_years = [year for year in available_years if year <= target_year]
+        fallback_year = fallback_years[-1] if fallback_years else available_years[-1]
+        jrc_end_use_percent[target_year] = jrc_end_use_percent[fallback_year]
+
+    return jrc_end_use_percent.sort_index(axis=1).stack()
 
 
 def _fill_missing_countries_and_years(
@@ -482,12 +554,19 @@ def _fill_missing_countries_and_years(
     ):  # it's fine. Just checking there is no MultiIndex in the columns
         jrc_data = jrc_data.loc[:, "value"]
     for country, neighbors in fill_missing_values.items():
-        jrc_data = jrc_data.assign(**{country: jrc_data[neighbors].mean(axis=1)})
+        available_neighbors = [
+            neighbor for neighbor in neighbors if neighbor in jrc_data.columns
+        ]
+        if available_neighbors:
+            jrc_data = jrc_data.assign(
+                **{country: jrc_data[available_neighbors].mean(axis=1)}
+            )
 
     jrc_data = jrc_data.stack().unstack("year")
-    jrc_data = jrc_data.assign(
-        **{str(year): jrc_data[2015] for year in range(2016, 2019)}
-    )
+    if 2015 in jrc_data.columns:
+        jrc_data = jrc_data.assign(
+            **{str(year): jrc_data[2015] for year in range(2016, 2019)}
+        )
     jrc_data.columns = jrc_data.columns.astype(int)
     return jrc_data.stack()
 
@@ -526,13 +605,16 @@ def _read_ch_non_hh_non_electricity_demand(
         ("CHE", "household"), level=("country_code", "cat_name")
     )
     hh_ratios = hh_con.div(
-        hh_con.drop("electricity", level="carrier_name").sum(level=["end_use"]), axis=0
+        hh_con.drop("electricity", level="carrier_name", errors="ignore")
+        .groupby(level=["end_use"])
+        .sum(),
+        axis=0,
     )
     ch_con_disaggregated = hh_ratios.mul(ch_con, level="end_use", axis=0).dropna(
         how="all"
     )
 
-    assert np.allclose(ch_con_disaggregated.sum(level="end_use"), ch_con)
+    assert np.allclose(ch_con_disaggregated.groupby(level="end_use").sum(), ch_con)
     ch_con = ch_con_disaggregated.reset_index("carrier_name")
     return (
         ch_con.assign(country_code="CHE")
@@ -558,19 +640,47 @@ def hardcoded_country_cleanup(
     biomass fuel = 69%, electricity = 28%, oil/solid fossil fuel = 1-2%
     See The World Bank Montenegro Second Energy Efficiency Project (P165509)
     """
+    if "MNE" not in energy_balance_df.index.get_level_values("country_code"):
+        return annual_final_energy_demand
+    if "MNE" not in annual_final_energy_demand.index.get_level_values("country_code"):
+        return annual_final_energy_demand
+
     MNE_energy_balance = energy_balance_df.loc[idx[:, "MNE"], :]
-    MNE_heat_electricity_demand = MNE_energy_balance.loc["biofuel"] * 0.28 / 0.69
-    MNE_energy_balance.loc["electricity"].update(
-        MNE_heat_electricity_demand
-    )  # FIXME this line is broken. It does not do anything.
+    if {"biofuel", "electricity"}.issubset(
+        MNE_energy_balance.index.get_level_values("carrier_name")
+    ):
+        MNE_heat_electricity_demand = MNE_energy_balance.loc["biofuel"] * 0.28 / 0.69
+        MNE_energy_balance.loc["electricity"].update(
+            MNE_heat_electricity_demand
+        )  # FIXME this line is broken. It does not do anything.
     neighbours = ["SRB", "HRV", "ALB", "BIH"]
+    available_neighbours = [
+        country
+        for country in neighbours
+        if country in annual_final_energy_demand.index.get_level_values("country_code")
+    ]
+    available_end_uses = [
+        end_use
+        for end_use in END_USE_CAT_NAMES.values()
+        if end_use in annual_final_energy_demand.index.get_level_values("end_use")
+    ]
+    if (
+        not available_neighbours
+        or not available_end_uses
+        or "household"
+        not in annual_final_energy_demand.index.get_level_values("cat_name")
+    ):
+        return annual_final_energy_demand
+
     neighbour_demand = annual_final_energy_demand.loc[
-        idx[list(END_USE_CAT_NAMES.values()), :, neighbours, ["household"]], :
+        idx[available_end_uses, :, available_neighbours, ["household"]], :
     ]
     end_use_contributions = (
-        neighbour_demand.sum(level=["end_use", "country_code", "cat_name"])
-        .div(neighbour_demand.sum(level="country_code"))
-        .mean(level=["end_use", "cat_name"])
+        neighbour_demand.groupby(level=["end_use", "country_code", "cat_name"])
+        .sum()
+        .div(neighbour_demand.groupby(level="country_code").sum())
+        .groupby(level=["end_use", "cat_name"])
+        .mean()
     )
     MNE_end_use = (
         end_use_contributions.stack()
@@ -581,8 +691,8 @@ def hardcoded_country_cleanup(
         .reorder_levels(annual_final_energy_demand.index.names)
     )
     MNE_end_use = MNE_end_use.where(MNE_end_use > 0).dropna(how="all")
-    annual_final_energy_demand = annual_final_energy_demand.append(
-        MNE_end_use, sort=True
+    annual_final_energy_demand = pd.concat(
+        [annual_final_energy_demand, MNE_end_use], sort=True
     ).sort_index()
 
     return annual_final_energy_demand
@@ -596,19 +706,27 @@ def _fill_data_gaps(
     # Fill the household sector's end-use data based on total sectoral demand
     hh_country_energy_balance = (
         energy_balance_dfs["hh"]
-        .sum(level="country_code")
+        .groupby(level="country_code")
+        .sum()
         .stack()
         .where(lambda x: x > 0)
     )
 
-    end_use_df.loc[:, idx[:, "household"]] = end_use_df.loc[
-        :, idx[:, "household"]
-    ].fillna(
-        end_use_df.loc[:, idx[:, "household"]]
-        .div(hh_country_energy_balance, axis=0)
-        .mean(level="country_code")
-        .mul(hh_country_energy_balance, level="country_code", axis=0)
-    )
+    if (
+        isinstance(end_use_df.columns, pd.MultiIndex)
+        and "cat_name" in end_use_df.columns.names
+        and "household" in end_use_df.columns.get_level_values("cat_name")
+    ):
+        household_columns = (
+            end_use_df.columns.get_level_values("cat_name") == "household"
+        )
+        household_demand = end_use_df.loc[:, household_columns]
+        end_use_df.loc[:, household_columns] = household_demand.fillna(
+            household_demand.div(hh_country_energy_balance, axis=0)
+            .groupby(level="country_code")
+            .mean()
+            .mul(hh_country_energy_balance, level="country_code", axis=0)
+        )
 
     end_use_df = end_use_df.where(end_use_df > 0)
 
@@ -628,10 +746,14 @@ def get_annual_electricity_demand(
     To remove later from the electricity demand profile.
     Gaps in electricity demand are filled before saving, based on annual energy demand.
     """
+    electricity_carriers = ["electricity", "direct_electric", "heat_pump"]
+    demand = annual_final_energy_demand.drop("end_use_electricity", errors="ignore")
+    demand = demand.loc[
+        demand.index.get_level_values("carrier_name").isin(electricity_carriers)
+    ]
     electricity_demand = (
-        annual_final_energy_demand.drop("end_use_electricity")
-        .loc[idx[:, ["electricity", "direct_electric", "heat_pump"], :, :], :]
-        .sum(level=["end_use", "country_code", "cat_name"])
+        demand.groupby(level=["end_use", "country_code", "cat_name"])
+        .sum()
         .stack()
         .unstack(["end_use", "cat_name"])
     )
@@ -650,10 +772,13 @@ def get_national_useful_heat_demand(
     """Derive useful heat demand from final energy demand."""
     demands = []
     for end_use in ["space_heat", "hot_water", "cooking"]:
+        if end_use not in annual_final_energy_demand.index.get_level_values("end_use"):
+            continue
         _demand = (
             annual_final_energy_demand.loc[[end_use]]
             .mul(_efficiencies(heat_tech_params[end_use]), level="carrier_name", axis=0)
-            .sum(level=["end_use", "country_code", "cat_name"])
+            .groupby(level=["end_use", "country_code", "cat_name"])
+            .sum()
         )
         # sense check: useful demand is at least the minimum efficiency * final demand
         assert (
@@ -662,13 +787,17 @@ def get_national_useful_heat_demand(
                 >= (
                     annual_final_energy_demand.loc[[end_use]]
                     .mul(_efficiencies(heat_tech_params[end_use]).min())
-                    .sum(level=["end_use", "country_code", "cat_name"])
+                    .groupby(level=["end_use", "country_code", "cat_name"])
+                    .sum()
                 )
             )
             .all()
             .all()
         )
         demands.append(_demand)
+
+    if not demands:
+        return pd.DataFrame()
 
     demand = pd.concat(demands).stack().unstack(["end_use", "cat_name"])
 
@@ -709,7 +838,7 @@ def _get_ch_sheet(
 ) -> pd.DataFrame:
     df = pd.read_excel(
         path_to_excel, sheet_name=sheet, skiprows=9, skipfooter=skipfooter, index_col=1
-    ).drop(["Unnamed: 0", "Δ ’00 – ’18"], axis=1)
+    ).drop(["Unnamed: 0", "Δ ’00 – ’18"], axis=1, errors="ignore")
     df.index = df.index.str.strip()
     df.columns = df.columns.astype(int)
     df = df.drop(2019, axis=1, errors="ignore")

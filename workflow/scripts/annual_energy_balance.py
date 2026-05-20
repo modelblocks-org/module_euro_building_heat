@@ -2,6 +2,7 @@
 
 from enum import Enum
 from string import digits
+import warnings
 
 import pandas as pd
 
@@ -10,6 +11,13 @@ idx = pd.IndexSlice
 EUROSTAT_TO_ALPHA3 = {"EL": "GRC", "UK": "GBR"}
 GWH_TO_TJ = 3.6
 TJ_TO_TWH = 1 / 3600
+
+warnings.filterwarnings(
+    "ignore",
+    message="Print area cannot be set to Defined name:.*",
+    category=UserWarning,
+    module="openpyxl.reader.workbook",
+)
 
 
 def eurostat_to_alpha3(country_code: str) -> str:
@@ -70,7 +78,12 @@ def generate_annual_energy_balance_nc(
         .set_index("country", append=True)
     )
     df.columns = df.columns.astype(int).rename("year")
-    df = df.loc[idx[cat_names.index, carrier_names.index, "TJ"], :].dropna(how="all")
+    keep_rows = (
+        df.index.isin(cat_names.index, level="cat_code")
+        & df.index.isin(carrier_names.index, level="carrier_code")
+        & df.index.isin(["TJ"], level="unit")
+    )
+    df = df.loc[keep_rows, :].dropna(how="all")
     df = df.sort_index(axis=1).loc[:, first_year:]
 
     tdf = df.stack()
@@ -96,19 +109,19 @@ def _add_ch_energy_balance(path_to_ch_excel, path_to_ch_industry_excel, index_le
         path_to_ch_excel,
         household_sheet,
         skipfooter=9,
-        cat_code=CAT_CODE.FINAL_CONSUMPTION_HOUSEHOLD_CATEGORY,
+        cat_code=CAT_CODE.FINAL_CONSUMPTION_HOUSEHOLD_CATEGORY.value,
     )
     ch_ind_energy_use = _get_ch_energy_balance_sheet(
         path_to_ch_excel,
         industry_sheet,
         skipfooter=12,
-        cat_code=CAT_CODE.FINAL_CONSUMPTION_INDUSTRY_CATEGORY,
+        cat_code=CAT_CODE.FINAL_CONSUMPTION_INDUSTRY_CATEGORY.value,
     )
     ch_ser_energy_use = _get_ch_energy_balance_sheet(
         path_to_ch_excel,
         other_sectors_sheet,
         skipfooter=12,
-        cat_code=CAT_CODE.FINAL_CONSUMPTION_OTHER_SECTORS_COMMERCIAL_PUBLIC_SERVICES,
+        cat_code=CAT_CODE.FINAL_CONSUMPTION_OTHER_SECTORS_COMMERCIAL_PUBLIC_SERVICES.value,
     )
 
     ch_waste_energy_use = get_ch_waste_consumption(path_to_ch_excel)

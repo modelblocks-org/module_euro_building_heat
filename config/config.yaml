@@ -1,8 +1,8 @@
 # Minimal example configuration for the heat demand workflow.
 years:
   # End year is exclusive, matching the Modelblocks module convention.
-  start: 2018
-  end: 2019
+  start: 2016
+  end: 2017
 
 threads:
   aggregation: 4
