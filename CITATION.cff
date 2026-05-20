@@ -1,0 +1,11 @@
+# Citation file
+# For more information, see:
+# https://citation-file-format.github.io/
+cff-version: 1.2.0
+message: If you use this software or data produced by it, please cite it using the metadata from this file.
+title: "Modelblocks - module_euro_building_heat: Euro building heat"
+repository: "https://github.com/modelblocks-org/module_euro_building_heat"
+license: Apache-2.0
+authors:
+  - given-names: Yannick
+    family-names: Egberink
