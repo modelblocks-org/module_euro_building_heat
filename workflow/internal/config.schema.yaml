@@ -17,6 +17,13 @@ properties:
         type: integer
       end:
         type: integer
+  weather:
+    type: object
+    additionalProperties: false
+    required: [year]
+    properties:
+      year:
+        type: integer
   threads:
     type: object
     additionalProperties: false
@@ -25,6 +32,13 @@ properties:
       aggregation:
         type: integer
         minimum: 1
+  population:
+    type: object
+    additionalProperties: false
+    properties:
+      resolution:
+        type: integer
+        enum: [100, 1000]
   scaling:
     type: object
     additionalProperties: false

@@ -1,8 +1,8 @@
 """Prepare annual energy balance data for heat demand calculations."""
 
+import warnings
 from enum import Enum
 from string import digits
-import warnings
 
 import pandas as pd
 
@@ -57,16 +57,9 @@ def generate_annual_energy_balance_nc(
     cat_names = pd.read_csv(path_to_cat_names, header=0, index_col=0)
     carrier_names = pd.read_csv(path_to_carrier_names, header=0, index_col=0)
 
-    df = pd.read_csv(
+    df = _read_eurostat_tsv(
         path_to_energy_balance,
-        delimiter="\t",
-        index_col=0,
-        na_values=[":", ": ", ": z"],
-    )
-    df.index = (
-        df.index.str.split(",", expand=True).rename(
-            ["cat_code", "carrier_code", "unit", "country"]
-        )  # comes as 'nrg_bal,siec,unit,geo\\time'
+        index_names=["cat_code", "carrier_code", "unit", "country"],
     )
     not_countries = [c for c in df.reset_index().country.unique() if len(c) > 2] + [
         "XK"
@@ -77,13 +70,12 @@ def generate_annual_energy_balance_nc(
         .assign(country=lambda df: df.country.map(eurostat_to_alpha3))
         .set_index("country", append=True)
     )
-    df.columns = df.columns.astype(int).rename("year")
     keep_rows = (
         df.index.isin(cat_names.index, level="cat_code")
         & df.index.isin(carrier_names.index, level="carrier_code")
         & df.index.isin(["TJ"], level="unit")
     )
-    df = df.loc[keep_rows, :].dropna(how="all")
+    df = _eurostat_values_to_numeric(df.loc[keep_rows, :]).dropna(how="all")
     df = df.sort_index(axis=1).loc[:, first_year:]
 
     tdf = df.stack()
@@ -98,6 +90,38 @@ def generate_annual_energy_balance_nc(
     # TODO treat missing values if necessary
 
     tdf.rename("value").to_csv(path_to_result)
+
+
+def _read_eurostat_tsv(path: str, index_names: list[str]) -> pd.DataFrame:
+    """Read Eurostat TSV data from old bulk files or the SDMX API TSV format."""
+    df = pd.read_csv(path, delimiter="\t", index_col=0)
+    index = df.index.str.split(",", expand=True)
+
+    if index.nlevels == len(index_names) + 1:
+        index = index.rename(["freq", *index_names])
+        df.index = index
+        if "A" not in df.index.get_level_values("freq"):
+            raise ValueError(f"Eurostat file {path} does not contain annual data.")
+        df = df.xs("A", level="freq")
+    elif index.nlevels == len(index_names):
+        df.index = index.rename(index_names)
+    else:
+        raise ValueError(
+            f"Unexpected Eurostat index format in {path}: "
+            f"expected {len(index_names)} or {len(index_names) + 1} fields, "
+            f"found {index.nlevels}."
+        )
+
+    df.columns = pd.Index([int(str(col).strip()) for col in df.columns], name="year")
+    return df
+
+
+def _eurostat_values_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
+    return df.apply(
+        lambda column: pd.to_numeric(
+            column.astype(str).str.strip().str.split().str[0], errors="coerce"
+        )
+    )
 
 
 def _add_ch_energy_balance(path_to_ch_excel, path_to_ch_industry_excel, index_levels):

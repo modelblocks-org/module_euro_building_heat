@@ -3,19 +3,36 @@
 import math
 
 import geopandas as gpd
-import pandas as pd
-import rasterio
+import rioxarray
 import xarray as xr
-from rasterstats import zonal_stats
+from gregor.aggregate import aggregate_raster_to_polygon
 
 EPSG_3035 = "EPSG:3035"
 WGS84 = "EPSG:4326"
 GRIDBOX_SIZE = 25000  # MERRA-2 grid
-idx = pd.IndexSlice
 
 
-# FIXME this will most likely be entirely replaced once a more generalised way to deal
-# with spatial units is available
+def _normalise_shape_ids(locations: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    required = {"shape_id", "geometry"}
+    missing = required.difference(locations.columns)
+    if missing:
+        raise ValueError(f"Missing required shape columns: {sorted(missing)}")
+    if locations.crs is None:
+        raise ValueError("The shapes parquet file must define a CRS.")
+
+    locations = locations.rename(columns={"shape_id": "id"}).copy()
+    locations["id"] = locations["id"].astype(str).str.replace(".", "-", regex=False)
+    if locations["id"].duplicated().any():
+        duplicate_ids = sorted(
+            locations.loc[locations["id"].duplicated(keep=False), "id"].unique()
+        )
+        raise ValueError(
+            "Shapes contain duplicate IDs after replacing '.' with '-': "
+            f"{duplicate_ids}"
+        )
+    return locations
+
+
 def population_on_weather_grid(
     path_to_population: str,
     path_to_locations: str,
@@ -32,9 +49,7 @@ def population_on_weather_grid(
     coordinate_ds = xr.open_dataset(path_to_coordinates)
 
     # Locations are parquet shape files at the resolution of interest.
-    locations = gpd.read_parquet(path_to_locations)
-    locations = locations.rename(columns={"shape_id": "id"})
-    locations["id"] = locations["id"].str.replace(".", "-", regex=False)
+    locations = _normalise_shape_ids(gpd.read_parquet(path_to_locations))
 
     gridbox_points = gpd.GeoDataFrame(
         geometry=gpd.points_from_xy(
@@ -50,37 +65,31 @@ def population_on_weather_grid(
     gridbox = gpd.GeoDataFrame(
         gridbox_points.index.to_frame(),
         geometry=gridbox_points.buffer(GRIDBOX_SIZE).envelope,
+        crs=EPSG_3035,
     )
+    locations_3035 = locations.to_crs(EPSG_3035)
+    minx, miny, maxx, maxy = locations_3035.total_bounds
+    gridbox = gridbox.cx[
+        minx - GRIDBOX_SIZE : maxx + GRIDBOX_SIZE,
+        miny - GRIDBOX_SIZE : maxy + GRIDBOX_SIZE,
+    ]
+    if gridbox.empty:
+        raise ValueError("No weather gridboxes overlap the provided shapes.")
+
     # Create new shapes that are either complete gridboxes or partial ones that
     # sit inside a specific location.
-    gridboxes_mapped_to_locations = gpd.overlay(
-        gridbox.to_crs(WGS84), locations.to_crs(WGS84)
+    gridboxes_mapped_to_locations = gpd.overlay(gridbox, locations_3035)
+    if gridboxes_mapped_to_locations.empty:
+        raise ValueError("No weather gridbox polygons intersect the provided shapes.")
+
+    population = rioxarray.open_rasterio(path_to_population, masked=True).squeeze(
+        drop=True
     )
-
-    with rasterio.open(path_to_population) as src:
-        population = src.read(1)
-        meta = src.meta
-        affine = src.transform
-
-        population_per_complete_or_partial_gridbox_polygon = zonal_stats(
-            gridboxes_mapped_to_locations.to_crs(meta["crs"]),
-            population,
-            affine=affine,
-            stats="sum",
-            nodata=meta["nodata"],
-        )
-        gridboxes_mapped_to_locations["population"] = [
-            i["sum"] for i in population_per_complete_or_partial_gridbox_polygon
-        ]
-
-        population_per_zone = zonal_stats(
-            locations.to_crs(meta["crs"]),
-            population,
-            affine=affine,
-            stats="sum",
-            nodata=meta["nodata"],
-        )
-        locations["population"] = [i["sum"] for i in population_per_zone]
+    population = population.fillna(0)
+    gridboxes_mapped_to_locations = _aggregate_population_to_polygons(
+        population, gridboxes_mapped_to_locations
+    )
+    locations = _aggregate_population_to_polygons(population, locations)
 
     # Confirm that the total population is valid (haven't picked up or lost regions).
     # The gridboxes cover all land with population that we are interested in.
@@ -94,6 +103,15 @@ def population_on_weather_grid(
         gridboxes_mapped_to_locations.set_index(["site", "id"]).population
     )
     population_da.to_netcdf(out_path)
+
+
+def _aggregate_population_to_polygons(
+    population: xr.DataArray, polygons: gpd.GeoDataFrame
+) -> gpd.GeoDataFrame:
+    aggregated = aggregate_raster_to_polygon(population, polygons, stats="sum")
+    polygons = polygons.copy()
+    polygons["population"] = aggregated["sum"].to_numpy()
+    return polygons
 
 
 if __name__ == "__main__":

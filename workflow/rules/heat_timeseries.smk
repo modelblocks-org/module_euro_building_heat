@@ -15,6 +15,7 @@ rule unscaled_heat_profiles:
     params:
         first_year=config["years"]["start"],
         final_year=config["years"]["end"] - 1,
+        weather_year=config["weather"]["year"],
     message:
         "Generate gridded heat demand profile shapes from weather data."
     script:

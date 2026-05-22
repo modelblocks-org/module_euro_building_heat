@@ -1,11 +1,20 @@
 # Minimal example configuration for the heat demand workflow.
 years:
   # End year is exclusive, matching the Modelblocks module convention.
-  start: 2016
-  end: 2017
+  start: 2020
+  end: 2021
+
+weather:
+  # Weather data year used to shape hourly heat demand profiles.
+  year: 2018
 
 threads:
-  aggregation: 4
+  aggregation: 8
+
+population:
+  # GHSL GHS-POP resolution in metres. 100 m is the most precise available
+  # Mollweide grid; use 1000 for a smaller, faster download.
+  resolution: 1000
 
 scaling:
   # Convert MWh to the power unit expected by the downstream model.

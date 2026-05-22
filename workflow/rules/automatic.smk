@@ -1,5 +1,7 @@
 """Rules to download automatic resource files for heat demand."""
 
+CURL_ARGS = "--fail --silent --show-error --location --retry 5 --retry-delay 5 --retry-all-errors --continue-at -"
+
 
 rule download_when2heat_params:
     output:
@@ -26,7 +28,7 @@ rule download_when2heat_params:
     message:
         "Download When2Heat demand profile parameters."
     shell:
-        "mkdir -p {output} && curl -f -sSLo '{output}/#1' '{params.url}' 2> {log}"
+        "mkdir -p {output} && curl {CURL_ARGS} --output '{output}/#1' '{params.url}' 2> {log}"
 
 
 rule download_gridded_weather_data:
@@ -43,29 +45,32 @@ rule download_gridded_weather_data:
     message:
         "Download gridded {wildcards.data_var} data."
     shell:
-        "curl -f -sSLo {output} '{params.dataset_url}/files/{wildcards.data_var}.nc' 2> {log}"
+        "curl {CURL_ARGS} --output {output}.tmp '{params.dataset_url}/files/{wildcards.data_var}.nc' 2> {log} && mv {output}.tmp {output}"
 
 
 rule download_raw_population:
     output:
-        temp("<resources>/automatic/raw-population-data.zip"),
+        temp(f"<resources>/automatic/{ghsl_population['stem']}_V1_0.zip"),
     log:
         "<logs>/automatic/download_raw_population.log",
     conda:
         "../envs/shell.yaml"
     params:
-        url=internal["resources"]["automatic"]["population"],
+        url=(
+            internal["resources"]["automatic"]["population"]
+            + f"/{ghsl_population['stem']}/V1-0/{ghsl_population['stem']}_V1_0.zip"
+        ),
     message:
-        "Download gridded population data."
+        f"Download GHSL gridded population data for {ghsl_population['epoch']} at {ghsl_population['resolution']} m."
     shell:
-        "curl -f -sSLo {output} '{params.url}' 2> {log}"
+        "curl {CURL_ARGS} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
 
 rule unzip_raw_population:
     input:
         rules.download_raw_population.output,
     output:
-        "<resources>/automatic/JRC_1K_POP_2018.tif",
+        f"<resources>/automatic/{ghsl_population['stem']}_V1_0.tif",
     log:
         "<logs>/automatic/unzip_raw_population.log",
     conda:
@@ -73,7 +78,7 @@ rule unzip_raw_population:
     message:
         "Extract gridded population data."
     shell:
-        "unzip -p '{input}' 'JRC_1K_POP_2018.tif' > '{output}' 2> {log}"
+        f"unzip -p '{{input}}' '{ghsl_population['stem']}_V1_0.tif' > '{{output}}' 2> {{log}}"
 
 
 JRC_IDEES_SPATIAL_SCOPE = internal["resources"]["automatic"]["jrc_idees_spatial_scope"]
@@ -93,7 +98,7 @@ rule download_jrc_idees:
     message:
         "Download JRC-IDEES data for {wildcards.country_code}."
     shell:
-        "curl -f -sSLo {output} '{params.dataset_url}/JRC-IDEES-2015_All_xlsx_{wildcards.country_code}.zip' 2> {log}"
+        "curl {CURL_ARGS} --output {output}.tmp '{params.dataset_url}/JRC-IDEES-2021_{wildcards.country_code}.zip' 2> {log} && mv {output}.tmp {output}"
 
 
 rule unzip_jrc_idees:
@@ -110,7 +115,7 @@ rule unzip_jrc_idees:
     message:
         "Extract JRC-IDEES tertiary sector data for {wildcards.country_code}."
     shell:
-        "unzip -p {input.country_data} JRC-IDEES-2015_Tertiary_{wildcards.country_code}.xlsx > {output} 2> {log}"
+        "unzip -p {input.country_data} JRC-IDEES-2021_Tertiary_{wildcards.country_code}.xlsx > {output} 2> {log}"
 
 
 rule download_eurostat_energy_data:
@@ -127,7 +132,7 @@ rule download_eurostat_energy_data:
     message:
         "Download {wildcards.dataset} Eurostat data."
     shell:
-        "curl -f -sSLo {output} {params.url} 2> {log}"
+        "curl {CURL_ARGS} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
 
 rule download_swiss_energy_data:
@@ -144,4 +149,4 @@ rule download_swiss_energy_data:
     message:
         "Download {wildcards.dataset} Swiss energy statistics."
     shell:
-        "curl -f -sSLo {output} {params.url} 2> {log}"
+        "curl {CURL_ARGS} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"

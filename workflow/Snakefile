@@ -28,11 +28,27 @@ validate(config, workflow.source_path("internal/config.schema.yaml"))
 with open(workflow.source_path("internal/settings.yaml"), "r") as f:
     internal = yaml.safe_load(f)
 
+config.setdefault("population", {})
+config["population"].setdefault("resolution", 100)
+config.setdefault("weather", {})
+config["weather"].setdefault("year", 2018)
+
 if config["years"]["start"] >= config["years"]["end"]:
     raise ValueError(
         "Configuration error: years.start must be less than years.end. "
         "The end year is exclusive."
     )
+
+population_epoch = min(
+    internal["resources"]["automatic"]["population_epochs"],
+    key=lambda year: abs(year - config["years"]["start"]),
+)
+population_resolution = config["population"]["resolution"]
+ghsl_population = {
+    "epoch": population_epoch,
+    "resolution": population_resolution,
+    "stem": f"GHS_POP_E{population_epoch}_GLOBE_R2023A_54009_{population_resolution}",
+}
 
 
 # Add all your includes here.

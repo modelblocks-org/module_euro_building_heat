@@ -1,7 +1,5 @@
 """Calculate annual useful heat demand from energy statistics."""
 
-from contextlib import suppress  # FIXME: please do not do this.
-
 import numpy as np
 import pandas as pd
 
@@ -52,6 +50,38 @@ def eurostat_to_alpha3(country_code: str) -> str:
     import pycountry
 
     return pycountry.countries.get(alpha_2=country_code).alpha_3
+
+
+def _read_eurostat_tsv(path: str, index_names: list[str]) -> pd.DataFrame:
+    """Read Eurostat TSV data from old bulk files or the SDMX API TSV format."""
+    df = pd.read_csv(path, delimiter="\t", index_col=0)
+    index = df.index.str.split(",", expand=True)
+
+    if index.nlevels == len(index_names) + 1:
+        index = index.rename(["freq", *index_names])
+        df.index = index
+        if "A" not in df.index.get_level_values("freq"):
+            raise ValueError(f"Eurostat file {path} does not contain annual data.")
+        df = df.xs("A", level="freq")
+    elif index.nlevels == len(index_names):
+        df.index = index.rename(index_names)
+    else:
+        raise ValueError(
+            f"Unexpected Eurostat index format in {path}: "
+            f"expected {len(index_names)} or {len(index_names) + 1} fields, "
+            f"found {index.nlevels}."
+        )
+
+    df.columns = pd.Index([int(str(col).strip()) for col in df.columns], name="year")
+    return df
+
+
+def _eurostat_values_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
+    return df.apply(
+        lambda column: pd.to_numeric(
+            column.astype(str).str.strip().str.split().str[0], errors="coerce"
+        )
+    )
 
 
 def get_heat_demand(
@@ -110,7 +140,7 @@ def get_heat_demand(
         result = result.loc[
             result.index.get_level_values("country_code").isin(country_codes)
         ]
-        result.rename("value").pipe(_fill_remaining_missing_values).to_csv(path)
+        result.rename("value").pipe(_check_no_remaining_missing_values).to_csv(path)
 
 
 def _get_energy_balances(
@@ -197,14 +227,10 @@ def _get_household_final_energy_demand(
     """Read data on household final energy demand."""
     carrier_names_df = pd.read_csv(path_to_carrier_names, index_col=0, header=0)
 
-    # Index name in TSV file is 'nrg_bal,siec,unit,geo\time'
-    hh_end_use_df = pd.read_csv(
-        path_to_hh_end_use, delimiter="\t", index_col=0, na_values=[":", ": ", ": z"]
+    hh_end_use_df = _read_eurostat_tsv(
+        path_to_hh_end_use,
+        index_names=["cat_code", "carrier_code", "unit", "country_code"],
     )
-    hh_end_use_df.index = hh_end_use_df.index.str.split(",", expand=True).rename(
-        ["cat_code", "carrier_code", "unit", "country_code"]
-    )
-    hh_end_use_df.columns = hh_end_use_df.columns.astype(int).rename("year")
 
     # remove 'countries' which are not relevant
     not_countries = [
@@ -222,7 +248,7 @@ def _get_household_final_energy_demand(
 
     # Just keep relevant data
     hh_end_use_df = (
-        hh_end_use_df.xs("TJ", level="unit")
+        _eurostat_values_to_numeric(hh_end_use_df.xs("TJ", level="unit"))
         .mul(TJ_TO_TWH)  # TJ -> TWh
         .dropna(how="all")
     )
@@ -549,10 +575,14 @@ def _fill_missing_countries_and_years(
         if country in country_codes and country != "CHE"
     }
     jrc_data = jrc_data.unstack("country_code")
-    with suppress(
-        KeyError
-    ):  # it's fine. Just checking there is no MultiIndex in the columns
+    if isinstance(jrc_data.columns, pd.MultiIndex):
+        if "value" not in jrc_data.columns.get_level_values(0):
+            raise ValueError(
+                "Unexpected JRC data columns after unstacking country_code: "
+                f"{jrc_data.columns.tolist()}"
+            )
         jrc_data = jrc_data.loc[:, "value"]
+
     for country, neighbors in fill_missing_values.items():
         available_neighbors = [
             neighbor for neighbor in neighbors if neighbor in jrc_data.columns
@@ -563,10 +593,6 @@ def _fill_missing_countries_and_years(
             )
 
     jrc_data = jrc_data.stack().unstack("year")
-    if 2015 in jrc_data.columns:
-        jrc_data = jrc_data.assign(
-            **{str(year): jrc_data[2015] for year in range(2016, 2019)}
-        )
     jrc_data.columns = jrc_data.columns.astype(int)
     return jrc_data.stack()
 
@@ -625,76 +651,14 @@ def _read_ch_non_hh_non_electricity_demand(
     )
 
 
-# FIXME: this function is surprising.
-# Why is a special case treatment necessary for Montenegro?
-# Montenegro is missing from JRC IDEES like all Western Balkan countries.
-# The data that is supposed to be filled in this function is in fact existing.
-# See https://github.com/calliope-project/euro-calliope/issues/298.
 def hardcoded_country_cleanup(
     annual_final_energy_demand: pd.DataFrame, energy_balance_df: pd.DataFrame
 ) -> pd.DataFrame:
-    """Hard coded country cleanup steps.
+    """Return annual demand unchanged.
 
-    Montenegro data isn't in the database, so we combine estimates from the World bank
-    with average end use contributions of neighbouring countries
-    biomass fuel = 69%, electricity = 28%, oil/solid fossil fuel = 1-2%
-    See The World Bank Montenegro Second Energy Efficiency Project (P165509)
+    Live Eurostat data includes Montenegro, so synthetic Montenegro calculations
+    are intentionally disabled to avoid overriding source data.
     """
-    if "MNE" not in energy_balance_df.index.get_level_values("country_code"):
-        return annual_final_energy_demand
-    if "MNE" not in annual_final_energy_demand.index.get_level_values("country_code"):
-        return annual_final_energy_demand
-
-    MNE_energy_balance = energy_balance_df.loc[idx[:, "MNE"], :]
-    if {"biofuel", "electricity"}.issubset(
-        MNE_energy_balance.index.get_level_values("carrier_name")
-    ):
-        MNE_heat_electricity_demand = MNE_energy_balance.loc["biofuel"] * 0.28 / 0.69
-        MNE_energy_balance.loc["electricity"].update(
-            MNE_heat_electricity_demand
-        )  # FIXME this line is broken. It does not do anything.
-    neighbours = ["SRB", "HRV", "ALB", "BIH"]
-    available_neighbours = [
-        country
-        for country in neighbours
-        if country in annual_final_energy_demand.index.get_level_values("country_code")
-    ]
-    available_end_uses = [
-        end_use
-        for end_use in END_USE_CAT_NAMES.values()
-        if end_use in annual_final_energy_demand.index.get_level_values("end_use")
-    ]
-    if (
-        not available_neighbours
-        or not available_end_uses
-        or "household"
-        not in annual_final_energy_demand.index.get_level_values("cat_name")
-    ):
-        return annual_final_energy_demand
-
-    neighbour_demand = annual_final_energy_demand.loc[
-        idx[available_end_uses, :, available_neighbours, ["household"]], :
-    ]
-    end_use_contributions = (
-        neighbour_demand.groupby(level=["end_use", "country_code", "cat_name"])
-        .sum()
-        .div(neighbour_demand.groupby(level="country_code").sum())
-        .groupby(level=["end_use", "cat_name"])
-        .mean()
-    )
-    MNE_end_use = (
-        end_use_contributions.stack()
-        .unstack(["end_use", "cat_name"])
-        .mul(MNE_energy_balance.stack(), axis=0)
-        .stack([0, 1])
-        .unstack("year")
-        .reorder_levels(annual_final_energy_demand.index.names)
-    )
-    MNE_end_use = MNE_end_use.where(MNE_end_use > 0).dropna(how="all")
-    annual_final_energy_demand = pd.concat(
-        [annual_final_energy_demand, MNE_end_use], sort=True
-    ).sort_index()
-
     return annual_final_energy_demand
 
 
@@ -849,9 +813,41 @@ def _get_ch_sheet(
         return df
 
 
-def _fill_remaining_missing_values(df: pd.DataFrame) -> pd.DataFrame:
-    # FIXME we shouldn't fill NaNs with 0 because this means 0 demand, maybe this should be in pre-processing
-    return df.fillna(0)
+def _check_no_remaining_missing_values(
+    df: pd.Series | pd.DataFrame,
+) -> pd.Series | pd.DataFrame:
+    missing = df.isna()
+    has_missing = (
+        missing.any().any() if isinstance(missing, pd.DataFrame) else missing.any()
+    )
+    if not has_missing:
+        return df
+
+    sample = _format_missing_value_sample(df, missing)
+    raise ValueError(
+        "Annual demand still contains missing values after preprocessing. "
+        "Refusing to convert missing demand to zero. Missing entries include:\n"
+        f"{sample}"
+    )
+
+
+def _format_missing_value_sample(
+    df: pd.Series | pd.DataFrame, missing: pd.Series | pd.DataFrame, n: int = 10
+) -> str:
+    if isinstance(df, pd.Series):
+        sample = df[missing].head(n)
+        return sample.index.to_frame(index=False).to_string(index=False)
+
+    row_positions, col_positions = np.where(missing.to_numpy())
+    rows = []
+    for row_pos, col_pos in zip(row_positions[:n], col_positions[:n]):
+        rows.append(
+            {
+                "index": df.index[row_pos],
+                "column": df.columns[col_pos],
+            }
+        )
+    return pd.DataFrame(rows).to_string(index=False)
 
 
 if __name__ == "__main__":

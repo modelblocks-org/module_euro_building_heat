@@ -18,6 +18,10 @@ dependencies:
   - python = 3.12.9
   - rasterio = 1.4.3
   - rasterstats = 0.20.0
+  - rioxarray = 0.18.2
   - scipy = 1.15.2
   - shapely = 2.0.7
   - xarray = 2025.1.2
+  - pip
+  - pip:
+      - gregor==0.0.2

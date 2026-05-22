@@ -35,7 +35,9 @@ ALPHA3_TO_JRC_IDEES = {
 
 
 def _normalise_country_ids(values: pd.Series) -> list[str]:
-    return sorted(values.dropna().astype(str).str.upper().unique())
+    country_ids = values.dropna().astype(str).str.strip().str.upper()
+    country_ids = country_ids[country_ids != ""]
+    return sorted(country_ids.unique())
 
 
 def _jrc_idees_scope(
@@ -62,6 +64,8 @@ if __name__ == "__main__":
         raise ValueError("The shapes parquet file must include a 'country_id' column.")
 
     country_ids = _normalise_country_ids(shapes["country_id"])
+    if not country_ids:
+        raise ValueError("The shapes parquet file does not contain any country IDs.")
     jrc_idees_country_codes = _jrc_idees_scope(
         country_ids,
         snakemake.params.fill_missing_values,

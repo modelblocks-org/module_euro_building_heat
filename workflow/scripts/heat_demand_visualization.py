@@ -33,7 +33,6 @@ def _read_shapes(path: str, shape_ids: list[str]) -> gpd.GeoDataFrame:
         raise ValueError("No shapes match the heat demand columns.")
 
     shapes = shapes.to_crs("EPSG:4326")
-    shapes["geometry"] = shapes.geometry.simplify(0.01, preserve_topology=True)
     return shapes[["shape_id", "country_id", "geometry"]]
 
 
@@ -122,6 +121,7 @@ HTML_TEMPLATE = """<!doctype html>
 
     const map = L.map('map');
     const layer = L.geoJSON(geojson, {{
+      smoothFactor: 0,
       style: feature => styleFeature(feature, 0),
       onEachFeature: (feature, layer) => {{
         layer.bindTooltip('');

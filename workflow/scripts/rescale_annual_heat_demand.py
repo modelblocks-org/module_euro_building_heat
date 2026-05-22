@@ -5,19 +5,33 @@ import pandas as pd
 import xarray as xr
 
 
+def normalise_shape_ids(values: pd.Index | pd.Series) -> pd.Index:
+    """Match shape IDs to xarray-safe IDs used by population weights."""
+    return pd.Index(values.astype(str).str.replace(".", "-", regex=False))
+
+
 def read_national_demand(path: str) -> pd.DataFrame:
     """Read national annual heat demand from the legacy CSV structure."""
     return (
         pd.read_csv(path, index_col=[0, 1, 2, 3])
         .squeeze("columns")
         .unstack("country_code")
+        .rename(columns=str.upper)
     )
 
 
 def shape_population(path: str) -> pd.Series:
     """Read total population assigned to each shape."""
     population = xr.open_dataarray(path).sum("site").to_series()
-    population.index = population.index.astype(str)
+    population.index = normalise_shape_ids(population.index)
+    if population.index.has_duplicates:
+        duplicate_ids = sorted(
+            population.index[population.index.duplicated(keep=False)].unique()
+        )
+        raise ValueError(
+            "Population weights contain duplicate normalised shape IDs: "
+            f"{duplicate_ids}"
+        )
     return population.rename("population")
 
 
@@ -29,8 +43,18 @@ def country_map(path: str) -> pd.Series:
     if missing:
         raise ValueError(f"Missing required shape columns: {sorted(missing)}")
 
-    mapping = shapes.set_index("shape_id")["country_id"]
-    mapping.index = mapping.index.astype(str).str.replace(".", "-", regex=False)
+    mapping = (
+        shapes.set_index("shape_id")["country_id"].astype(str).str.strip().str.upper()
+    )
+    mapping.index = normalise_shape_ids(mapping.index)
+    if mapping.index.has_duplicates:
+        duplicate_ids = sorted(
+            mapping.index[mapping.index.duplicated(keep=False)].unique()
+        )
+        raise ValueError(
+            "Shapes contain duplicate IDs after replacing '.' with '-': "
+            f"{duplicate_ids}"
+        )
     return mapping
 
 
@@ -43,26 +67,38 @@ def rescale_to_shapes(
     common_shapes = shape_to_country.index.intersection(population.index)
     if common_shapes.empty:
         raise ValueError("No shapes overlap with calculated population weights.")
+    missing_population = sorted(shape_to_country.index.difference(population.index))
+    if missing_population:
+        raise ValueError(
+            f"No population weights found for shape IDs: {missing_population}"
+        )
 
     shape_to_country = shape_to_country.loc[common_shapes]
     population = population.loc[common_shapes].fillna(0)
-    population_share = population.groupby(shape_to_country).transform(
-        lambda values: values / values.sum()
-    )
-
-    demand = pd.DataFrame(
-        {
-            shape_id: national_demand[country_id] * population_share.loc[shape_id]
-            for shape_id, country_id in shape_to_country.items()
-            if country_id in national_demand.columns
-        }
-    )
     missing_countries = sorted(set(shape_to_country) - set(national_demand.columns))
     if missing_countries:
         raise ValueError(
             "No national heat demand found for shape country_id values: "
             f"{missing_countries}"
         )
+
+    country_population = population.groupby(shape_to_country).sum()
+    zero_population_countries = sorted(
+        country_population[country_population <= 0].index.tolist()
+    )
+    if zero_population_countries:
+        raise ValueError(
+            "Cannot distribute national heat demand for countries with zero "
+            f"shape population: {zero_population_countries}"
+        )
+
+    population_share = population / shape_to_country.map(country_population)
+    demand = pd.DataFrame(
+        {
+            shape_id: national_demand[country_id] * population_share.loc[shape_id]
+            for shape_id, country_id in shape_to_country.items()
+        }
+    )
     return demand
 
 

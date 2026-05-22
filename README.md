@@ -55,14 +55,24 @@ The main configuration groups are:
 
 - `years`: first model year and exclusive end year. For example, `start: 2018`
   and `end: 2019` processes the 2018 calendar year.
+- `weather.year`: weather data year used to shape hourly heat-demand profiles.
+  The default is `2018`.
 - `threads.aggregation`: number of threads used when aggregating gridded heat
   profiles to shapes.
+- `population.resolution`: GHSL GHS-POP resolution in metres. The default is
+  `100`, the most precise available Mollweide grid; `1000` uses the smaller
+  1 km product. The workflow selects the GHSL five-year population epoch
+  closest to `years.start`.
 - `scaling.power`: factor used to convert MWh to the power or energy unit
   expected by the downstream model.
 - `heat.tech_efficiencies`: carrier-specific efficiencies used to convert final
   energy demand into useful heat demand by end use.
 - `heat.sfh_mfh_shares`: shares of single-family and multi-family households
   used when combining household heat profiles.
+
+The default gridded weather archive currently covers 2000-2018. For model years
+outside that archive, the workflow uses `weather.year` to calculate hourly
+profile shapes and then applies those shapes to the configured model years.
 
 The module is designed to be called from another Snakemake workflow. A minimal
 import looks like this:
@@ -147,10 +157,10 @@ This module is based on the following research and datasets:
   <https://zenodo.org/records/11516744>
 - When2Heat demand profile parameter archive:
   <https://zenodo.org/records/10965295>
-- JRC-IDEES 2015 energy demand data:
-  <https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2015_v1>
-- Eurostat gridded population data, JRC 1 km population grid 2018:
-  <https://ec.europa.eu/eurostat/cache/GISCO/geodatafiles/JRC_GRID_2018.zip>
+- JRC-IDEES 2021 energy demand data:
+  <https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2021_v1>
+- GHSL GHS-POP R2023A gridded population data:
+  <https://human-settlement.emergency.copernicus.eu/ghs_pop2023.php>
 - Eurostat household end-use and energy-balance datasets, distributed here via
   the Euro-Calliope dataset mirror:
   <https://github.com/calliope-project/euro-calliope-datasets>
