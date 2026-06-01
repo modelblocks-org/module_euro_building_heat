@@ -150,3 +150,24 @@ rule download_swiss_energy_data:
         "Download {wildcards.dataset} Swiss energy statistics."
     shell:
         "curl {CURL_ARGS} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+
+
+ECUK_END_USE_URLS = internal["resources"]["automatic"]["GBR"]["ecuk_end_use"]
+ECUK_END_USE_YEAR = selected_ecuk_year(config["years"]["start"], ECUK_END_USE_URLS)
+
+
+rule download_ecuk_end_use:
+    output:
+        "<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx",
+    log:
+        "<logs>/automatic/download_ecuk_end_use_{ecuk_year}.log",
+    wildcard_constraints:
+        ecuk_year="|".join(str(year) for year in sorted(ECUK_END_USE_URLS)),
+    conda:
+        "../envs/shell.yaml"
+    params:
+        url=lambda wc: ECUK_END_USE_URLS[int(wc.ecuk_year)],
+    message:
+        "Download ECUK {wildcards.ecuk_year} end-use data tables."
+    shell:
+        "curl {CURL_ARGS} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"

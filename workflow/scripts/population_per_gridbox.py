@@ -1,8 +1,10 @@
 """Calculate population weights per weather gridbox and shape."""
 
 import math
+import warnings
 
 import geopandas as gpd
+import pandas as pd
 import rioxarray
 import xarray as xr
 from gregor.aggregate import aggregate_raster_to_polygon
@@ -81,6 +83,9 @@ def population_on_weather_grid(
     gridboxes_mapped_to_locations = gpd.overlay(gridbox, locations_3035)
     if gridboxes_mapped_to_locations.empty:
         raise ValueError("No weather gridbox polygons intersect the provided shapes.")
+    gridboxes_mapped_to_locations = _assign_unmapped_locations_to_nearest_gridbox(
+        gridbox, locations_3035, gridboxes_mapped_to_locations
+    )
 
     population = rioxarray.open_rasterio(path_to_population, masked=True).squeeze(
         drop=True
@@ -91,18 +96,67 @@ def population_on_weather_grid(
     )
     locations = _aggregate_population_to_polygons(population, locations)
 
-    # Confirm that the total population is valid (haven't picked up or lost regions).
-    # The gridboxes cover all land with population that we are interested in.
-    assert math.isclose(
-        locations.population.sum(),
-        gridboxes_mapped_to_locations.population.sum(),
-        abs_tol=10**3,
-    )
+    total_population = locations.population.sum()
+    assigned_population = gridboxes_mapped_to_locations.population.sum()
+    if assigned_population <= 0:
+        raise ValueError("No population could be assigned to weather gridboxes.")
+    if not math.isclose(total_population, assigned_population, abs_tol=10**3):
+        missing_population = total_population - assigned_population
+        missing_fraction = missing_population / total_population
+        warnings.warn(
+            "Population assigned to weather gridboxes differs from total shape "
+            "population. This can happen when shapes extend beyond the weather "
+            "grid extent. "
+            f"Total={total_population:.0f}, assigned={assigned_population:.0f}, "
+            f"missing={missing_population:.0f} ({missing_fraction:.2%}).",
+            stacklevel=2,
+        )
 
     population_da = xr.DataArray.from_series(
         gridboxes_mapped_to_locations.set_index(["site", "id"]).population
     )
     population_da.to_netcdf(out_path)
+
+
+def _assign_unmapped_locations_to_nearest_gridbox(
+    gridbox: gpd.GeoDataFrame,
+    locations: gpd.GeoDataFrame,
+    mapped: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """Assign locations without gridbox overlap to the nearest weather gridbox."""
+    missing_ids = sorted(set(locations["id"]) - set(mapped["id"]))
+    if not missing_ids:
+        return mapped
+
+    missing_locations = locations.loc[
+        locations["id"].isin(missing_ids), ["id", "geometry"]
+    ]
+    nearest = gpd.sjoin_nearest(
+        missing_locations,
+        gridbox[["site", "geometry"]].reset_index(drop=True),
+        how="left",
+        distance_col="distance_to_weather_gridbox",
+    )
+    if nearest["site"].isna().any():
+        unmapped_ids = sorted(nearest.loc[nearest["site"].isna(), "id"].unique())
+        raise ValueError(
+            "No nearest weather gridbox could be found for shape IDs: "
+            f"{unmapped_ids}"
+        )
+
+    max_distance = nearest["distance_to_weather_gridbox"].max()
+    warnings.warn(
+        "Some shapes do not intersect any weather gridbox and will be assigned "
+        "to the nearest gridbox: "
+        f"{missing_ids}. Maximum nearest-grid distance is {max_distance:.0f} m.",
+        stacklevel=2,
+    )
+    nearest = nearest[["site", "id", "geometry"]]
+    return gpd.GeoDataFrame(
+        pd.concat([mapped, nearest], ignore_index=True),
+        geometry="geometry",
+        crs=mapped.crs,
+    )
 
 
 def _aggregate_population_to_polygons(

@@ -13,7 +13,7 @@ threads:
 
 population:
   # GHSL GHS-POP resolution in metres. 100 m is the most precise available
-  # Mollweide grid; use 1000 for a smaller, faster download.
+  # Mollweide grid; use 100 for a heavier, longer download.
   resolution: 1000
 
 scaling:

@@ -39,7 +39,8 @@ def _site_weighted_ave(
     """
     id_grid_weight = grid_weight.sel(id=id).dropna("site")
     normalised_weight = id_grid_weight / id_grid_weight.sum("site")
-    return (gridded_data.reindex_like(id_grid_weight) * normalised_weight).sum("site")
+    weighted_sites = gridded_data.sel(site=normalised_weight.site)
+    return (weighted_sites * normalised_weight).sum("site")
 
 
 if __name__ == "__main__":

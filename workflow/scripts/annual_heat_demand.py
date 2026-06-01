@@ -1,7 +1,13 @@
 """Calculate annual useful heat demand from energy statistics."""
 
+import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).parent))
+from ecuk_end_use import read_ecuk_service_end_use_shares
 
 END_USE_CAT_NAMES = {
     "FC_OTH_HH_E_CK": "cooking",
@@ -89,6 +95,7 @@ def get_heat_demand(
     path_to_ch_end_use: str,
     path_to_energy_balance: str,
     path_to_commercial_demand: str,
+    paths_to_ecuk_end_use: list[str],
     path_to_carrier_names: str,
     heat_tech_params: dict[str, dict[str, float]],
     fill_missing_values: dict[str, list[str]],
@@ -112,14 +119,10 @@ def get_heat_demand(
         energy_balance_dfs["com"].add(energy_balance_dfs["oth"], fill_value=0),
         path_to_ch_end_use,
         path_to_commercial_demand,
+        paths_to_ecuk_end_use,
         annual_final_demand,
         fill_missing_values=fill_missing_values,
         country_codes=country_codes,
-    )
-
-    # Fix data gaps for some countries
-    annual_final_demand = hardcoded_country_cleanup(
-        annual_final_demand, energy_balance_dfs["hh"]
     )
 
     # get electricity demand data specifically, to remove from ENTSOE timeseries
@@ -428,6 +431,7 @@ def get_commercial_final_energy_demand(
     energy_balance: pd.DataFrame,
     path_to_ch_end_use: str,
     path_to_jrc_end_use: str,
+    paths_to_ecuk_end_use: list[str],
     annual_final_energy_demand: pd.DataFrame,
     fill_missing_values: dict[str, list[str]],
     country_codes: list[str],
@@ -459,8 +463,24 @@ def get_commercial_final_energy_demand(
         energy_balance, jrc_end_use_df, fill_missing_values, country_codes
     )
 
-    # Add Swiss data when Switzerland is in scope and ambient heat from heat pumps.
+    official_commercial_data = []
+    if "GBR" in country_codes:
+        if not paths_to_ecuk_end_use:
+            raise ValueError(
+                "GBR is in scope, but no ECUK end-use workbook was provided."
+            )
+        official_commercial_data.append(
+            _map_ecuk_to_eurostat(energy_balance, paths_to_ecuk_end_use[0])
+        )
+
+    for official_data in official_commercial_data:
+        mapped_end_uses = _drop_matching_country_end_uses(
+            mapped_end_uses, official_data
+        )
+
+    # Add official data, Swiss data when in scope, and ambient heat from heat pumps.
     mapped_end_use_parts = [mapped_end_uses]
+    mapped_end_use_parts.extend(official_commercial_data)
     if "CHE" in country_codes:
         # 'fuel' is just generic non-electric energy, which we distribute based on
         # household data
@@ -505,6 +525,27 @@ def get_commercial_final_energy_demand(
     ).sort_index()
 
     return annual_final_energy_demand
+
+
+def _map_ecuk_to_eurostat(energy_balance: pd.DataFrame, path_to_ecuk_end_use: str):
+    ecuk_end_use_percent = read_ecuk_service_end_use_shares(
+        path_to_ecuk_end_use, energy_balance.columns
+    )
+    return (
+        ecuk_end_use_percent.align(energy_balance.stack())[1]
+        .mul(ecuk_end_use_percent)
+        .dropna()
+    )
+
+
+def _drop_matching_country_end_uses(
+    base: pd.Series, replacement: pd.Series
+) -> pd.Series:
+    countries = set(replacement.index.get_level_values("country_code"))
+    end_uses = set(replacement.index.get_level_values("end_use"))
+    mask = base.index.get_level_values("country_code").isin(countries)
+    mask &= base.index.get_level_values("end_use").isin(end_uses)
+    return base.loc[~mask]
 
 
 def _map_jrc_to_eurostat(
@@ -635,12 +676,15 @@ def _read_ch_non_hh_non_electricity_demand(
         .groupby(level=["end_use"])
         .sum(),
         axis=0,
-    )
+    ).reindex(columns=ch_con.columns)
     ch_con_disaggregated = hh_ratios.mul(ch_con, level="end_use", axis=0).dropna(
         how="all"
     )
 
-    assert np.allclose(ch_con_disaggregated.groupby(level="end_use").sum(), ch_con)
+    assert np.allclose(
+        ch_con_disaggregated.groupby(level="end_use").sum().reindex_like(ch_con),
+        ch_con,
+    )
     ch_con = ch_con_disaggregated.reset_index("carrier_name")
     return (
         ch_con.assign(country_code="CHE")
@@ -649,17 +693,6 @@ def _read_ch_non_hh_non_electricity_demand(
         .rename_axis(index=["end_use", "country_code", "carrier_name", "year"])
         .mul(PJ_TO_TWH)  # PJ -> TWh
     )
-
-
-def hardcoded_country_cleanup(
-    annual_final_energy_demand: pd.DataFrame, energy_balance_df: pd.DataFrame
-) -> pd.DataFrame:
-    """Return annual demand unchanged.
-
-    Live Eurostat data includes Montenegro, so synthetic Montenegro calculations
-    are intentionally disabled to avoid overriding source data.
-    """
-    return annual_final_energy_demand
 
 
 def _fill_data_gaps(
@@ -850,12 +883,19 @@ def _format_missing_value_sample(
     return pd.DataFrame(rows).to_string(index=False)
 
 
+def _as_list(value) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    return list(value)
+
+
 if __name__ == "__main__":
     get_heat_demand(
         path_to_hh_end_use=snakemake.input.hh_end_use,
         path_to_ch_end_use=snakemake.input.ch_end_use,
         path_to_energy_balance=snakemake.input.energy_balance,
         path_to_commercial_demand=snakemake.input.commercial_demand,
+        paths_to_ecuk_end_use=_as_list(snakemake.input.ecuk_end_use),
         path_to_carrier_names=snakemake.input.carrier_names,
         heat_tech_params=snakemake.params.heat_tech_params,
         country_codes=snakemake.params.countries,

@@ -34,7 +34,6 @@ resources:
       - SE
       - SI
       - SK
-      - UK
     eurostat:
       energy-balance: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/nrg_bal_c?format=TSV&compressed=true
       hh-end-use: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/nrg_d_hhq?format=TSV&compressed=true
@@ -42,6 +41,14 @@ resources:
       end-use: https://www.bfe.admin.ch/bfe/en/home/versorgung/statistik-und-geodaten/energiestatistiken/energieverbrauch-nach-verwendungszweck.exturl.html/aHR0cHM6Ly9wdWJkYi5iZmUuYWRtaW4uY2gvZGUvcHVibGljYX/Rpb24vZG93bmxvYWQvOTg1NA==.html
       energy-balance: https://www.bfe.admin.ch/bfe/en/home/versorgung/statistik-und-geodaten/energiestatistiken/gesamtenergiestatistik.exturl.html/aHR0cHM6Ly9wdWJkYi5iZmUuYWRtaW4uY2gvZGUvcHVibGljYX/Rpb24vZG93bmxvYWQvNzUxOQ==.html
       industry-energy-balance: https://www.bfe.admin.ch/bfe/en/home/versorgung/statistik-und-geodaten/energiestatistiken/teilstatistiken.exturl.html/aHR0cHM6Ly9wdWJkYi5iZmUuYWRtaW4uY2gvZGUvcHVibGljYX/Rpb24vZG93bmxvYWQvODc4OA==.html
+    GBR:
+      ecuk_end_use:
+        2020: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/1020160/2020_End_use_tables_-_web_copy.xlsx
+        2021: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/1092943/2021_End_use_tables_July_2022_update.xlsx
+        2022: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/1113673/ECUK_2022_End_Use_tables_27102022.xlsx
+        2023: https://assets.publishing.service.gov.uk/media/66a7e5a5ce1fd0da7b592f0f/ECUK_2023_End_Use_tables.xlsx
+        2024: https://assets.publishing.service.gov.uk/media/66f132b1b4d70bfba161ab06/ECUK_2024_End_Use_tables.xlsx
+        2025: https://assets.publishing.service.gov.uk/media/6937e46392da4705a575d466/ECUK_2025_End_Use_tables_181225.xlsx
 scope:
   spatial:
     countries:
@@ -85,7 +92,6 @@ data_pre_processing:
     jrc_idees:
       ALB: [BGR, HRV, HUN, ROU, GRC]
       BIH: [BGR, HRV, HUN, ROU, GRC]
-      MNE: [BGR, HRV, HUN, ROU, GRC]
       MKD: [BGR, HRV, HUN, ROU, GRC]
       SRB: [BGR, HRV, HUN, ROU, GRC]
       NOR: [SWE, DNK]

@@ -16,6 +16,18 @@ def _jrc_idees_inputs(wildcards):
     )
 
 
+def _ecuk_end_use_inputs(wildcards):
+    country_data = checkpoints.prepare_shape_country_scope.get(
+        shapes=wildcards.shapes
+    ).output.country_ids
+    if "GBR" not in _read_checkpoint_lines(country_data):
+        return []
+    return expand(
+        "<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx",
+        ecuk_year=ECUK_END_USE_YEAR,
+    )
+
+
 checkpoint prepare_shape_country_scope:
     input:
         shapes="<shapes>",
@@ -81,6 +93,7 @@ rule process_annual_heat_demand:
         ch_end_use="<resources>/automatic/CHE/end-use.xlsx",
         energy_balance=rules.process_annual_energy_balances.output[0],
         commercial_demand=rules.process_jrc_idees_tertiary.output[0],
+        ecuk_end_use=_ecuk_end_use_inputs,
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
         carrier_names=workflow.source_path(
             "../internal/energy-balance-carrier-names.csv"
