@@ -40,6 +40,11 @@ def process_jrc_heat_tertiary_sector_data(
     paths_to_national_data: list[str], out_path: str
 ):
     """Process JRC-IDEES tertiary data to extract its heat demand."""
+    read_jrc_heat_tertiary_sector_data(paths_to_national_data).to_csv(out_path)
+
+
+def read_jrc_heat_tertiary_sector_data(paths_to_national_data: list[str]) -> pd.Series:
+    """Read JRC-IDEES tertiary data and return the processed long series."""
     dfs = []
     for file in paths_to_national_data:
         df_final_energy = pd.read_excel(file, sheet_name="SER_hh_fec", index_col=0)
@@ -75,7 +80,7 @@ def process_jrc_heat_tertiary_sector_data(
 
         dfs.append(df)
 
-    pd.concat(dfs).stack().to_csv(out_path)
+    return pd.concat(dfs).stack()
 
 
 def _clean_df(df: pd.DataFrame, energy_type: str):
@@ -83,7 +88,8 @@ def _clean_df(df: pd.DataFrame, energy_type: str):
     df = _select_year_columns(df)
     year_columns = df.columns
     df = df.assign(end_use=np.nan)
-    df.loc[df.index.isin(END_USES.keys()), "end_use"] = list(END_USES.keys())
+    end_use_rows = df.index.isin(END_USES.keys())
+    df.loc[end_use_rows, "end_use"] = df.index[end_use_rows]
     df.end_use = df.end_use.fillna(df.end_use.ffill())
 
     df = (

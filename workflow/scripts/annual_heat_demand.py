@@ -8,6 +8,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 from ecuk_end_use import read_ecuk_service_end_use_shares
+from jrc_idees_heat import read_jrc_heat_tertiary_sector_data
 
 END_USE_CAT_NAMES = {
     "FC_OTH_HH_E_CK": "cooking",
@@ -96,18 +97,29 @@ def get_heat_demand(
     path_to_energy_balance: str,
     path_to_commercial_demand: str,
     paths_to_ecuk_end_use: list[str],
+    paths_to_uk_jrc_idees_2015: list[str],
     path_to_carrier_names: str,
     heat_tech_params: dict[str, dict[str, float]],
     fill_missing_values: dict[str, list[str]],
     country_codes: list[str],
+    model_years: list[int],
     path_to_electricity_demand: str,
     path_to_output: str,
 ) -> None:
     """Get the annual heat demand of countries in TWh."""
+    model_years = [int(year) for year in model_years]
     # Get annual energy balance data for household and commercial sectors
     energy_balance_dfs = _get_energy_balances(
         path_to_energy_balance, path_to_carrier_names
     )
+    energy_balance_dfs = {
+        sector: _select_model_years(
+            _extend_energy_balance_model_years(df, model_years),
+            model_years,
+            f"{sector} energy balance",
+        )
+        for sector, df in energy_balance_dfs.items()
+    }
 
     # Get household final energy demand by end use
     annual_final_demand = _get_household_final_energy_demand(
@@ -120,6 +132,7 @@ def get_heat_demand(
         path_to_ch_end_use,
         path_to_commercial_demand,
         paths_to_ecuk_end_use,
+        paths_to_uk_jrc_idees_2015,
         annual_final_demand,
         fill_missing_values=fill_missing_values,
         country_codes=country_codes,
@@ -139,7 +152,7 @@ def get_heat_demand(
         [electricity_demand, national_useful_heat_demand],
         [path_to_electricity_demand, path_to_output],
     ):
-        result = df.stack([0, 1]).squeeze()
+        result = _select_output_years(df, model_years).stack([0, 1]).squeeze()
         result = result.loc[
             result.index.get_level_values("country_code").isin(country_codes)
         ]
@@ -171,6 +184,53 @@ def _get_energy_balances(
         for sector_code, cat_codes in balance_codes.items()
     }
     return balances
+
+
+def _select_model_years(
+    df: pd.DataFrame, model_years: list[int], label: str
+) -> pd.DataFrame:
+    missing_years = sorted(set(model_years) - set(df.columns))
+    if missing_years:
+        raise ValueError(f"{label} is missing configured model years: {missing_years}")
+    return df.loc[:, model_years]
+
+
+def _select_output_years(df: pd.DataFrame, model_years: list[int]) -> pd.DataFrame:
+    if "year" in df.index.names:
+        return df.loc[df.index.get_level_values("year").isin(model_years)]
+    return df.reindex(index=model_years)
+
+
+def _extend_energy_balance_model_years(
+    energy_balance: pd.DataFrame, model_years: list[int]
+) -> pd.DataFrame:
+    """Fill missing country model years from the latest available country year."""
+    energy_balance = energy_balance.copy()
+    countries = energy_balance.index.get_level_values("country_code").unique()
+    for country_code in countries:
+        country_balance = energy_balance.xs(
+            country_code, level="country_code", drop_level=False
+        )
+        country_totals = country_balance.sum(axis=0, min_count=1)
+        available_years = sorted(
+            year
+            for year, value in country_totals.items()
+            if pd.notna(value) and value > 0
+        )
+        if not available_years:
+            continue
+
+        for model_year in model_years:
+            current_total = country_totals.get(model_year)
+            if pd.notna(current_total) and current_total > 0:
+                continue
+            prior_years = [year for year in available_years if year <= model_year]
+            source_year = prior_years[-1] if prior_years else available_years[0]
+            energy_balance.loc[country_balance.index, model_year] = country_balance[
+                source_year
+            ].to_numpy()
+
+    return energy_balance
 
 
 def _slice_energy_balance_by_sector(
@@ -432,6 +492,7 @@ def get_commercial_final_energy_demand(
     path_to_ch_end_use: str,
     path_to_jrc_end_use: str,
     paths_to_ecuk_end_use: list[str],
+    paths_to_uk_jrc_idees_2015: list[str],
     annual_final_energy_demand: pd.DataFrame,
     fill_missing_values: dict[str, list[str]],
     country_codes: list[str],
@@ -470,7 +531,11 @@ def get_commercial_final_energy_demand(
                 "GBR is in scope, but no ECUK end-use workbook was provided."
             )
         official_commercial_data.append(
-            _map_ecuk_to_eurostat(energy_balance, paths_to_ecuk_end_use[0])
+            _map_uk_official_to_eurostat(
+                energy_balance,
+                paths_to_ecuk_end_use[0],
+                paths_to_uk_jrc_idees_2015,
+            )
         )
 
     for official_data in official_commercial_data:
@@ -531,11 +596,136 @@ def _map_ecuk_to_eurostat(energy_balance: pd.DataFrame, path_to_ecuk_end_use: st
     ecuk_end_use_percent = read_ecuk_service_end_use_shares(
         path_to_ecuk_end_use, energy_balance.columns
     )
-    return (
-        ecuk_end_use_percent.align(energy_balance.stack())[1]
-        .mul(ecuk_end_use_percent)
-        .dropna()
+    return _map_end_use_shares_to_eurostat(energy_balance, ecuk_end_use_percent)
+
+
+def _map_uk_official_to_eurostat(
+    energy_balance: pd.DataFrame,
+    path_to_ecuk_end_use: str,
+    paths_to_uk_jrc_idees_2015: list[str],
+) -> pd.Series:
+    uk_end_use_percent = _uk_official_end_use_shares(
+        path_to_ecuk_end_use,
+        paths_to_uk_jrc_idees_2015,
+        energy_balance.columns,
     )
+    return _map_end_use_shares_to_eurostat(energy_balance, uk_end_use_percent)
+
+
+def _uk_official_end_use_shares(
+    path_to_ecuk_end_use: str,
+    paths_to_uk_jrc_idees_2015: list[str],
+    target_years: pd.Index,
+) -> pd.Series:
+    target_years = sorted(int(year) for year in target_years)
+    if not target_years:
+        return pd.Series(dtype=float)
+
+    ecuk_years = [year for year in target_years if year >= 2020]
+    bridge_years = [year for year in target_years if 2016 <= year <= 2019]
+    legacy_years = [year for year in target_years if year <= 2015]
+
+    pieces = []
+    ecuk_endpoint = read_ecuk_service_end_use_shares(path_to_ecuk_end_use, [2020]).xs(
+        2020, level="year"
+    )
+    if ecuk_years:
+        pieces.append(read_ecuk_service_end_use_shares(path_to_ecuk_end_use, ecuk_years))
+
+    if legacy_years or bridge_years:
+        if not paths_to_uk_jrc_idees_2015:
+            raise ValueError(
+                "GBR annual demand before 2020 requires the legacy UK "
+                "JRC-IDEES 2015 workbook."
+            )
+        legacy_shares = _read_uk_jrc_2015_end_use_shares(
+            paths_to_uk_jrc_idees_2015[0]
+        )
+        if legacy_years:
+            pieces.append(
+                _select_legacy_uk_jrc_shares_for_years(legacy_shares, legacy_years)
+            )
+        if bridge_years:
+            legacy_endpoint = legacy_shares.xs(2015, level="year")
+            pieces.append(
+                _interpolate_uk_jrc_ecuk_shares(
+                    legacy_endpoint, ecuk_endpoint, bridge_years
+                )
+            )
+
+    if not pieces:
+        raise ValueError("Could not derive official UK commercial end-use shares.")
+
+    return pd.concat(pieces).sort_index()
+
+
+def _read_uk_jrc_2015_end_use_shares(path_to_uk_jrc_idees_2015: str) -> pd.Series:
+    jrc_end_use_df = read_jrc_heat_tertiary_sector_data(
+        [path_to_uk_jrc_idees_2015]
+    ).xs("final_energy", level="energy")
+    return (
+        _jrc_end_use_percent(jrc_end_use_df)
+        .xs("GBR", level="country_code", drop_level=False)
+        .reorder_levels(["carrier_name", "end_use", "country_code", "year"])
+        .sort_index()
+    )
+
+
+def _select_legacy_uk_jrc_shares_for_years(
+    legacy_shares: pd.Series, target_years: list[int]
+) -> pd.Series:
+    available_years = sorted(legacy_shares.index.get_level_values("year").unique())
+    pieces = []
+    for target_year in target_years:
+        if target_year in available_years:
+            source_year = target_year
+        else:
+            source_year = min(
+                available_years,
+                key=lambda year: (abs(year - target_year), -year),
+            )
+        piece = legacy_shares.xs(source_year, level="year", drop_level=False)
+        piece = piece.reset_index("year", drop=True)
+        piece = piece.to_frame("value").assign(year=target_year).set_index(
+            "year", append=True
+        )["value"]
+        pieces.append(piece.reorder_levels(legacy_shares.index.names))
+    return pd.concat(pieces)
+
+
+def _interpolate_uk_jrc_ecuk_shares(
+    legacy_2015: pd.Series, ecuk_2020: pd.Series, target_years: list[int]
+) -> pd.Series:
+    legacy_2015 = legacy_2015.reorder_levels(
+        ["carrier_name", "end_use", "country_code"]
+    ).sort_index()
+    ecuk_2020 = ecuk_2020.reorder_levels(
+        ["carrier_name", "end_use", "country_code"]
+    ).sort_index()
+    index = legacy_2015.index.union(ecuk_2020.index)
+    legacy_2015 = legacy_2015.reindex(index, fill_value=0)
+    ecuk_2020 = ecuk_2020.reindex(index, fill_value=0)
+
+    pieces = []
+    for target_year in target_years:
+        weight = (target_year - 2015) / (2020 - 2015)
+        shares = legacy_2015.mul(1 - weight).add(ecuk_2020.mul(weight))
+        shares = _normalise_end_use_shares_by_carrier(shares)
+        shares = shares.to_frame("value").assign(year=target_year).set_index(
+            "year", append=True
+        )["value"]
+        pieces.append(shares)
+
+    return pd.concat(pieces).reorder_levels(
+        ["carrier_name", "end_use", "country_code", "year"]
+    )
+
+
+def _normalise_end_use_shares_by_carrier(shares: pd.Series) -> pd.Series:
+    denominators = shares.groupby(level=["carrier_name", "country_code"]).transform(
+        "sum"
+    )
+    return shares.div(denominators).where(denominators > 0).dropna()
 
 
 def _drop_matching_country_end_uses(
@@ -554,6 +744,46 @@ def _map_jrc_to_eurostat(
     fill_missing_values: dict[str, list[str]],
     country_codes: list[str],
 ) -> pd.DataFrame:
+    jrc_end_use_percent = _jrc_end_use_percent(jrc_end_use_df)
+    jrc_end_use_percent = _fill_missing_countries_and_years(
+        jrc_data=jrc_end_use_percent,
+        fill_missing_values=fill_missing_values,
+        country_codes=country_codes,
+    )
+    jrc_end_use_percent = _extend_jrc_share_years(
+        jrc_end_use_percent, energy_balance.columns
+    )
+
+    mapped_end_uses = _map_end_use_shares_to_eurostat(
+        energy_balance, jrc_end_use_percent
+    )
+
+    return mapped_end_uses
+
+
+def _map_end_use_shares_to_eurostat(
+    energy_balance: pd.DataFrame, end_use_percent: pd.Series
+) -> pd.Series:
+    energy_balance_long = energy_balance.stack()
+    energy_balance_long.index = energy_balance_long.index.set_names(
+        ["carrier_name", "country_code", "year"]
+    )
+    lookup_index = pd.MultiIndex.from_arrays(
+        [
+            end_use_percent.index.get_level_values("carrier_name"),
+            end_use_percent.index.get_level_values("country_code"),
+            end_use_percent.index.get_level_values("year"),
+        ],
+        names=energy_balance_long.index.names,
+    )
+    energy_for_share = pd.Series(
+        energy_balance_long.reindex(lookup_index).to_numpy(),
+        index=end_use_percent.index,
+    )
+    return energy_for_share.mul(end_use_percent).dropna()
+
+
+def _jrc_end_use_percent(jrc_end_use_df: pd.Series) -> pd.Series:
     jrc_end_use_df = (
         jrc_end_use_df.xs("ktoe", level="unit")
         .rename(eurostat_to_alpha3, level="country_code")
@@ -565,23 +795,7 @@ def _map_jrc_to_eurostat(
         .dropna(how="all")
         .stack("year")
     )
-
-    jrc_end_use_percent = _fill_missing_countries_and_years(
-        jrc_data=jrc_end_use_percent,
-        fill_missing_values=fill_missing_values,
-        country_codes=country_codes,
-    )
-    jrc_end_use_percent = _extend_jrc_share_years(
-        jrc_end_use_percent, energy_balance.columns
-    )
-
-    mapped_end_uses = (
-        jrc_end_use_percent.align(energy_balance.stack())[1]
-        .mul(jrc_end_use_percent)
-        .dropna()
-    )
-
-    return mapped_end_uses
+    return jrc_end_use_percent
 
 
 def _extend_jrc_share_years(
@@ -896,9 +1110,11 @@ if __name__ == "__main__":
         path_to_energy_balance=snakemake.input.energy_balance,
         path_to_commercial_demand=snakemake.input.commercial_demand,
         paths_to_ecuk_end_use=_as_list(snakemake.input.ecuk_end_use),
+        paths_to_uk_jrc_idees_2015=_as_list(snakemake.input.uk_jrc_idees_2015),
         path_to_carrier_names=snakemake.input.carrier_names,
         heat_tech_params=snakemake.params.heat_tech_params,
         country_codes=snakemake.params.countries,
+        model_years=snakemake.params.model_years,
         fill_missing_values=snakemake.params.fill_missing_values,
         path_to_electricity_demand=snakemake.output.electricity,
         path_to_output=snakemake.output.total_demand,

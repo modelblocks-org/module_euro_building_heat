@@ -4,6 +4,7 @@ type: object
 additionalProperties: false
 required:
   - years
+  - weather
   - threads
   - scaling
   - heat
@@ -20,9 +21,11 @@ properties:
   weather:
     type: object
     additionalProperties: false
-    required: [year]
+    required: [start, end]
     properties:
-      year:
+      start:
+        type: integer
+      end:
         type: integer
   threads:
     type: object

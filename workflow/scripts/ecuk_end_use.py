@@ -21,6 +21,7 @@ CARRIER_TRANSLATION = {
 }
 
 
+# FIXME: Update this with earlier data from JRC for the years through 2018. This makes comparisons based on earlier years possible.
 def selected_ecuk_year(config_year: int, available_years: Iterable[int]) -> int:
     """Return the closest ECUK publication year, preferring later years on ties."""
     years = sorted(int(year) for year in available_years)

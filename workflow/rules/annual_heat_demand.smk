@@ -28,9 +28,37 @@ def _ecuk_end_use_inputs(wildcards):
     )
 
 
-checkpoint prepare_shape_country_scope:
+def _uk_jrc_idees_2015_inputs(wildcards):
+    country_data = checkpoints.prepare_shape_country_scope.get(
+        shapes=wildcards.shapes
+    ).output.country_ids
+    if "GBR" not in _read_checkpoint_lines(country_data):
+        return []
+    if config["years"]["start"] > 2019:
+        return []
+    return ["<resources>/automatic/GBR/jrc-idees-2015_Tertiary_UK.xlsx"]
+
+
+rule filter_shapes:
     input:
         shapes="<shapes>",
+    output:
+        "<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
+    log:
+        "<logs>/{shapes}/filter_shapes.log",
+    conda:
+        "../envs/geo.yaml"
+    params:
+        supported_countries=internal["scope"]["spatial"]["countries"],
+    message:
+        "Filter marine regions from '{wildcards.shapes}' shapes."
+    script:
+        "../scripts/filter_shapes.py"
+
+
+checkpoint prepare_shape_country_scope:
+    input:
+        shapes=rules.filter_shapes.output[0],
     output:
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
         jrc_idees_country_codes="<resources>/automatic/shapes/{shapes}/jrc_idees_country_codes.txt",
@@ -39,6 +67,7 @@ checkpoint prepare_shape_country_scope:
     conda:
         "../envs/geo.yaml"
     params:
+        supported_countries=internal["scope"]["spatial"]["countries"],
         fill_missing_values=internal["data_pre_processing"]["fill_missing_values"][
             "jrc_idees"
         ],
@@ -80,7 +109,7 @@ rule process_annual_energy_balances:
     conda:
         "../envs/heat.yaml"
     params:
-        first_year=config["years"]["start"],
+        first_year=min(config["years"]["start"], 2000),
     message:
         "Process annual energy balances from Eurostat and Swiss statistics."
     script:
@@ -94,6 +123,7 @@ rule process_annual_heat_demand:
         energy_balance=rules.process_annual_energy_balances.output[0],
         commercial_demand=rules.process_jrc_idees_tertiary.output[0],
         ecuk_end_use=_ecuk_end_use_inputs,
+        uk_jrc_idees_2015=_uk_jrc_idees_2015_inputs,
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
         carrier_names=workflow.source_path(
             "../internal/energy-balance-carrier-names.csv"
@@ -107,6 +137,7 @@ rule process_annual_heat_demand:
         "../envs/heat.yaml"
     params:
         heat_tech_params=config["heat"]["tech_efficiencies"],
+        model_years=MODEL_YEARS,
         countries=lambda wildcards, input: _read_checkpoint_lines(input.country_ids),
         fill_missing_values=internal["data_pre_processing"]["fill_missing_values"][
             "jrc_idees"
@@ -120,7 +151,7 @@ rule process_annual_heat_demand:
 rule rescale_annual_heat_demand_to_shapes:
     input:
         annual_demand=rules.process_annual_heat_demand.output.total_demand,
-        shapes="<shapes>",
+        shapes=rules.filter_shapes.output[0],
         population="<resources>/automatic/shapes/{shapes}/population.nc",
     output:
         "<annual_heat_demand>",

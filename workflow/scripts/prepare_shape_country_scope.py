@@ -40,6 +40,23 @@ def _normalise_country_ids(values: pd.Series) -> list[str]:
     return sorted(country_ids.unique())
 
 
+def _check_supported_country_ids(
+    country_ids: list[str], supported_countries: list[str]
+) -> None:
+    supported_country_ids = {
+        str(country_id).strip().upper()
+        for country_id in supported_countries
+        if str(country_id).strip()
+    }
+    unsupported_country_ids = sorted(set(country_ids) - supported_country_ids)
+    if unsupported_country_ids:
+        raise ValueError(
+            "The shapes file requests countries that this module cannot process: "
+            f"{unsupported_country_ids}. Remove these countries from the shapes "
+            "input or add the required data support before running the workflow."
+        )
+
+
 def _jrc_idees_scope(
     country_ids: list[str],
     fill_missing_values: dict[str, list[str]],
@@ -66,6 +83,10 @@ if __name__ == "__main__":
     country_ids = _normalise_country_ids(shapes["country_id"])
     if not country_ids:
         raise ValueError("The shapes parquet file does not contain any country IDs.")
+    _check_supported_country_ids(
+        country_ids,
+        snakemake.params.supported_countries,
+    )
     jrc_idees_country_codes = _jrc_idees_scope(
         country_ids,
         snakemake.params.fill_missing_values,

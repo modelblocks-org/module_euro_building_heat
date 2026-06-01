@@ -13,9 +13,7 @@ rule unscaled_heat_profiles:
     conda:
         "../envs/heat.yaml"
     params:
-        first_year=config["years"]["start"],
-        final_year=config["years"]["end"] - 1,
-        weather_year=config["weather"]["year"],
+        weather_years=WEATHER_YEARS,
     message:
         "Generate gridded heat demand profile shapes from weather data."
     script:
@@ -26,7 +24,7 @@ rule population_per_weather_gridbox:
     input:
         weather_grid="<resources>/automatic/gridded-weather/grid.nc",
         population=rules.unzip_raw_population.output[0],
-        locations="<shapes>",
+        locations=rules.filter_shapes.output[0],
     output:
         "<resources>/automatic/shapes/{shapes}/population.nc",
     log:
@@ -72,6 +70,7 @@ rule heat_demand_final_timeseries:
     params:
         sfh_mfh_shares=config["heat"]["sfh_mfh_shares"],
         scaling_factor=config["scaling"]["power"],
+        weather_model_years=WEATHER_MODEL_YEARS,
     message:
         "Scale heat demand time series for '{wildcards.shapes}' shapes."
     script:
@@ -81,7 +80,7 @@ rule heat_demand_final_timeseries:
 rule heat_demand_visualization:
     input:
         heat_demand="<heat_demand>",
-        shapes="<shapes>",
+        shapes=rules.filter_shapes.output[0],
     output:
         "<heat_demand_visualization>",
     log:

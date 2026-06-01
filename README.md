@@ -55,8 +55,10 @@ The main configuration groups are:
 
 - `years`: first model year and exclusive end year. For example, `start: 2018`
   and `end: 2019` processes the 2018 calendar year.
-- `weather.year`: weather data year used to shape hourly heat-demand profiles.
-  The default is `2018`.
+- `weather`: first weather year and exclusive end weather year used to shape
+  hourly heat-demand profiles. The weather-year span must match the model-year
+  span. Output time series keep weather-year timestamps while annual scaling
+  uses the paired model years.
 - `threads.aggregation`: number of threads used when aggregating gridded heat
   profiles to shapes.
 - `population.resolution`: GHSL GHS-POP resolution in metres. The default is
@@ -71,8 +73,8 @@ The main configuration groups are:
   used when combining household heat profiles.
 
 The default gridded weather archive currently covers 2000-2018. For model years
-outside that archive, the workflow uses `weather.year` to calculate hourly
-profile shapes and then applies those shapes to the configured model years.
+outside that archive, configure a matching weather-year range; those weather
+timestamps are preserved in the final time series.
 
 The module is designed to be called from another Snakemake workflow. A minimal
 import looks like this:
@@ -157,8 +159,8 @@ This module is based on the following research and datasets:
   <https://zenodo.org/records/11516744>
 - When2Heat demand profile parameter archive:
   <https://zenodo.org/records/10965295>
-- JRC-IDEES 2021 energy demand data:
-  <https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2021_v1>
+- JRC-IDEES 2023 energy demand data:
+  <https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2023_v1>
 - GHSL GHS-POP R2023A gridded population data:
   <https://human-settlement.emergency.copernicus.eu/ghs_pop2023.php>
 - Eurostat household end-use and energy-balance datasets, distributed here via

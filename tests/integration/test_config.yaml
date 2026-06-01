@@ -3,7 +3,8 @@ module_euro_building_heat:
     start: 2018
     end: 2019
   weather:
-    year: 2018
+    start: 2018
+    end: 2019
   threads:
     aggregation: 1
   scaling:

@@ -12,6 +12,7 @@ def scale_heat_demand_profiles(
     unscaled_demand_profiles: xr.Dataset,
     sfh_mfh_shares: dict,
     model_scaling_factor: float,
+    weather_model_years: dict[int, int],
 ) -> xr.DataArray:
     """Create demand timeseries for space heat and hot water across all building types.
 
@@ -33,6 +34,9 @@ def scale_heat_demand_profiles(
         model_scaling_factor (float):
             Scaling factor to go from MWh to the units of energy used in the final
             Calliope model.
+        weather_model_years:
+            Mapping from weather years in the profile timestamps to model years in
+            annual demand totals.
 
     Returns:
         xr.DataArray: merged and scaled heat demand profiles.
@@ -59,7 +63,9 @@ def scale_heat_demand_profiles(
         .sum("building")
     )
     scaled_demand_profiles = grouped_unscaled_demand.groupby("time.year").apply(
-        _scale_demand, annual_demand=annual_demand_twh
+        _scale_demand,
+        annual_demand=annual_demand_twh,
+        weather_model_years={int(k): int(v) for k, v in weather_model_years.items()},
     )
 
     return (
@@ -68,12 +74,17 @@ def scale_heat_demand_profiles(
 
 
 def _scale_demand(
-    one_year_profile: xr.Dataset, annual_demand: xr.Dataset
+    one_year_profile: xr.Dataset,
+    annual_demand: xr.Dataset,
+    weather_model_years: dict[int, int],
 ) -> xr.Dataset:
-    """Scale demand in each year and sum different building types into one profile."""
-    year = one_year_profile.time.dt.year[0]
+    """Scale one weather year with the annual demand for its paired model year."""
+    weather_year = int(one_year_profile.time.dt.year[0])
+    if weather_year not in weather_model_years:
+        raise ValueError(f"No model year mapping found for weather year {weather_year}.")
+    model_year = weather_model_years[weather_year]
     normalised_profile = one_year_profile / one_year_profile.sum("time")
-    demand = normalised_profile * annual_demand.sel(year=year).drop("year")
+    demand = normalised_profile * annual_demand.sel(year=model_year).drop("year")
     return demand.sum("cat_name")
 
 
@@ -130,6 +141,7 @@ if __name__ == "__main__":
         unscaled_profiles,
         snakemake.params.sfh_mfh_shares,
         snakemake.params.scaling_factor,
+        snakemake.params.weather_model_years,
     )
     # if snakemake.wildcards.input_dataset == "electrified-heat":
     #     cop = xr.open_dataset(snakemake.input.cop).to_array("end_use")

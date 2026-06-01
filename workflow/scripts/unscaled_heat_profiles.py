@@ -26,9 +26,7 @@ def get_unscaled_heat_profiles(
     path_to_wind_speed: str,
     path_to_temperature: str,
     path_to_when2heat_params: str,
-    first_year: str | int,
-    final_year: str | int,
-    weather_year: str | int,
+    weather_years: list[str | int],
     out_path: str,
 ) -> None:
     """Produces time series of heat demand profiles.
@@ -41,14 +39,10 @@ def get_unscaled_heat_profiles(
         path_to_wind_speed (str): Gridded wind speed data in m/s.
         path_to_temperature (str): Gridded air temperature data in degrees C.
         path_to_when2heat_params (str): When2heat parameters.
-        first_year (Union[str, int]): First year of data in the profile (inclusive).
-        final_year (Union[str, int]): Final year of data in the profile (inclusive).
-        weather_year (Union[str, int]): Weather data year used to shape profiles.
+        weather_years: Weather years used to shape profiles.
         out_path (str): Path to which data will be saved.
     """
-    first_year = int(first_year)
-    final_year = int(final_year)
-    weather_year = int(weather_year)
+    weather_years = [int(year) for year in weather_years]
 
     # Weather data is subset by the geographic area covered by model run
     # (given by available population sites)
@@ -59,13 +53,44 @@ def get_unscaled_heat_profiles(
     assert temperature_ds.attrs["unit"].lower() == "degrees c"
     assert wind_ds.attrs["unit"].lower() == "m/s"
 
+    # Parameters and how to apply them is based on [@BDEW:2015]
+    daily_params = read_daily_parameters(path_to_when2heat_params)
+    hourly_params = read_hourly_parameters(path_to_when2heat_params)
+
+    grouped_hourly_heat = xr.concat(
+        [
+            _get_unscaled_heat_profile_for_weather_year(
+                temperature_ds,
+                wind_ds,
+                daily_params,
+                hourly_params,
+                weather_year,
+            )
+            for weather_year in weather_years
+        ],
+        dim="time",
+    ).sortby("time")
+    encoding = {
+        k: {"zlib": True, "complevel": 4} for k in grouped_hourly_heat.data_vars
+    }
+    grouped_hourly_heat.to_netcdf(out_path, encoding=encoding)
+
+
+def _get_unscaled_heat_profile_for_weather_year(
+    temperature_ds: xr.Dataset,
+    wind_ds: xr.Dataset,
+    daily_params: pd.DataFrame,
+    hourly_params: xr.DataArray,
+    weather_year: int,
+) -> xr.Dataset:
+    """Generate unscaled hourly heat profiles for one weather year."""
     # Only need site-wide mean wind speed for this analysis.
     average_wind_speed = wind_ds["wind10m"].sel(time=str(weather_year)).mean("time")
 
     # Subset temperature to the weather year extended by a couple of days either end,
     # so we don't compute values for years we don't need, but keep a buffer for the
     # shifts happening when obtaining reference temperature.
-    temperature_ds = temperature_ds.sel(
+    temperature_for_year = temperature_ds.sel(
         time=slice(
             str(weather_year - 1) + "-12-25", str(weather_year + 1) + "-01-05"
         )
@@ -76,14 +101,12 @@ def get_unscaled_heat_profiles(
     # the heat demand of each day.
     # See [@Ruhnau:2019] for more information on the method
     reference_temperature = get_reference_temperature(
-        temperature_ds["temperature"], time_dim="time"
+        temperature_for_year["temperature"], time_dim="time"
     )
 
-    # Subset to get only the target year
+    # Subset to get only the target weather year. Output timestamps intentionally
+    # remain in weather years; model years are only used later for annual scaling.
     reference_temperature = reference_temperature.sel(time=str(weather_year))
-    # Parameters and how to apply them is based on [@BDEW:2015]
-    daily_params = read_daily_parameters(path_to_when2heat_params)
-    hourly_params = read_hourly_parameters(path_to_when2heat_params)
 
     # Get daily demand
     daily_heat = when2heat_daily(
@@ -109,15 +132,7 @@ def get_unscaled_heat_profiles(
     grouped_hourly_heat = xr.merge(
         [hourly_space.rename("space_heat"), hourly_hot_water.rename("hot_water")]
     )
-    grouped_hourly_heat = _repeat_weather_profile_for_model_years(
-        grouped_hourly_heat,
-        first_year=first_year,
-        final_year=final_year,
-    )
-    encoding = {
-        k: {"zlib": True, "complevel": 4} for k in grouped_hourly_heat.data_vars
-    }
-    grouped_hourly_heat.to_netcdf(out_path, encoding=encoding)
+    return grouped_hourly_heat
 
 
 def get_hourly_heat_profiles(
@@ -283,32 +298,6 @@ def _hour_and_day_to_datetime(da: xr.DataArray) -> xr.DataArray:
     return da.rename({"new_time": "time"})
 
 
-def _repeat_weather_profile_for_model_years(
-    profile: xr.Dataset,
-    first_year: int,
-    final_year: int,
-) -> xr.Dataset:
-    """Repeat one weather year of profiles across the requested model years."""
-    profiles = []
-
-    for model_year in range(first_year, final_year + 1):
-        model_profile = profile.copy()
-        model_profile = model_profile.assign_coords(
-            time=_replace_year(profile.indexes["time"], model_year)
-        )
-        profiles.append(model_profile)
-
-    return xr.concat(profiles, dim="time").sortby("time")
-
-
-def _replace_year(time_index: pd.DatetimeIndex, year: int) -> pd.DatetimeIndex:
-    """Return `time_index` with timestamps moved to `year`."""
-    return pd.DatetimeIndex(
-        [timestamp.replace(year=year) for timestamp in time_index],
-        name=time_index.name,
-    )
-
-
 def _csv_reader(
     building_type: Literal["SFH", "MFH", "COM"], input_path: str
 ) -> pd.DataFrame:
@@ -375,8 +364,6 @@ if __name__ == "__main__":
         path_to_wind_speed=snakemake.input.wind_speed,
         path_to_temperature=snakemake.input.temperature,
         path_to_when2heat_params=snakemake.input.when2heat,
-        first_year=snakemake.params.first_year,
-        final_year=snakemake.params.final_year,
-        weather_year=snakemake.params.weather_year,
+        weather_years=snakemake.params.weather_years,
         out_path=snakemake.output[0],
     )

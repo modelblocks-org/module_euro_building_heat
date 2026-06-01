@@ -11,6 +11,7 @@ rule download_when2heat_params:
     conda:
         "../envs/shell.yaml"
     params:
+        curl_args=CURL_ARGS,
         url=lambda wildcards: internal["resources"]["automatic"][
             "when2heat_params"
         ].format(
@@ -28,7 +29,7 @@ rule download_when2heat_params:
     message:
         "Download When2Heat demand profile parameters."
     shell:
-        "mkdir -p {output} && curl {CURL_ARGS} --output '{output}/#1' '{params.url}' 2> {log}"
+        "mkdir -p {output} && curl {params.curl_args} --output '{output}/#1' '{params.url}' 2> {log}"
 
 
 rule download_gridded_weather_data:
@@ -41,11 +42,12 @@ rule download_gridded_weather_data:
     conda:
         "../envs/shell.yaml"
     params:
+        curl_args=CURL_ARGS,
         dataset_url=internal["resources"]["automatic"]["gridded_weather_data"],
     message:
         "Download gridded {wildcards.data_var} data."
     shell:
-        "curl {CURL_ARGS} --output {output}.tmp '{params.dataset_url}/files/{wildcards.data_var}.nc' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output}.tmp '{params.dataset_url}/files/{wildcards.data_var}.nc' 2> {log} && mv {output}.tmp {output}"
 
 
 rule download_raw_population:
@@ -56,6 +58,7 @@ rule download_raw_population:
     conda:
         "../envs/shell.yaml"
     params:
+        curl_args=CURL_ARGS,
         url=(
             internal["resources"]["automatic"]["population"]
             + f"/{ghsl_population['stem']}/V1-0/{ghsl_population['stem']}_V1_0.zip"
@@ -63,7 +66,7 @@ rule download_raw_population:
     message:
         f"Download GHSL gridded population data for {ghsl_population['epoch']} at {ghsl_population['resolution']} m."
     shell:
-        "curl {CURL_ARGS} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
 
 rule unzip_raw_population:
@@ -82,6 +85,7 @@ rule unzip_raw_population:
 
 
 JRC_IDEES_SPATIAL_SCOPE = internal["resources"]["automatic"]["jrc_idees_spatial_scope"]
+JRC_IDEES_VERSION = internal["resources"]["automatic"]["jrc_idees_version"]
 
 
 rule download_jrc_idees:
@@ -94,11 +98,13 @@ rule download_jrc_idees:
     conda:
         "../envs/shell.yaml"
     params:
+        curl_args=CURL_ARGS,
         dataset_url=internal["resources"]["automatic"]["jrc_idees"],
+        version=JRC_IDEES_VERSION,
     message:
         "Download JRC-IDEES data for {wildcards.country_code}."
     shell:
-        "curl {CURL_ARGS} --output {output}.tmp '{params.dataset_url}/JRC-IDEES-2021_{wildcards.country_code}.zip' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output}.tmp '{params.dataset_url}/JRC-IDEES-{params.version}_{wildcards.country_code}.zip' 2> {log} && mv {output}.tmp {output}"
 
 
 rule unzip_jrc_idees:
@@ -112,10 +118,43 @@ rule unzip_jrc_idees:
         country_code="|".join(JRC_IDEES_SPATIAL_SCOPE),
     conda:
         "../envs/shell.yaml"
+    params:
+        version=JRC_IDEES_VERSION,
     message:
         "Extract JRC-IDEES tertiary sector data for {wildcards.country_code}."
     shell:
-        "unzip -p {input.country_data} JRC-IDEES-2021_Tertiary_{wildcards.country_code}.xlsx > {output} 2> {log}"
+        "unzip -p {input.country_data} JRC-IDEES-{params.version}_Tertiary_{wildcards.country_code}.xlsx > {output} 2> {log}"
+
+
+rule download_uk_jrc_idees_2015:
+    output:
+        temp("<resources>/automatic/GBR/jrc-idees-2015_UK.zip"),
+    log:
+        "<logs>/automatic/download_uk_jrc_idees_2015.log",
+    conda:
+        "../envs/shell.yaml"
+    params:
+        curl_args=CURL_ARGS,
+        dataset_url=internal["resources"]["automatic"]["GBR"]["jrc_idees_2015"],
+    message:
+        "Download legacy JRC-IDEES 2015 data for UK."
+    shell:
+        "curl {params.curl_args} --output {output}.tmp '{params.dataset_url}/JRC-IDEES-2015_All_xlsx_UK.zip' 2> {log} && mv {output}.tmp {output}"
+
+
+rule unzip_uk_jrc_idees_2015:
+    input:
+        country_data=rules.download_uk_jrc_idees_2015.output,
+    output:
+        "<resources>/automatic/GBR/jrc-idees-2015_Tertiary_UK.xlsx",
+    log:
+        "<logs>/automatic/unzip_uk_jrc_idees_2015.log",
+    conda:
+        "../envs/shell.yaml"
+    message:
+        "Extract legacy JRC-IDEES 2015 tertiary sector data for UK."
+    shell:
+        "unzip -p {input.country_data} JRC-IDEES-2015_Tertiary_UK.xlsx > {output} 2> {log}"
 
 
 rule download_eurostat_energy_data:
@@ -128,11 +167,12 @@ rule download_eurostat_energy_data:
     conda:
         "../envs/shell.yaml"
     params:
+        curl_args=CURL_ARGS,
         url=lambda wc: internal["resources"]["automatic"]["eurostat"][wc.dataset],
     message:
         "Download {wildcards.dataset} Eurostat data."
     shell:
-        "curl {CURL_ARGS} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
 
 rule download_swiss_energy_data:
@@ -145,11 +185,12 @@ rule download_swiss_energy_data:
     conda:
         "../envs/shell.yaml"
     params:
+        curl_args=CURL_ARGS,
         url=lambda wc: internal["resources"]["automatic"]["CHE"][wc.dataset],
     message:
         "Download {wildcards.dataset} Swiss energy statistics."
     shell:
-        "curl {CURL_ARGS} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
 
 ECUK_END_USE_URLS = internal["resources"]["automatic"]["GBR"]["ecuk_end_use"]
@@ -166,8 +207,9 @@ rule download_ecuk_end_use:
     conda:
         "../envs/shell.yaml"
     params:
+        curl_args=CURL_ARGS,
         url=lambda wc: ECUK_END_USE_URLS[int(wc.ecuk_year)],
     message:
         "Download ECUK {wildcards.ecuk_year} end-use data tables."
     shell:
-        "curl {CURL_ARGS} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
