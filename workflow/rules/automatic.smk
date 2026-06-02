@@ -31,7 +31,10 @@ rule download_when2heat_params:
     shell:
         "mkdir -p {output} && curl {params.curl_args} --output '{output}/#1' '{params.url}' 2> {log}"
 
-
+# FIXME: Update to the weather data is needed. It is old
+# and the data is on a 50km grid which makes it too course for some of the small countries. 
+# Malta is also failing for some reason so this needs looking into.
+# Currently countries that do not work are snapped to the closest weather gid cell.
 rule download_gridded_weather_data:
     output:
         "<resources>/automatic/gridded-weather/{data_var}.nc",
@@ -194,7 +197,11 @@ rule download_swiss_energy_data:
 
 
 ECUK_END_USE_URLS = internal["resources"]["automatic"]["GBR"]["ecuk_end_use"]
-ECUK_END_USE_YEAR = selected_ecuk_year(config["years"]["start"], ECUK_END_USE_URLS)
+ECUK_END_USE_YEAR = min(
+    int(year)
+    for year in ECUK_END_USE_URLS
+    if int(year) > config["years"]["end"] - 1
+)
 
 
 rule download_ecuk_end_use:

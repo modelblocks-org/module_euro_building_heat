@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 sys.path.insert(0, str(Path(__file__).parent))
 from ecuk_end_use import read_ecuk_service_end_use_shares
@@ -96,25 +97,47 @@ def get_heat_demand(
     path_to_ch_end_use: str,
     path_to_energy_balance: str,
     path_to_commercial_demand: str,
+    path_to_shapes: str,
+    path_to_population: str | None,
     paths_to_ecuk_end_use: list[str],
     paths_to_uk_jrc_idees_2015: list[str],
     path_to_carrier_names: str,
     heat_tech_params: dict[str, dict[str, float]],
-    fill_missing_values: dict[str, list[str]],
+    data_proxies: dict[str, dict[str, list[str]]],
     country_codes: list[str],
+    source_country_codes: list[str],
     model_years: list[int],
     path_to_electricity_demand: str,
     path_to_output: str,
 ) -> None:
     """Get the annual heat demand of countries in TWh."""
     model_years = [int(year) for year in model_years]
+    data_proxies = data_proxies or {}
     # Get annual energy balance data for household and commercial sectors
     energy_balance_dfs = _get_energy_balances(
         path_to_energy_balance, path_to_carrier_names
     )
+    annual_energy_balance_proxies = data_proxies.get("annual_energy_balance", {})
+    if set(country_codes) & set(annual_energy_balance_proxies):
+        if path_to_population is None:
+            raise ValueError(
+                "Annual energy-balance proxies require shape population data."
+            )
+        country_population = _shape_country_population(
+            path_to_shapes, path_to_population
+        )
+        energy_balance_dfs = {
+            sector: _add_energy_balance_proxies(
+                df,
+                country_population,
+                annual_energy_balance_proxies,
+                country_codes,
+            )
+            for sector, df in energy_balance_dfs.items()
+        }
     energy_balance_dfs = {
         sector: _select_model_years(
-            _extend_energy_balance_model_years(df, model_years),
+            df,
             model_years,
             f"{sector} energy balance",
         )
@@ -125,6 +148,12 @@ def get_heat_demand(
     annual_final_demand = _get_household_final_energy_demand(
         path_to_hh_end_use, path_to_ch_end_use, path_to_carrier_names
     )
+    annual_final_demand = _add_household_end_use_proxies(
+        annual_final_demand,
+        energy_balance_dfs["hh"],
+        data_proxies.get("household_end_use", {}),
+        country_codes,
+    )
 
     # get commercial final energy demand by end use
     annual_final_demand = get_commercial_final_energy_demand(
@@ -134,8 +163,9 @@ def get_heat_demand(
         paths_to_ecuk_end_use,
         paths_to_uk_jrc_idees_2015,
         annual_final_demand,
-        fill_missing_values=fill_missing_values,
+        jrc_idees_proxies=data_proxies.get("jrc_idees", {}),
         country_codes=country_codes,
+        source_country_codes=source_country_codes,
     )
 
     # get electricity demand data specifically, to remove from ENTSOE timeseries
@@ -197,39 +227,89 @@ def _select_model_years(
 
 def _select_output_years(df: pd.DataFrame, model_years: list[int]) -> pd.DataFrame:
     if "year" in df.index.names:
+        missing_years = sorted(
+            set(model_years) - set(df.index.get_level_values("year"))
+        )
+        if missing_years:
+            raise ValueError(f"Output demand is missing model years: {missing_years}")
         return df.loc[df.index.get_level_values("year").isin(model_years)]
-    return df.reindex(index=model_years)
+    missing_years = sorted(set(model_years) - set(df.index))
+    if missing_years:
+        raise ValueError(f"Output demand is missing model years: {missing_years}")
+    return df.loc[model_years]
 
 
-def _extend_energy_balance_model_years(
-    energy_balance: pd.DataFrame, model_years: list[int]
+def _normalise_shape_ids(values: pd.Index | pd.Series) -> pd.Index:
+    return pd.Index(values.astype(str).str.replace(".", "-", regex=False))
+
+
+def _shape_country_population(path_to_shapes: str, path_to_population: str) -> pd.Series:
+    shapes = pd.read_parquet(path_to_shapes)
+    required_columns = {"shape_id", "country_id"}
+    missing_columns = required_columns.difference(shapes.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required shape columns: {sorted(missing_columns)}")
+
+    shape_to_country = (
+        shapes.set_index("shape_id")["country_id"].astype(str).str.strip().str.upper()
+    )
+    shape_to_country.index = _normalise_shape_ids(shape_to_country.index)
+    population = xr.open_dataarray(path_to_population).sum("site").to_series()
+    population.index = _normalise_shape_ids(population.index)
+    return population.groupby(shape_to_country).sum().rename("population")
+
+
+def _normalise_proxy_map(proxy_map: dict[str, list[str]]) -> dict[str, list[str]]:
+    return {
+        str(country_id).strip().upper(): [
+            str(reference).strip().upper() for reference in references
+        ]
+        for country_id, references in proxy_map.items()
+    }
+
+
+def _add_energy_balance_proxies(
+    energy_balance: pd.DataFrame,
+    country_population: pd.Series,
+    proxies: dict[str, list[str]],
+    country_codes: list[str],
 ) -> pd.DataFrame:
-    """Fill missing country model years from the latest available country year."""
-    energy_balance = energy_balance.copy()
-    countries = energy_balance.index.get_level_values("country_code").unique()
-    for country_code in countries:
-        country_balance = energy_balance.xs(
-            country_code, level="country_code", drop_level=False
-        )
-        country_totals = country_balance.sum(axis=0, min_count=1)
-        available_years = sorted(
-            year
-            for year, value in country_totals.items()
-            if pd.notna(value) and value > 0
-        )
-        if not available_years:
+    proxies = _normalise_proxy_map(proxies)
+    existing_countries = set(energy_balance.index.get_level_values("country_code"))
+    additions = []
+    for country_code in country_codes:
+        if country_code in existing_countries:
             continue
+        reference_countries = proxies[country_code]
+        proxy_population = country_population.loc[[country_code, *reference_countries]]
+        if not (proxy_population > 0).all():
+            missing_population = sorted(proxy_population[proxy_population <= 0].index)
+            raise ValueError(f"Missing proxy population: {missing_population}.")
+        reference_intensities = []
+        for reference in reference_countries:
+            reference_balance = energy_balance.xs(
+                reference, level="country_code", drop_level=False
+            ).droplevel("country_code")
+            reference_intensities.append(
+                reference_balance.div(proxy_population[reference])
+            )
 
-        for model_year in model_years:
-            current_total = country_totals.get(model_year)
-            if pd.notna(current_total) and current_total > 0:
-                continue
-            prior_years = [year for year in available_years if year <= model_year]
-            source_year = prior_years[-1] if prior_years else available_years[0]
-            energy_balance.loc[country_balance.index, model_year] = country_balance[
-                source_year
-            ].to_numpy()
+        proxied_balance = (
+            pd.concat(reference_intensities)
+            .groupby(level="carrier_name")
+            .mean()
+            .mul(proxy_population[country_code])
+        )
+        proxied_balance = (
+            proxied_balance
+            .assign(country_code=country_code)
+            .set_index("country_code", append=True)
+            .reorder_levels(energy_balance.index.names)
+        )
+        additions.append(proxied_balance)
 
+    if additions:
+        energy_balance = pd.concat([energy_balance, *additions]).sort_index()
     return energy_balance
 
 
@@ -355,6 +435,70 @@ def _get_household_final_energy_demand(
     return hh_end_use_df
 
 
+def _add_household_end_use_proxies(
+    household_demand: pd.DataFrame,
+    household_energy_balance: pd.DataFrame,
+    proxies: dict[str, list[str]],
+    country_codes: list[str],
+) -> pd.DataFrame:
+    proxies = _normalise_proxy_map(proxies)
+    existing_countries = set(household_demand.index.get_level_values("country_code"))
+    additions = []
+    for country_code in country_codes:
+        if country_code in existing_countries:
+            continue
+        target_balance = household_energy_balance.xs(
+            country_code, level="country_code", drop_level=False
+        )
+        proxy_shares = _household_proxy_end_use_shares(
+            household_demand, proxies[country_code]
+        )
+        proxy_shares = (
+            proxy_shares.to_frame("value")
+            .assign(country_code=country_code)
+            .set_index("country_code", append=True)
+            ["value"]
+            .reorder_levels(
+                ["end_use", "carrier_name", "country_code", "cat_name", "year"]
+            )
+        )
+        proxied_demand = _map_end_use_shares_to_eurostat(
+            target_balance, proxy_shares
+        ).unstack("year")
+        if proxied_demand.empty:
+            raise ValueError(
+                f"Household end-use proxy for {country_code} produced no demand "
+                "for the configured model years."
+            )
+        additions.append(proxied_demand)
+
+    if additions:
+        household_demand = pd.concat([household_demand, *additions]).sort_index()
+    return household_demand
+
+
+def _household_proxy_end_use_shares(
+    household_demand: pd.DataFrame, reference_countries: list[str]
+) -> pd.Series:
+    reference_demand = pd.concat(
+        [
+            household_demand.xs(reference, level="country_code", drop_level=False)
+            for reference in reference_countries
+        ]
+    )
+    reference_demand.columns = reference_demand.columns.rename("year")
+    reference_demand = reference_demand.stack("year")
+    denominator = reference_demand.groupby(
+        level=["carrier_name", "country_code", "cat_name", "year"]
+    ).transform("sum")
+    shares = reference_demand.div(denominator).dropna()
+    return (
+        shares.groupby(level=["end_use", "carrier_name", "cat_name", "year"])
+        .mean()
+        .rename("value")
+    )
+
+
 def _check_units_removed(df: pd.DataFrame, carrier_names_df: pd.DataFrame) -> bool:
     cat_codes = [
         cat_code
@@ -453,21 +597,17 @@ def read_ch_hh_final_demand(path_to_ch_end_use: str) -> pd.DataFrame:
     """Get Switzerland data from their govt. stats documents."""
     space_heat = _get_ch_sheet(
         path_to_ch_end_use,
-        "Tabelle 18",
-        skipfooter=8,
+        "Tabelle20",
         translation=CH_ENERGY_CARRIER_TRANSLATION,
     )
     hot_water = _get_ch_sheet(
         path_to_ch_end_use,
-        "Tabelle 20",
-        skipfooter=5,
+        "Tabelle22",
         translation=CH_ENERGY_CARRIER_TRANSLATION,
     )
-    # Quirk of the excel is that there is no space in this sheet name
     cooking = _get_ch_sheet(
         path_to_ch_end_use,
-        "Tabelle21",
-        skipfooter=4,
+        "Tabelle23",
         translation=CH_ENERGY_CARRIER_TRANSLATION,
     )
 
@@ -494,8 +634,9 @@ def get_commercial_final_energy_demand(
     paths_to_ecuk_end_use: list[str],
     paths_to_uk_jrc_idees_2015: list[str],
     annual_final_energy_demand: pd.DataFrame,
-    fill_missing_values: dict[str, list[str]],
+    jrc_idees_proxies: dict[str, list[str]],
     country_codes: list[str],
+    source_country_codes: list[str],
 ) -> pd.DataFrame:
     """Get commercial final energy demand.
 
@@ -521,11 +662,11 @@ def get_commercial_final_energy_demand(
 
     # Map JRC end uses to annual commercial demand
     mapped_end_uses = _map_jrc_to_eurostat(
-        energy_balance, jrc_end_use_df, fill_missing_values, country_codes
+        energy_balance, jrc_end_use_df, jrc_idees_proxies, country_codes
     )
 
     official_commercial_data = []
-    if "GBR" in country_codes:
+    if "GBR" in source_country_codes:
         if not paths_to_ecuk_end_use:
             raise ValueError(
                 "GBR is in scope, but no ECUK end-use workbook was provided."
@@ -538,21 +679,28 @@ def get_commercial_final_energy_demand(
             )
         )
 
+    official_commercial_data = [
+        official_data.reorder_levels(mapped_end_uses.index.names)
+        for official_data in official_commercial_data
+    ]
     for official_data in official_commercial_data:
         mapped_end_uses = _drop_matching_country_end_uses(
             mapped_end_uses, official_data
         )
 
     # Add official data, Swiss data when in scope, and ambient heat from heat pumps.
-    mapped_end_use_parts = [mapped_end_uses]
-    mapped_end_use_parts.extend(official_commercial_data)
-    if "CHE" in country_codes:
+    mapped_end_use_parts = [mapped_end_uses, *official_commercial_data]
+    if "CHE" in source_country_codes:
         # 'fuel' is just generic non-electric energy, which we distribute based on
         # household data
         ch_con_fuel = _read_ch_non_hh_non_electricity_demand(
-            path_to_ch_end_use, "Tabelle 25", annual_final_energy_demand
+            path_to_ch_end_use,
+            "Tabelle27",
+            annual_final_energy_demand,
         )
-        ch_con_elec = _read_ch_non_hh_electricity_demand(path_to_ch_end_use, "Tabelle26")
+        ch_con_elec = _read_ch_non_hh_electricity_demand(
+            path_to_ch_end_use, "Tabelle28"
+        )
         mapped_end_use_parts.extend(
             [
                 ch_con_fuel.rename({"process_heat": "cooking"}).reorder_levels(
@@ -575,6 +723,12 @@ def get_commercial_final_energy_demand(
     )
     mapped_end_uses = pd.concat(mapped_end_use_parts)
     mapped_end_uses.index = mapped_end_uses.index.remove_unused_levels()
+    mapped_end_uses = _add_commercial_end_use_proxies(
+        mapped_end_uses,
+        energy_balance,
+        jrc_idees_proxies,
+        country_codes,
+    )
 
     annual_final_energy_demand = pd.concat(
         [
@@ -590,6 +744,74 @@ def get_commercial_final_energy_demand(
     ).sort_index()
 
     return annual_final_energy_demand
+
+
+def _add_commercial_end_use_proxies(
+    commercial_demand: pd.Series,
+    energy_balance: pd.DataFrame,
+    proxies: dict[str, list[str]],
+    country_codes: list[str],
+) -> pd.Series:
+    proxies = _normalise_proxy_map(proxies)
+    if not proxies:
+        return commercial_demand
+
+    core_country_index = commercial_demand.loc[
+        commercial_demand.index.get_level_values("carrier_name") != "ambient_heat"
+    ].index.get_level_values("country_code")
+    countries_with_core_data = set(core_country_index)
+    additions = []
+    added_countries = []
+    for country_code in country_codes:
+        if country_code in countries_with_core_data:
+            continue
+        proxy_shares = _commercial_proxy_end_use_shares(
+            commercial_demand, proxies[country_code]
+        )
+        proxy_shares = (
+            proxy_shares.to_frame("value")
+            .assign(country_code=country_code)
+            .set_index("country_code", append=True)
+            ["value"]
+            .reorder_levels(commercial_demand.index.names)
+        )
+        target_balance = energy_balance.xs(
+            country_code, level="country_code", drop_level=False
+        )
+        proxied_demand = _map_end_use_shares_to_eurostat(target_balance, proxy_shares)
+        if proxied_demand.empty:
+            raise ValueError(
+                f"Commercial end-use proxy for {country_code} produced no demand "
+                "for the configured model years."
+            )
+        additions.append(proxied_demand)
+        added_countries.append(country_code)
+
+    if not additions:
+        return commercial_demand
+
+    keep_base = ~commercial_demand.index.get_level_values("country_code").isin(
+        added_countries
+    )
+    return pd.concat([commercial_demand.loc[keep_base], *additions]).sort_index()
+
+
+def _commercial_proxy_end_use_shares(
+    commercial_demand: pd.Series, reference_countries: list[str]
+) -> pd.Series:
+    reference_demand = pd.concat(
+        [
+            commercial_demand.xs(reference, level="country_code", drop_level=False)
+            for reference in reference_countries
+        ]
+    )
+    denominator = reference_demand.groupby(
+        level=["carrier_name", "country_code", "year"]
+    ).transform("sum")
+    shares = reference_demand.div(denominator).dropna()
+    return (
+        shares.groupby(level=["end_use", "carrier_name", "year"]).mean().rename("value")
+    )
 
 
 def _map_ecuk_to_eurostat(energy_balance: pd.DataFrame, path_to_ecuk_end_use: str):
@@ -621,18 +843,20 @@ def _uk_official_end_use_shares(
     if not target_years:
         return pd.Series(dtype=float)
 
-    ecuk_years = [year for year in target_years if year >= 2020]
-    bridge_years = [year for year in target_years if 2016 <= year <= 2019]
+    ecuk_years = [year for year in target_years if year >= 2017]
     legacy_years = [year for year in target_years if year <= 2015]
+    unsupported_years = [year for year in target_years if year == 2016]
+    if unsupported_years:
+        raise ValueError(
+            "GBR commercial end-use shares are unavailable for exact years: "
+            f"{unsupported_years}."
+        )
 
     pieces = []
-    ecuk_endpoint = read_ecuk_service_end_use_shares(path_to_ecuk_end_use, [2020]).xs(
-        2020, level="year"
-    )
     if ecuk_years:
         pieces.append(read_ecuk_service_end_use_shares(path_to_ecuk_end_use, ecuk_years))
 
-    if legacy_years or bridge_years:
+    if legacy_years:
         if not paths_to_uk_jrc_idees_2015:
             raise ValueError(
                 "GBR annual demand before 2020 requires the legacy UK "
@@ -641,17 +865,9 @@ def _uk_official_end_use_shares(
         legacy_shares = _read_uk_jrc_2015_end_use_shares(
             paths_to_uk_jrc_idees_2015[0]
         )
-        if legacy_years:
-            pieces.append(
-                _select_legacy_uk_jrc_shares_for_years(legacy_shares, legacy_years)
-            )
-        if bridge_years:
-            legacy_endpoint = legacy_shares.xs(2015, level="year")
-            pieces.append(
-                _interpolate_uk_jrc_ecuk_shares(
-                    legacy_endpoint, ecuk_endpoint, bridge_years
-                )
-            )
+        pieces.append(
+            _select_legacy_uk_jrc_shares_for_years(legacy_shares, legacy_years)
+        )
 
     if not pieces:
         raise ValueError("Could not derive official UK commercial end-use shares.")
@@ -675,57 +891,16 @@ def _select_legacy_uk_jrc_shares_for_years(
     legacy_shares: pd.Series, target_years: list[int]
 ) -> pd.Series:
     available_years = sorted(legacy_shares.index.get_level_values("year").unique())
+    missing_years = sorted(set(target_years) - set(available_years))
+    if missing_years:
+        raise ValueError(
+            "Legacy UK JRC-IDEES shares are missing requested model years: "
+            f"{missing_years}. Available years: {available_years}."
+        )
     pieces = []
     for target_year in target_years:
-        if target_year in available_years:
-            source_year = target_year
-        else:
-            source_year = min(
-                available_years,
-                key=lambda year: (abs(year - target_year), -year),
-            )
-        piece = legacy_shares.xs(source_year, level="year", drop_level=False)
-        piece = piece.reset_index("year", drop=True)
-        piece = piece.to_frame("value").assign(year=target_year).set_index(
-            "year", append=True
-        )["value"]
-        pieces.append(piece.reorder_levels(legacy_shares.index.names))
+        pieces.append(legacy_shares.xs(target_year, level="year", drop_level=False))
     return pd.concat(pieces)
-
-
-def _interpolate_uk_jrc_ecuk_shares(
-    legacy_2015: pd.Series, ecuk_2020: pd.Series, target_years: list[int]
-) -> pd.Series:
-    legacy_2015 = legacy_2015.reorder_levels(
-        ["carrier_name", "end_use", "country_code"]
-    ).sort_index()
-    ecuk_2020 = ecuk_2020.reorder_levels(
-        ["carrier_name", "end_use", "country_code"]
-    ).sort_index()
-    index = legacy_2015.index.union(ecuk_2020.index)
-    legacy_2015 = legacy_2015.reindex(index, fill_value=0)
-    ecuk_2020 = ecuk_2020.reindex(index, fill_value=0)
-
-    pieces = []
-    for target_year in target_years:
-        weight = (target_year - 2015) / (2020 - 2015)
-        shares = legacy_2015.mul(1 - weight).add(ecuk_2020.mul(weight))
-        shares = _normalise_end_use_shares_by_carrier(shares)
-        shares = shares.to_frame("value").assign(year=target_year).set_index(
-            "year", append=True
-        )["value"]
-        pieces.append(shares)
-
-    return pd.concat(pieces).reorder_levels(
-        ["carrier_name", "end_use", "country_code", "year"]
-    )
-
-
-def _normalise_end_use_shares_by_carrier(shares: pd.Series) -> pd.Series:
-    denominators = shares.groupby(level=["carrier_name", "country_code"]).transform(
-        "sum"
-    )
-    return shares.div(denominators).where(denominators > 0).dropna()
 
 
 def _drop_matching_country_end_uses(
@@ -741,18 +916,10 @@ def _drop_matching_country_end_uses(
 def _map_jrc_to_eurostat(
     energy_balance: pd.DataFrame,
     jrc_end_use_df: pd.DataFrame,
-    fill_missing_values: dict[str, list[str]],
+    jrc_idees_proxies: dict[str, list[str]],
     country_codes: list[str],
 ) -> pd.DataFrame:
     jrc_end_use_percent = _jrc_end_use_percent(jrc_end_use_df)
-    jrc_end_use_percent = _fill_missing_countries_and_years(
-        jrc_data=jrc_end_use_percent,
-        fill_missing_values=fill_missing_values,
-        country_codes=country_codes,
-    )
-    jrc_end_use_percent = _extend_jrc_share_years(
-        jrc_end_use_percent, energy_balance.columns
-    )
 
     mapped_end_uses = _map_end_use_shares_to_eurostat(
         energy_balance, jrc_end_use_percent
@@ -798,60 +965,6 @@ def _jrc_end_use_percent(jrc_end_use_df: pd.Series) -> pd.Series:
     return jrc_end_use_percent
 
 
-def _extend_jrc_share_years(
-    jrc_end_use_percent: pd.DataFrame, target_years: pd.Index
-) -> pd.DataFrame:
-    """Copy the latest available JRC end-use shares to missing target years."""
-    jrc_end_use_percent = jrc_end_use_percent.unstack("year")
-    available_years = sorted(jrc_end_use_percent.columns)
-    if not available_years:
-        return jrc_end_use_percent.stack()
-
-    for target_year in target_years:
-        if target_year in jrc_end_use_percent.columns:
-            continue
-        fallback_years = [year for year in available_years if year <= target_year]
-        fallback_year = fallback_years[-1] if fallback_years else available_years[-1]
-        jrc_end_use_percent[target_year] = jrc_end_use_percent[fallback_year]
-
-    return jrc_end_use_percent.sort_index(axis=1).stack()
-
-
-def _fill_missing_countries_and_years(
-    jrc_data: pd.DataFrame,
-    fill_missing_values: dict[str, str],
-    country_codes: list[str],
-) -> pd.DataFrame:
-    # Only fill countries requested by the current shape set. This avoids requiring
-    # unrelated reference countries for other configured fallback cases.
-    fill_missing_values = {
-        country: neighbors
-        for country, neighbors in fill_missing_values.items()
-        if country in country_codes and country != "CHE"
-    }
-    jrc_data = jrc_data.unstack("country_code")
-    if isinstance(jrc_data.columns, pd.MultiIndex):
-        if "value" not in jrc_data.columns.get_level_values(0):
-            raise ValueError(
-                "Unexpected JRC data columns after unstacking country_code: "
-                f"{jrc_data.columns.tolist()}"
-            )
-        jrc_data = jrc_data.loc[:, "value"]
-
-    for country, neighbors in fill_missing_values.items():
-        available_neighbors = [
-            neighbor for neighbor in neighbors if neighbor in jrc_data.columns
-        ]
-        if available_neighbors:
-            jrc_data = jrc_data.assign(
-                **{country: jrc_data[available_neighbors].mean(axis=1)}
-            )
-
-    jrc_data = jrc_data.stack().unstack("year")
-    jrc_data.columns = jrc_data.columns.astype(int)
-    return jrc_data.stack()
-
-
 def _read_ch_non_hh_electricity_demand(
     path_to_ch_end_use: str, sheet_name: str
 ) -> pd.DataFrame:
@@ -859,7 +972,6 @@ def _read_ch_non_hh_electricity_demand(
         _get_ch_sheet(
             path_to_ch_end_use,
             sheet_name,
-            skipfooter=4,
             translation=CH_HH_END_USE_TRANSLATION,
         )
         .assign(carrier_name="electricity", country_code="CHE")
@@ -871,12 +983,13 @@ def _read_ch_non_hh_electricity_demand(
 
 
 def _read_ch_non_hh_non_electricity_demand(
-    path_to_ch_end_use: str, sheet_name: str, hh_final_energy_demand: pd.DataFrame
+    path_to_ch_end_use: str,
+    sheet_name: str,
+    hh_final_energy_demand: pd.DataFrame,
 ):
     ch_con = _get_ch_sheet(
         path_to_ch_end_use,
         sheet_name,
-        skipfooter=4,
         translation=CH_HH_END_USE_TRANSLATION,
     )
     # this is actually just generic non-electric energy,
@@ -1045,19 +1158,63 @@ def _efficiencies(params: dict[str, float]) -> pd.Series:
 
 
 def _get_ch_sheet(
-    path_to_excel: str, sheet: str, skipfooter, translation=None
+    path_to_excel: str,
+    sheet: str,
+    translation=None,
 ) -> pd.DataFrame:
-    df = pd.read_excel(
-        path_to_excel, sheet_name=sheet, skiprows=9, skipfooter=skipfooter, index_col=1
-    ).drop(["Unnamed: 0", "Δ ’00 – ’18"], axis=1, errors="ignore")
-    df.index = df.index.str.strip()
-    df.columns = df.columns.astype(int)
-    df = df.drop(2019, axis=1, errors="ignore")
+    available_sheets = pd.ExcelFile(path_to_excel).sheet_names
+    if sheet not in available_sheets:
+        raise ValueError(
+            f"Swiss end-use sheet {sheet!r} was not found in {path_to_excel}. "
+            "The workflow expects the current BFE end-use workbook "
+            "(publication 12361, 2000-2024). Refresh the CHE/end-use.xlsx "
+            "automatic resource."
+        )
+
+    raw = pd.read_excel(path_to_excel, sheet_name=sheet, header=None)
+    header_row, year_columns, years = _ch_sheet_year_columns(raw, sheet)
+    label_column = min(year_columns) - 1
+    if label_column < 0:
+        raise ValueError(f"Could not find row labels in Swiss sheet {sheet}.")
+
+    df = raw.iloc[header_row + 1 :, [label_column, *year_columns]].copy()
+    df = df.dropna(how="all")
+    df = df.set_index(df.columns[0])
+    df.index = df.index.astype(str).str.strip()
+    df = df.loc[df.index != ""]
+    df.columns = pd.Index(years, name="year")
+    if max(years) < 2024:
+        raise ValueError(
+            f"Swiss end-use sheet {sheet!r} in {path_to_excel} only contains "
+            f"years up to {max(years)}. The workflow expects the current BFE "
+            "end-use workbook with data through 2024."
+        )
+    df = df.apply(pd.to_numeric, errors="coerce").dropna(how="all")
 
     if translation is not None:
         return df.groupby(translation).sum()
     else:
         return df
+
+
+def _ch_sheet_year_columns(
+    raw: pd.DataFrame, sheet_name: str
+) -> tuple[int, list[int], list[int]]:
+    for row_number, row in raw.iterrows():
+        year_columns = []
+        years = []
+        for column_number, value in row.items():
+            try:
+                year = int(value)
+            except (TypeError, ValueError):
+                continue
+            if 1900 <= year <= 2100:
+                year_columns.append(column_number)
+                years.append(year)
+        if year_columns:
+            return row_number, year_columns, years
+
+    raise ValueError(f"Could not find year columns in Swiss sheet {sheet_name}.")
 
 
 def _check_no_remaining_missing_values(
@@ -1103,19 +1260,27 @@ def _as_list(value) -> list[str]:
     return list(value)
 
 
+def _as_optional_path(value) -> str | None:
+    paths = _as_list(value)
+    return paths[0] if paths else None
+
+
 if __name__ == "__main__":
     get_heat_demand(
         path_to_hh_end_use=snakemake.input.hh_end_use,
         path_to_ch_end_use=snakemake.input.ch_end_use,
         path_to_energy_balance=snakemake.input.energy_balance,
         path_to_commercial_demand=snakemake.input.commercial_demand,
+        path_to_shapes=snakemake.input.shapes,
+        path_to_population=_as_optional_path(snakemake.input.population),
         paths_to_ecuk_end_use=_as_list(snakemake.input.ecuk_end_use),
         paths_to_uk_jrc_idees_2015=_as_list(snakemake.input.uk_jrc_idees_2015),
         path_to_carrier_names=snakemake.input.carrier_names,
         heat_tech_params=snakemake.params.heat_tech_params,
         country_codes=snakemake.params.countries,
+        source_country_codes=snakemake.params.source_countries,
         model_years=snakemake.params.model_years,
-        fill_missing_values=snakemake.params.fill_missing_values,
+        data_proxies=snakemake.params.data_proxies,
         path_to_electricity_demand=snakemake.output.electricity,
         path_to_output=snakemake.output.total_demand,
     )

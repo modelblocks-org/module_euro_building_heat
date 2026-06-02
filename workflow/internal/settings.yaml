@@ -39,7 +39,7 @@ resources:
       energy-balance: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/nrg_bal_c?format=TSV&compressed=true
       hh-end-use: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/nrg_d_hhq?format=TSV&compressed=true
     CHE:
-      end-use: https://www.bfe.admin.ch/bfe/en/home/versorgung/statistik-und-geodaten/energiestatistiken/energieverbrauch-nach-verwendungszweck.exturl.html/aHR0cHM6Ly9wdWJkYi5iZmUuYWRtaW4uY2gvZGUvcHVibGljYX/Rpb24vZG93bmxvYWQvOTg1NA==.html
+      end-use: https://pubdb.bfe.admin.ch/de/publication/download/12361
       energy-balance: https://www.bfe.admin.ch/bfe/en/home/versorgung/statistik-und-geodaten/energiestatistiken/gesamtenergiestatistik.exturl.html/aHR0cHM6Ly9wdWJkYi5iZmUuYWRtaW4uY2gvZGUvcHVibGljYX/Rpb24vZG93bmxvYWQvNzUxOQ==.html
       industry-energy-balance: https://www.bfe.admin.ch/bfe/en/home/versorgung/statistik-und-geodaten/energiestatistiken/teilstatistiken.exturl.html/aHR0cHM6Ly9wdWJkYi5iZmUuYWRtaW4uY2gvZGUvcHVibGljYX/Rpb24vZG93bmxvYWQvODc4OA==.html
     GBR:
@@ -52,51 +52,122 @@ resources:
         2024: https://assets.publishing.service.gov.uk/media/66f132b1b4d70bfba161ab06/ECUK_2024_End_Use_tables.xlsx
         2025: https://assets.publishing.service.gov.uk/media/6937e46392da4705a575d466/ECUK_2025_End_Use_tables_181225.xlsx
 scope:
-  spatial:
-    countries:
-      - AUT
-      - BEL
-      - BGR
-      - HRV
-      - CYP
-      - CZE
-      - DNK
-      - EST
-      - FIN
-      - FRA
-      - DEU
-      - GRC
-      - HUN
-      - IRL
-      - ITA
-      - LVA
-      - LTU
-      - LUX
-      - NLD
-      - MLT
-      - POL
-      - PRT
-      - ROU
-      - SVK
-      - SVN
-      - ESP
-      - SWE
-      - GBR
-      - ALB
-      - BIH
-      - MKD
-      - MNE
-      - NOR
-      - SRB
-      - CHE
-
-data_pre_processing:
-  fill_missing_values:
-    jrc_idees:
-      ALB: [BGR, HRV, HUN, ROU, GRC]
-      BIH: [BGR, HRV, HUN, ROU, GRC]
-      MKD: [BGR, HRV, HUN, ROU, GRC]
-      SRB: [BGR, HRV, HUN, ROU, GRC]
-      MNE: [BGR, HRV, HUN, ROU, GRC]
-      NOR: [SWE, DNK]
-      CHE: [DEU, AUT, FRA, ITA]
+  datasets:
+    annual_energy_balance:
+      proxy_config: annual_energy_balance
+      proxy_requires_shape_population: true
+      countries:
+        - ALB
+        - AUT
+        - BEL
+        - BGR
+        - BIH
+        - CHE
+        - CYP
+        - CZE
+        - DEU
+        - DNK
+        - EST
+        - FIN
+        - FRA
+        - GBR
+        - GEO
+        - GRC
+        - HRV
+        - HUN
+        - IRL
+        - ISL
+        - ITA
+        - LVA
+        - LTU
+        - LUX
+        - MDA
+        - MKD
+        - MLT
+        - MNE
+        - NLD
+        - NOR
+        - POL
+        - PRT
+        - ROU
+        - SRB
+        - SVK
+        - SVN
+        - ESP
+        - SWE
+        - TUR
+        - UKR
+    household_end_use:
+      proxy_config: household_end_use
+      countries:
+        - ALB
+        - AUT
+        - BEL
+        - BGR
+        - BIH
+        - CHE
+        - CYP
+        - CZE
+        - DEU
+        - DNK
+        - EST
+        - FIN
+        - FRA
+        - GBR
+        - GEO
+        - GRC
+        - HRV
+        - HUN
+        - IRL
+        - ITA
+        - LVA
+        - LTU
+        - LUX
+        - MDA
+        - MKD
+        - MLT
+        - MNE
+        - NLD
+        - NOR
+        - POL
+        - PRT
+        - ROU
+        - SRB
+        - SVK
+        - SVN
+        - ESP
+        - SWE
+        - TUR
+        - UKR
+    commercial_end_use:
+      proxy_config: jrc_idees
+      countries:
+        - AUT
+        - BEL
+        - BGR
+        - HRV
+        - CYP
+        - CZE
+        - DNK
+        - EST
+        - FIN
+        - FRA
+        - DEU
+        - GRC
+        - HUN
+        - IRL
+        - ITA
+        - LVA
+        - LTU
+        - LUX
+        - NLD
+        - MLT
+        - POL
+        - PRT
+        - ROU
+        - SVK
+        - SVN
+        - ESP
+        - SWE
+        - GBR
+        - CHE

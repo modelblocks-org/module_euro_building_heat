@@ -1,6 +1,7 @@
 """Scale national annual heat demand to arbitrary Modelblocks shapes."""
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -102,10 +103,51 @@ def rescale_to_shapes(
     return demand
 
 
+def report_country_total_discrepancies(
+    national_demand: pd.DataFrame,
+    disaggregated_demand: pd.DataFrame,
+    shape_to_country: pd.Series,
+    rtol: float = 1e-6,
+    atol: float = 1e-9,
+) -> None:
+    """Print countries whose disaggregated total does not match annual demand."""
+    shape_to_country = shape_to_country.reindex(disaggregated_demand.columns)
+    disaggregated_country_totals = (
+        disaggregated_demand.T.groupby(shape_to_country).sum().T.sum(axis=0)
+    )
+    national_country_totals = national_demand.sum(axis=0).reindex(
+        disaggregated_country_totals.index
+    )
+
+    discrepancies = disaggregated_country_totals.sub(national_country_totals)
+    reference = national_country_totals.where(national_country_totals != 0)
+    discrepancy_pct = discrepancies.div(reference).mul(100)
+    matching = np.isclose(
+        disaggregated_country_totals,
+        national_country_totals,
+        rtol=rtol,
+        atol=atol,
+        equal_nan=False,
+    )
+    if matching.all():
+        return
+
+    print(
+        "Annual and disaggregated heat demand totals differ for these countries "
+        "(disaggregated - annual):"
+    )
+    for country_code in disaggregated_country_totals.index[~matching]:
+        print(
+            f"  {country_code}: {discrepancies[country_code]:.6g} TWh "
+            f"({discrepancy_pct[country_code]:.6g}%)"
+        )
+
+
 if __name__ == "__main__":
     demand = read_national_demand(snakemake.input.annual_demand)
     mapping = country_map(snakemake.input.shapes)
     population = shape_population(snakemake.input.population)
 
     scaled = rescale_to_shapes(demand, mapping, population)
+    report_country_total_discrepancies(demand, scaled, mapping)
     scaled.to_parquet(snakemake.output[0])

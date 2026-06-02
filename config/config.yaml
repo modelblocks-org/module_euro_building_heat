@@ -1,8 +1,8 @@
 # Minimal example configuration for the heat demand workflow.
 years:
   # End year is exclusive, matching the Modelblocks module convention.
-  start: 2024
-  end: 2025
+  start: 2023
+  end: 2024
 
 weather:
   # Weather years used to shape hourly heat demand profiles. End year is exclusive.
@@ -16,6 +16,32 @@ population:
   # GHSL GHS-POP resolution in metres. 100 m is the most precise available
   # Mollweide grid; use 100 for a heavier, longer download.
   resolution: 1000
+
+# FIXME: Still GBR as a proxy is breaking so update later. 
+data_proxies:
+  annual_energy_balance:
+    AND: [ESP]
+    LIE: [CHE]
+    MCO: [FRA]
+    SMR: [ITA]
+  household_end_use:
+    AND: [ESP]
+    ISL: [SWE, DNK]
+    LIE: [CHE]
+    MCO: [FRA]
+    SMR: [ITA]
+  jrc_idees:
+    ALB: [BGR, HRV, HUN, ROU, GRC]
+    AND: [ESP]
+    BIH: [BGR, HRV, HUN, ROU, GRC]
+    ISL: [SWE, DNK]
+    LIE: [CHE]
+    MKD: [BGR, HRV, HUN, ROU, GRC]
+    MCO: [FRA]
+    MNE: [BGR, HRV, HUN, ROU, GRC]
+    NOR: [SWE, DNK]
+    SMR: [ITA]
+    SRB: [BGR, HRV, HUN, ROU, GRC]
 
 scaling:
   # Convert MWh to the power unit expected by the downstream model.

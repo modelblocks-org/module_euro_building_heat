@@ -21,15 +21,6 @@ CARRIER_TRANSLATION = {
 }
 
 
-# FIXME: Update this with earlier data from JRC for the years through 2018. This makes comparisons based on earlier years possible.
-def selected_ecuk_year(config_year: int, available_years: Iterable[int]) -> int:
-    """Return the closest ECUK publication year, preferring later years on ties."""
-    years = sorted(int(year) for year in available_years)
-    if not years:
-        raise ValueError("At least one ECUK end-use year must be configured.")
-    return max(years, key=lambda year: (-abs(year - int(config_year)), year))
-
-
 def read_ecuk_service_end_use_shares(path: str, target_years: Iterable[int]):
     """Read ECUK service-sector end-use shares for Great Britain."""
     import pandas as pd
@@ -73,10 +64,15 @@ def ecuk_service_end_use_shares_from_table(table, target_years: Iterable[int]):
 
     values = pd.DataFrame.from_records(records)
     available_years = sorted(values["source_year"].unique())
+    missing_years = sorted(set(target_years) - set(available_years))
+    if missing_years:
+        raise ValueError(
+            "ECUK Table U5 is missing requested model years: "
+            f"{missing_years}. Available years: {available_years}."
+        )
     shares = []
     for target_year in target_years:
-        source_year = selected_ecuk_year(target_year, available_years)
-        source_values = values[values["source_year"].eq(source_year)]
+        source_values = values[values["source_year"].eq(target_year)]
         denominators = source_values.groupby("carrier_name")["value"].sum()
         output_values = source_values.dropna(subset=["end_use"])
         for row in output_values.itertuples(index=False):

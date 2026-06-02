@@ -16,8 +16,12 @@ properties:
     properties:
       start:
         type: integer
+        minimum: 2010
+        maximum: 2023
       end:
         type: integer
+        minimum: 2011
+        maximum: 2024
   weather:
     type: object
     additionalProperties: false
@@ -42,6 +46,16 @@ properties:
       resolution:
         type: integer
         enum: [100, 1000]
+  data_proxies:
+    type: object
+    additionalProperties: false
+    properties:
+      annual_energy_balance:
+        $ref: "#/$defs/country_proxy_map"
+      household_end_use:
+        $ref: "#/$defs/country_proxy_map"
+      jrc_idees:
+        $ref: "#/$defs/country_proxy_map"
   scaling:
     type: object
     additionalProperties: false
@@ -74,3 +88,12 @@ properties:
             type: number
             minimum: 0
             maximum: 1
+$defs:
+  country_proxy_map:
+    type: object
+    additionalProperties:
+      type: array
+      minItems: 1
+      items:
+        type: string
+        pattern: "^[A-Za-z]{3}$"

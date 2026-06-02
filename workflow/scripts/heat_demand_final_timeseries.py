@@ -101,37 +101,6 @@ def prepare_annual_demand(annual_demand: pd.Series) -> xr.DataArray:
         .to_xarray()[["space_heat", "hot_water"]]
     )
 
-
-# FIXME: this probably should be removed. Models can just convert this if needed.
-def electrify_heat_demand_profiles(
-    heat_demand: xr.DataArray, cop: xr.DataArray, electrification_shares: dict
-) -> xr.DataArray:
-    """Convert heat demand to electricity demand."""
-    normalised_heat_demand = heat_demand / heat_demand.sum("time")
-
-    # Weight COP to SCOP (seasonal coefficient of performance).
-    weighted_average_cop = (
-        (normalised_heat_demand * cop).sum("time").expand_dims(tech=["heat-pump"])
-    )
-    direct_electrification_eff = xr.DataArray([1], dims={"tech": ["direct"]})
-    efficiency_da = xr.concat(
-        [weighted_average_cop, direct_electrification_eff], dim="tech"
-    )
-    electrification_shares_da = (
-        pd.DataFrame(electrification_shares)
-        .rename_axis(index="tech")
-        .to_xarray()
-        .to_array("end_use")
-    )
-    assert np.isclose(
-        electrification_shares_da.sum("tech"), 1
-    ).all(), "Heat electrification shares must add up to 1."
-    electrified_heat_demand = (
-        heat_demand * electrification_shares_da / efficiency_da
-    ).sum("tech")
-    return electrified_heat_demand
-
-
 if __name__ == "__main__":
     annual_demand = pd.read_parquet(snakemake.input.annual_demand)
     annual_demand_ds = prepare_annual_demand(annual_demand)
@@ -143,14 +112,6 @@ if __name__ == "__main__":
         snakemake.params.scaling_factor,
         snakemake.params.weather_model_years,
     )
-    # if snakemake.wildcards.input_dataset == "electrified-heat":
-    #     cop = xr.open_dataset(snakemake.input.cop).to_array("end_use")
-    #     scaled_profiles = electrify_heat_demand_profiles(
-    #         scaled_profiles, cop, snakemake.params.electrification_shares
-    #     )
-
-    # # Demands are stored as negative values for Calliope to ingest
-    # if snakemake.wildcards.tech_group == "demand":
 
     final_df = (
         scaled_profiles.sum("end_use")

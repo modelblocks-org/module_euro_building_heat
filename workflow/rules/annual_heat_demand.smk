@@ -19,7 +19,7 @@ def _jrc_idees_inputs(wildcards):
 def _ecuk_end_use_inputs(wildcards):
     country_data = checkpoints.prepare_shape_country_scope.get(
         shapes=wildcards.shapes
-    ).output.country_ids
+    ).output.source_country_ids
     if "GBR" not in _read_checkpoint_lines(country_data):
         return []
     return expand(
@@ -31,12 +31,28 @@ def _ecuk_end_use_inputs(wildcards):
 def _uk_jrc_idees_2015_inputs(wildcards):
     country_data = checkpoints.prepare_shape_country_scope.get(
         shapes=wildcards.shapes
-    ).output.country_ids
+    ).output.source_country_ids
     if "GBR" not in _read_checkpoint_lines(country_data):
         return []
     if config["years"]["start"] > 2019:
         return []
     return ["<resources>/automatic/GBR/jrc-idees-2015_Tertiary_UK.xlsx"]
+
+
+def _annual_energy_balance_proxy_population_inputs(wildcards):
+    country_data = checkpoints.prepare_shape_country_scope.get(
+        shapes=wildcards.shapes
+    ).output.country_ids
+    countries = set(_read_checkpoint_lines(country_data))
+    proxy_countries = set(
+        config.get("data_proxies", {}).get("annual_energy_balance", {})
+    )
+    if countries & proxy_countries:
+        return expand(
+            "<resources>/automatic/shapes/{shapes}/population.nc",
+            shapes=wildcards.shapes,
+        )
+    return []
 
 
 rule filter_shapes:
@@ -49,7 +65,8 @@ rule filter_shapes:
     conda:
         "../envs/geo.yaml"
     params:
-        supported_countries=internal["scope"]["spatial"]["countries"],
+        dataset_scopes=internal["scope"]["datasets"],
+        data_proxies=config.get("data_proxies", {}),
     message:
         "Filter marine regions from '{wildcards.shapes}' shapes."
     script:
@@ -61,16 +78,15 @@ checkpoint prepare_shape_country_scope:
         shapes=rules.filter_shapes.output[0],
     output:
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
+        source_country_ids="<resources>/automatic/shapes/{shapes}/source_country_ids.txt",
         jrc_idees_country_codes="<resources>/automatic/shapes/{shapes}/jrc_idees_country_codes.txt",
     log:
         "<logs>/{shapes}/annual/prepare_shape_country_scope.log",
     conda:
         "../envs/geo.yaml"
     params:
-        supported_countries=internal["scope"]["spatial"]["countries"],
-        fill_missing_values=internal["data_pre_processing"]["fill_missing_values"][
-            "jrc_idees"
-        ],
+        dataset_scopes=internal["scope"]["datasets"],
+        data_proxies=config.get("data_proxies", {}),
         jrc_idees_spatial_scope=JRC_IDEES_SPATIAL_SCOPE,
     message:
         "Determine heat-demand country scope for '{wildcards.shapes}' shapes."
@@ -122,9 +138,12 @@ rule process_annual_heat_demand:
         ch_end_use="<resources>/automatic/CHE/end-use.xlsx",
         energy_balance=rules.process_annual_energy_balances.output[0],
         commercial_demand=rules.process_jrc_idees_tertiary.output[0],
+        shapes=rules.filter_shapes.output[0],
+        population=_annual_energy_balance_proxy_population_inputs,
         ecuk_end_use=_ecuk_end_use_inputs,
         uk_jrc_idees_2015=_uk_jrc_idees_2015_inputs,
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
+        source_country_ids="<resources>/automatic/shapes/{shapes}/source_country_ids.txt",
         carrier_names=workflow.source_path(
             "../internal/energy-balance-carrier-names.csv"
         ),
@@ -139,9 +158,10 @@ rule process_annual_heat_demand:
         heat_tech_params=config["heat"]["tech_efficiencies"],
         model_years=MODEL_YEARS,
         countries=lambda wildcards, input: _read_checkpoint_lines(input.country_ids),
-        fill_missing_values=internal["data_pre_processing"]["fill_missing_values"][
-            "jrc_idees"
-        ],
+        source_countries=lambda wildcards, input: _read_checkpoint_lines(
+            input.source_country_ids
+        ),
+        data_proxies=config.get("data_proxies", {}),
     message:
         "Calculate national annual heat demand for household and commercial sectors."
     script:

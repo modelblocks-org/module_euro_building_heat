@@ -40,34 +40,95 @@ def _normalise_country_ids(values: pd.Series) -> list[str]:
     return sorted(country_ids.unique())
 
 
-def _check_supported_country_ids(
-    country_ids: list[str], supported_countries: list[str]
-) -> None:
-    supported_country_ids = {
+def _normalise_country_set(values) -> set[str]:
+    return {
         str(country_id).strip().upper()
-        for country_id in supported_countries
+        for country_id in values
         if str(country_id).strip()
     }
-    unsupported_country_ids = sorted(set(country_ids) - supported_country_ids)
-    if unsupported_country_ids:
-        raise ValueError(
-            "The shapes file requests countries that this module cannot process: "
-            f"{unsupported_country_ids}. Remove these countries from the shapes "
-            "input or add the required data support before running the workflow."
-        )
+
+
+def _normalise_proxy_map(proxy_map: dict | None) -> dict[str, set[str]]:
+    if not proxy_map:
+        return {}
+    return {
+        str(country_id).strip().upper(): _normalise_country_set(references)
+        for country_id, references in proxy_map.items()
+    }
+
+
+def _check_dataset_country_scope(
+    country_ids: list[str], dataset_scopes: dict, data_proxies: dict | None
+) -> None:
+    requested_country_ids = set(country_ids)
+    data_proxies = data_proxies or {}
+    failures = []
+    for dataset_name, scope in dataset_scopes.items():
+        covered_country_ids = _normalise_country_set(scope.get("countries", []))
+        proxy_key = scope.get("proxy_config")
+        proxies = _normalise_proxy_map(data_proxies.get(proxy_key))
+
+        for country_id in sorted(requested_country_ids - covered_country_ids):
+            proxy_country_ids = proxies.get(country_id, set())
+            missing_scope = sorted(proxy_country_ids - covered_country_ids)
+            missing_shapes = sorted(proxy_country_ids - requested_country_ids)
+            if (
+                proxy_country_ids
+                and not missing_scope
+                and (
+                    not scope.get("proxy_requires_shape_population", False)
+                    or not missing_shapes
+                )
+            ):
+                continue
+            failures.append(
+                f"{dataset_name}: {country_id}"
+                + (
+                    " no proxy"
+                    if not proxy_country_ids
+                    else f" proxies missing from scope {missing_scope}"
+                    if missing_scope
+                    else f" proxies missing from shapes {missing_shapes}"
+                )
+            )
+
+    if failures:
+        raise ValueError("Unsupported countries: " + "; ".join(failures))
+
+
+def _expand_country_ids(
+    country_ids: list[str],
+    proxies: dict[str, list[str]],
+    covered_country_ids: set[str],
+) -> list[str]:
+    proxies = _normalise_proxy_map(proxies)
+    expanded_country_ids = set(country_ids)
+    changed = True
+    while changed:
+        changed = False
+        for country_id, references in proxies.items():
+            if (
+                country_id not in expanded_country_ids
+                or country_id in covered_country_ids
+            ):
+                continue
+            before = len(expanded_country_ids)
+            expanded_country_ids.update(references)
+            changed = changed or len(expanded_country_ids) > before
+    return sorted(expanded_country_ids)
 
 
 def _jrc_idees_scope(
     country_ids: list[str],
-    fill_missing_values: dict[str, list[str]],
+    jrc_idees_proxies: dict[str, list[str]],
     jrc_idees_spatial_scope: list[str],
+    commercial_end_use_scope: list[str],
 ) -> list[str]:
-    reference_countries = {
-        reference
-        for country_id in country_ids
-        for reference in fill_missing_values.get(country_id, [])
-    }
-    required_country_ids = set(country_ids) | reference_countries
+    required_country_ids = _expand_country_ids(
+        country_ids,
+        jrc_idees_proxies,
+        _normalise_country_set(commercial_end_use_scope),
+    )
     return sorted(
         jrc_code
         for country_id in required_country_ids
@@ -83,17 +144,29 @@ if __name__ == "__main__":
     country_ids = _normalise_country_ids(shapes["country_id"])
     if not country_ids:
         raise ValueError("The shapes parquet file does not contain any country IDs.")
-    _check_supported_country_ids(
+    _check_dataset_country_scope(
         country_ids,
-        snakemake.params.supported_countries,
+        snakemake.params.dataset_scopes,
+        snakemake.params.data_proxies,
+    )
+    commercial_end_use_scope = snakemake.params.dataset_scopes[
+        "commercial_end_use"
+    ]["countries"]
+    source_country_ids = _expand_country_ids(
+        country_ids,
+        snakemake.params.data_proxies.get("jrc_idees", {}),
+        _normalise_country_set(commercial_end_use_scope),
     )
     jrc_idees_country_codes = _jrc_idees_scope(
         country_ids,
-        snakemake.params.fill_missing_values,
+        snakemake.params.data_proxies.get("jrc_idees", {}),
         snakemake.params.jrc_idees_spatial_scope,
+        commercial_end_use_scope,
     )
 
     with open(snakemake.output.country_ids, "w") as f:
         f.write("\n".join(country_ids) + "\n")
+    with open(snakemake.output.source_country_ids, "w") as f:
+        f.write("\n".join(source_country_ids) + "\n")
     with open(snakemake.output.jrc_idees_country_codes, "w") as f:
         f.write("\n".join(jrc_idees_country_codes) + "\n")
