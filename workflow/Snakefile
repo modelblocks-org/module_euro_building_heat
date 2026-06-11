@@ -14,6 +14,8 @@ pathvars:
     # Module results
     annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
     heat_demand="<results>/{shapes}/aggregated/heat_demand.parquet",
+    heat_pump_cop="<results>/{shapes}/aggregated/heat_pump_cop.parquet",
+    heat_pump_electricity_demand="<results>/{shapes}/aggregated/heat_pump_electricity_demand.parquet",
     heat_demand_visualization="<results>/{shapes}/visualization/heat_demand.html",
 
 
@@ -67,6 +69,7 @@ ghsl_population = {
 include: "rules/automatic.smk"
 include: "rules/annual_heat_demand.smk"
 include: "rules/heat_timeseries.smk"
+include: "rules/heat_pump_cop.smk"
 
 
 # Add additional files to be delivered alongside the workflow here.

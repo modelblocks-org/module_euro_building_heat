@@ -41,7 +41,7 @@ rule download_gridded_weather_data:
     log:
         "<logs>/automatic/download_gridded_weather_data_{data_var}.log",
     wildcard_constraints:
-        data_var="grid|temperature|wind10m",
+        data_var="grid|temperature|wind10m|tsoil5",
     conda:
         "../envs/shell.yaml"
     params:
@@ -51,6 +51,22 @@ rule download_gridded_weather_data:
         "Download gridded {wildcards.data_var} data."
     shell:
         "curl {params.curl_args} --output {output}.tmp '{params.dataset_url}/files/{wildcards.data_var}.nc' 2> {log} && mv {output}.tmp {output}"
+
+
+rule download_heat_pump_characteristics:
+    output:
+        "<resources>/automatic/heat-pump-characteristics.nc",
+    log:
+        "<logs>/automatic/download_heat_pump_characteristics.log",
+    conda:
+        "../envs/shell.yaml"
+    params:
+        curl_args=CURL_ARGS,
+        url=internal["resources"]["automatic"]["heat_pump_characteristics"],
+    message:
+        "Download manufacturer heat-pump characteristic data."
+    shell:
+        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
 
 rule download_raw_population:

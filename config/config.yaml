@@ -72,3 +72,17 @@ heat:
   sfh_mfh_shares:
     MFH: 0.45
     SFH: 0.55
+  heat_pump:
+    sink_temperature:
+      underfloor: 35
+      radiator_large: 50
+      radiator_conventional: 65
+      hot_water: 60
+    space_heat_sink_shares:
+      underfloor: 0.1
+      radiator_large: 0.15
+      radiator_conventional: 0.75
+    heat_pump_shares:
+      ashp: 0.9
+      gshp: 0.1
+    correction_factor: 0.85

@@ -23,6 +23,12 @@ pathvars:
     heat_demand:
       default: "<results>/{shapes}/aggregated/heat_demand.parquet"
       description: Shape-aggregated heat demand time series.
+    heat_pump_cop:
+      default: "<results>/{shapes}/aggregated/heat_pump_cop.parquet"
+      description: Shape-aggregated heat-pump coefficient of performance time series.
+    heat_pump_electricity_demand:
+      default: "<results>/{shapes}/aggregated/heat_pump_electricity_demand.parquet"
+      description: Shape-aggregated electricity demand time series for heat supplied by heat pumps.
     heat_demand_visualization:
       default: "<results>/{shapes}/visualization/heat_demand.html"
       description: Interactive choropleth map for visually checking heat demand time series.

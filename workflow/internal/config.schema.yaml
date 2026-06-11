@@ -88,6 +88,43 @@ properties:
             type: number
             minimum: 0
             maximum: 1
+      heat_pump:
+        type: object
+        additionalProperties: false
+        required:
+          - sink_temperature
+          - space_heat_sink_shares
+          - heat_pump_shares
+          - correction_factor
+        properties:
+          sink_temperature:
+            type: object
+            minProperties: 2
+            additionalProperties:
+              type: number
+          space_heat_sink_shares:
+            type: object
+            minProperties: 1
+            additionalProperties:
+              type: number
+              minimum: 0
+              maximum: 1
+          heat_pump_shares:
+            type: object
+            additionalProperties: false
+            required: [ashp, gshp]
+            properties:
+              ashp:
+                type: number
+                minimum: 0
+                maximum: 1
+              gshp:
+                type: number
+                minimum: 0
+                maximum: 1
+          correction_factor:
+            type: number
+            exclusiveMinimum: 0
 $defs:
   country_proxy_map:
     type: object
