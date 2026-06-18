@@ -58,7 +58,11 @@ The main configuration groups are:
 - `weather`: first weather year and exclusive end weather year used to shape
   hourly heat-demand profiles. The weather-year span must match the model-year
   span. Output time series keep weather-year timestamps while annual scaling
-  uses the paired model years.
+  uses the paired model years. Weather data is downloaded from CDS/ERA5 for
+  the requested shapes only. Monthly ERA5 requests are downloaded as GRIB files
+  with all required weather variables in each request. Set
+  `weather.download_workers` to control how many monthly requests run in
+  parallel; the default is `2`.
 - `threads.aggregation`: number of threads used when aggregating gridded heat
   profiles to shapes.
 - `population.resolution`: GHSL GHS-POP resolution in metres. The default is
@@ -72,9 +76,9 @@ The main configuration groups are:
 - `heat.sfh_mfh_shares`: shares of single-family and multi-family households
   used when combining household heat profiles.
 
-The default gridded weather archive currently covers 2000-2018. For model years
-outside that archive, configure a matching weather-year range; those weather
-timestamps are preserved in the final time series.
+CDS downloads require a valid `$HOME/.cdsapirc` file and accepted Terms of Use
+for the ERA5 hourly single-levels dataset in the Copernicus Climate Data Store.
+The workflow does not store CDS credentials in the module configuration.
 
 The module is designed to be called from another Snakemake workflow. A minimal
 import looks like this:
@@ -155,8 +159,9 @@ This module is based on the following research and datasets:
 
 - When2Heat heat-demand profile methodology and parameters:
   <https://github.com/oruhnau/when2heat>
-- Gridded weather data used for temperature, wind speed, and grid definitions:
-  <https://zenodo.org/records/11516744>
+- ERA5 hourly single-level weather data used for temperature, wind speed, soil
+  temperature, and grid definitions:
+  <https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels>
 - When2Heat demand profile parameter archive:
   <https://zenodo.org/records/10965295>
 - JRC-IDEES 2023 energy demand data:

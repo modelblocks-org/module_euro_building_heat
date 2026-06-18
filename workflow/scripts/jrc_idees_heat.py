@@ -4,6 +4,14 @@ import numpy as np
 import pandas as pd
 
 idx = pd.IndexSlice
+JRC_HEAT_INDEX_NAMES = [
+    "carrier_name",
+    "end_use",
+    "country_code",
+    "unit",
+    "energy",
+    "year",
+]
 
 END_USES = {
     "Space heating": "space_heat",
@@ -80,14 +88,26 @@ def read_jrc_heat_tertiary_sector_data(paths_to_national_data: list[str]) -> pd.
 
         dfs.append(df)
 
+    if not dfs:
+        return _empty_jrc_heat_series()
+
     return pd.concat(dfs).stack()
+
+
+def _empty_jrc_heat_series() -> pd.Series:
+    index = pd.MultiIndex.from_arrays(
+        [[] for _ in JRC_HEAT_INDEX_NAMES],
+        names=JRC_HEAT_INDEX_NAMES,
+    )
+    return pd.Series(index=index, dtype=float)
 
 
 def _clean_df(df: pd.DataFrame, energy_type: str):
     country_code = df.index.names[0].split(" - ")[0]
     df = _select_year_columns(df)
     year_columns = df.columns
-    df = df.assign(end_use=np.nan)
+    df = df.assign(end_use=pd.NA)
+    df["end_use"] = df["end_use"].astype("object")
     end_use_rows = df.index.isin(END_USES.keys())
     df.loc[end_use_rows, "end_use"] = df.index[end_use_rows]
     df.end_use = df.end_use.fillna(df.end_use.ffill())

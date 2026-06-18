@@ -285,9 +285,9 @@ def _get_ch_transport_energy_balance(path_to_excel):
     df.columns = carrier_name_func(0).fillna(carrier_name_func(1)).values
 
     df = (
-        df.groupby(axis=1, level=0)
+        df.T.groupby(level=0)
         .sum()
-        .rename_axis(index="year", columns="carrier_code")
+        .T.rename_axis(index="year", columns="carrier_code")
         .T
     )
     df.index = pd.MultiIndex.from_tuples(df.index, names=("carrier_code", "cat_code"))
@@ -357,7 +357,7 @@ def _get_ch_industry_energy_balance_by_carrier_sheet(path_to_excel):
 
     return (
         pd.concat(dfs)
-        .groupby(axis=0, level=["carrier_code", "year"])
+        .groupby(level=["carrier_code", "year"])
         .sum()
         .stack()
         .rename("value")
@@ -415,7 +415,7 @@ def _get_ch_industry_energy_balance_legacy(path_to_excel):
             ],
             axis=0,
         )
-        .groupby(axis=0, level=[0, 1])  # group carriers
+        .groupby(level=[0, 1])  # group carriers
         .sum()
         .stack()
         .rename("value")
@@ -444,8 +444,9 @@ def _read_industry_subsector(
         .assign(carrier_code=carrier_code)
         .reset_index()
         .set_index(["carrier_code", "year"])
-        .groupby(axis=1, level=0)  # group sectors
+        .T.groupby(level=0)  # group sectors
         .sum()
+        .T
     )
 
 

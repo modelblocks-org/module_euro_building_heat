@@ -26,10 +26,14 @@ pyarrow = ">=24.0.0,<25"
 [tasks]
 test-integration = {cmd = "pytest tests/integration_test.py"}
 
-[feature.geo]
+[feature."heat-demand"]
 channels = ["conda-forge", "bioconda", "nodefaults"]
 
-[feature.geo.dependencies]
+[feature."heat-demand".dependencies]
+bottleneck = "1.6.0.*"
+cfgrib = "0.9.15.1.*"
+dask = "2026.6.0.*"
+eccodes = "2.46.0.*"
 fiona = "1.10.1.*"
 gdal = "3.10.2.*"
 geopandas = "1.0.1.*"
@@ -38,6 +42,7 @@ jinja2 = "3.1.6.*"
 netcdf4 = "1.7.2.*"
 networkx = "3.4.2.*"
 numpy = "2.2.4.*"
+openpyxl = "3.1.5.*"
 pandas = "2.2.3.*"
 pyarrow = "19.0.1.*"
 pycountry = "24.6.1.*"
@@ -48,9 +53,26 @@ rioxarray = "0.18.2.*"
 scipy = "1.15.2.*"
 shapely = "2.0.7.*"
 xarray = "2025.1.2.*"
+xlrd = "2.0.2.*"
 
-[feature.geo.pypi-dependencies]
+[feature."heat-demand".pypi-dependencies]
 gregor = "==0.0.2"
 
+[feature.shell]
+channels = ["conda-forge", "bioconda", "nodefaults"]
+
+[feature.shell.dependencies]
+python = "3.12.9.*"
+cdsapi = "0.7.7.*"
+curl = "8.20.0.*"
+fiona = "1.10.1.*"
+gdal = "3.10.2.*"
+geopandas = "1.0.1.*"
+numpy = "2.2.4.*"
+pandas = "2.2.3.*"
+pyarrow = "19.0.1.*"
+shapely = "2.0.7.*"
+
 [environments]
-geo = { features = ["geo"], no-default-feature = true }
+heat-demand = { features = ["heat-demand"], no-default-feature = true }
+shell = { features = ["shell"], no-default-feature = true }

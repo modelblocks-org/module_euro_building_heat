@@ -1,17 +1,37 @@
 """Rules for gridded and shape-aggregated heat-demand time series."""
 
 
+rule process_gridded_weather_data:
+    input:
+        raw_weather=rules.download_gridded_weather_data.output.raw_weather,
+    output:
+        grid="<resources>/automatic/shapes/{shapes}/gridded-weather/grid.nc",
+        temperature="<resources>/automatic/shapes/{shapes}/gridded-weather/temperature.nc",
+        wind10m="<resources>/automatic/shapes/{shapes}/gridded-weather/wind10m.nc",
+        tsoil5="<resources>/automatic/shapes/{shapes}/gridded-weather/tsoil5.nc",
+    log:
+        "<logs>/{shapes}/timeseries/process_gridded_weather_data.log",
+    conda:
+        "../envs/heat_demand.yaml"
+    params:
+        weather_years=WEATHER_YEARS,
+    message:
+        "Process raw ERA5 weather data for '{wildcards.shapes}'."
+    script:
+        "../scripts/process_gridded_weather_data.py"
+
+
 rule unscaled_heat_profiles:
     input:
-        wind_speed="<resources>/automatic/gridded-weather/wind10m.nc",
-        temperature="<resources>/automatic/gridded-weather/temperature.nc",
+        wind_speed=rules.process_gridded_weather_data.output.wind10m,
+        temperature=rules.process_gridded_weather_data.output.temperature,
         when2heat=rules.download_when2heat_params.output[0],
     output:
-        "<resources>/automatic/hourly_unscaled_heat_demand.nc",
+        "<resources>/automatic/shapes/{shapes}/gridded-hourly_unscaled_heat_demand.nc",
     log:
-        "<logs>/timeseries/unscaled_heat_profiles.log",
+        "<logs>/{shapes}/timeseries/unscaled_heat_profiles.log",
     conda:
-        "../envs/heat.yaml"
+        "../envs/heat_demand.yaml"
     params:
         weather_years=WEATHER_YEARS,
     message:
@@ -22,7 +42,7 @@ rule unscaled_heat_profiles:
 
 rule population_per_weather_gridbox:
     input:
-        weather_grid="<resources>/automatic/gridded-weather/grid.nc",
+        weather_grid=rules.process_gridded_weather_data.output.grid,
         population=rules.unzip_raw_population.output[0],
         locations=rules.filter_shapes.output[0],
     output:
@@ -30,7 +50,7 @@ rule population_per_weather_gridbox:
     log:
         "<logs>/{shapes}/timeseries/population_per_weather_gridbox.log",
     conda:
-        "../envs/geo.yaml"
+        "../envs/heat_demand.yaml"
     params:
         lat_name="lat",
         lon_name="lon",
@@ -49,7 +69,7 @@ rule group_gridded_timeseries_heat_demand:
     log:
         "<logs>/{shapes}/timeseries/group_gridded_timeseries_heat_demand.log",
     conda:
-        "../envs/heat.yaml"
+        "../envs/heat_demand.yaml"
     threads: config["threads"]["aggregation"]
     message:
         "Aggregate gridded heat demand profiles to '{wildcards.shapes}' shapes."
@@ -66,7 +86,7 @@ rule heat_demand_final_timeseries:
     log:
         "<logs>/{shapes}/timeseries/heat_demand_final_timeseries.log",
     conda:
-        "../envs/heat.yaml"
+        "../envs/heat_demand.yaml"
     params:
         sfh_mfh_shares=config["heat"]["sfh_mfh_shares"],
         scaling_factor=config["scaling"]["power"],
@@ -86,7 +106,7 @@ rule heat_demand_visualization:
     log:
         "<logs>/{shapes}/visualization/heat_demand_visualization.log",
     conda:
-        "../envs/geo.yaml"
+        "../envs/heat_demand.yaml"
     params:
         max_steps=1000,
     message:

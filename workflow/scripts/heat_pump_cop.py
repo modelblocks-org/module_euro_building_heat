@@ -68,7 +68,7 @@ def cop(
 
     # 2. Get characteristics per sink method.
     pre_grouped_heat_pump_characteristics = (
-        xr.open_dataarray(path_to_heat_pump_characteristics)
+        xr.open_dataarray(path_to_heat_pump_characteristics, decode_timedelta=True)
         .mean("product")  # ASSUME: take the average of all heat pump products
         .sel(data_type="COP")
         .interp(sink_temp=list(sink_temperature.values()))
@@ -152,7 +152,7 @@ def _load_temperature_data(
     path_to_temperature_data: str, weather_years: list[int]
 ) -> xr.Dataset:
     """Subset to the configured weather years and check that units are correct."""
-    ds = xr.open_dataset(path_to_temperature_data).sel(
+    ds = xr.open_dataset(path_to_temperature_data, decode_timedelta=True).sel(
         time=slice(str(min(weather_years)), str(max(weather_years)))
     )
     assert ds.attrs["unit"].lower() == "degrees c"

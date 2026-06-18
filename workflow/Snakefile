@@ -30,9 +30,6 @@ validate(config, workflow.source_path("internal/config.schema.yaml"))
 with open(workflow.source_path("internal/settings.yaml"), "r") as f:
     internal = yaml.safe_load(f)
 
-config.setdefault("population", {})
-config["population"].setdefault("resolution", 100)
-
 if config["years"]["start"] >= config["years"]["end"]:
     raise ValueError(
         "Configuration error: years.start must be less than years.end. "

@@ -70,8 +70,12 @@ def _site_weighted_ave(
 
 
 if __name__ == "__main__":
-    gridded_data = xr.open_dataset(snakemake.input.gridded_timeseries_data)
-    grid_weights = xr.open_dataarray(snakemake.input.grid_weights)
+    gridded_data = xr.open_dataset(
+        snakemake.input.gridded_timeseries_data, decode_timedelta=True
+    )
+    grid_weights = xr.open_dataarray(
+        snakemake.input.grid_weights, decode_timedelta=True
+    )
 
     resolution_specific_data = group_gridcells(
         gridded_data, grid_weights, snakemake.threads

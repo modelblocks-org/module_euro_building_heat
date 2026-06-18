@@ -31,26 +31,22 @@ rule download_when2heat_params:
     shell:
         "mkdir -p {output} && curl {params.curl_args} --output '{output}/#1' '{params.url}' 2> {log}"
 
-# FIXME: Update to the weather data is needed. It is old
-# and the data is on a 50km grid which makes it too course for some of the small countries. 
-# Malta is also failing for some reason so this needs looking into.
-# Currently countries that do not work are snapped to the closest weather gid cell.
 rule download_gridded_weather_data:
+    input:
+        locations="<shapes>",
     output:
-        "<resources>/automatic/gridded-weather/{data_var}.nc",
+        raw_weather=directory("<resources>/automatic/shapes/{shapes}/gridded-weather/raw"),
     log:
-        "<logs>/automatic/download_gridded_weather_data_{data_var}.log",
-    wildcard_constraints:
-        data_var="grid|temperature|wind10m|tsoil5",
+        "<logs>/{shapes}/automatic/download_gridded_weather_data.log",
     conda:
         "../envs/shell.yaml"
     params:
-        curl_args=CURL_ARGS,
-        dataset_url=internal["resources"]["automatic"]["gridded_weather_data"],
+        weather_years=WEATHER_YEARS,
+        download_workers=config["weather"].get("download_workers", 2),
     message:
-        "Download gridded {wildcards.data_var} data."
-    shell:
-        "curl {params.curl_args} --output {output}.tmp '{params.dataset_url}/files/{wildcards.data_var}.nc' 2> {log} && mv {output}.tmp {output}"
+        "Download raw ERA5 gridded weather data for '{wildcards.shapes}'."
+    script:
+        "../scripts/download_gridded_weather_data.py"
 
 
 rule download_heat_pump_characteristics:
@@ -97,10 +93,12 @@ rule unzip_raw_population:
         "<logs>/automatic/unzip_raw_population.log",
     conda:
         "../envs/shell.yaml"
+    params:
+        member=f"{ghsl_population['stem']}_V1_0.tif",
     message:
         "Extract gridded population data."
-    shell:
-        f"unzip -p '{{input}}' '{ghsl_population['stem']}_V1_0.tif' > '{{output}}' 2> {{log}}"
+    script:
+        "../scripts/extract_zip_member.py"
 
 
 JRC_IDEES_SPATIAL_SCOPE = internal["resources"]["automatic"]["jrc_idees_spatial_scope"]
@@ -138,11 +136,13 @@ rule unzip_jrc_idees:
     conda:
         "../envs/shell.yaml"
     params:
-        version=JRC_IDEES_VERSION,
+        member=lambda wildcards: (
+            f"JRC-IDEES-{JRC_IDEES_VERSION}_Tertiary_{wildcards.country_code}.xlsx"
+        ),
     message:
         "Extract JRC-IDEES tertiary sector data for {wildcards.country_code}."
-    shell:
-        "unzip -p {input.country_data} JRC-IDEES-{params.version}_Tertiary_{wildcards.country_code}.xlsx > {output} 2> {log}"
+    script:
+        "../scripts/extract_zip_member.py"
 
 
 rule download_uk_jrc_idees_2015:
@@ -170,10 +170,12 @@ rule unzip_uk_jrc_idees_2015:
         "<logs>/automatic/unzip_uk_jrc_idees_2015.log",
     conda:
         "../envs/shell.yaml"
+    params:
+        member="JRC-IDEES-2015_Tertiary_UK.xlsx",
     message:
         "Extract legacy JRC-IDEES 2015 tertiary sector data for UK."
-    shell:
-        "unzip -p {input.country_data} JRC-IDEES-2015_Tertiary_UK.xlsx > {output} 2> {log}"
+    script:
+        "../scripts/extract_zip_member.py"
 
 
 rule download_eurostat_energy_data:

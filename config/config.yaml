@@ -8,6 +8,8 @@ weather:
   # Weather years used to shape hourly heat demand profiles. End year is exclusive.
   start: 2018
   end: 2019
+  # Number of monthly CDS ERA5 requests to submit in parallel.
+  download_workers: 2
 
 threads:
   aggregation: 8
@@ -17,19 +19,23 @@ population:
   # Mollweide grid; use 100 for a heavier, longer download.
   resolution: 1000
 
-# FIXME: Still GBR as a proxy is breaking so update later. 
 data_proxies:
+# Use proxies to fill missing data for countries with no or incomplete data. 
+# Multiple proxy countries can be specified for a single country, in which case the data from the proxy countries will be averaged.
+  # annual_energy_balance uses energy balance data from the proxy country and scales with population.
   annual_energy_balance:
     AND: [ESP]
     LIE: [CHE]
-    MCO: [FRA]
+    MCO: [GBR]
     SMR: [ITA]
+  # household_end_use uses household end use data from the proxy country to scale annual energy balance data.
   household_end_use:
     AND: [ESP]
     ISL: [SWE, DNK]
     LIE: [CHE]
-    MCO: [FRA]
+    MCO: [GBR]
     SMR: [ITA]
+  # jrc_idees uses the JRC IDEES dataset from the proxy country to shape hourly profiles.
   jrc_idees:
     ALB: [BGR, HRV, HUN, ROU, GRC]
     AND: [ESP]
@@ -37,7 +43,7 @@ data_proxies:
     ISL: [SWE, DNK]
     LIE: [CHE]
     MKD: [BGR, HRV, HUN, ROU, GRC]
-    MCO: [FRA]
+    MCO: [GBR]
     MNE: [BGR, HRV, HUN, ROU, GRC]
     NOR: [SWE, DNK]
     SMR: [ITA]

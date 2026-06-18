@@ -3,15 +3,15 @@
 
 rule heat_pump_cop:
     input:
-        temperature_air="<resources>/automatic/gridded-weather/temperature.nc",
-        temperature_ground="<resources>/automatic/gridded-weather/tsoil5.nc",
+        temperature_air=rules.process_gridded_weather_data.output.temperature,
+        temperature_ground=rules.process_gridded_weather_data.output.tsoil5,
         heat_pump_characteristics=rules.download_heat_pump_characteristics.output[0],
     output:
-        "<resources>/automatic/heat-pump-cop.nc",
+        "<resources>/automatic/shapes/{shapes}/gridded-heat-pump-cop.nc",
     log:
-        "<logs>/heat-pump/heat_pump_cop.log",
+        "<logs>/{shapes}/heat-pump/heat_pump_cop.log",
     conda:
-        "../envs/heat.yaml"
+        "../envs/heat_demand.yaml"
     params:
         sink_temperature=config["heat"]["heat_pump"]["sink_temperature"],
         space_heat_sink_shares=config["heat"]["heat_pump"]["space_heat_sink_shares"],
@@ -33,7 +33,7 @@ rule group_gridded_timeseries_heat_pump_cop:
     log:
         "<logs>/{shapes}/heat-pump/group_gridded_timeseries_heat_pump_cop.log",
     conda:
-        "../envs/heat.yaml"
+        "../envs/heat_demand.yaml"
     threads: config["threads"]["aggregation"]
     message:
         "Aggregate gridded heat-pump COP profiles to '{wildcards.shapes}' shapes."
@@ -52,7 +52,7 @@ rule heat_pump_electricity_demand_timeseries:
     log:
         "<logs>/{shapes}/heat-pump/heat_pump_electricity_demand_timeseries.log",
     conda:
-        "../envs/heat.yaml"
+        "../envs/heat_demand.yaml"
     params:
         weather_model_years=WEATHER_MODEL_YEARS,
     message:

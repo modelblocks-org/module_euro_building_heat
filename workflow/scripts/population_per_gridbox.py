@@ -4,14 +4,16 @@ import math
 import warnings
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import rioxarray
 import xarray as xr
 from gregor.aggregate import aggregate_raster_to_polygon
+from shapely.geometry import box
 
 EPSG_3035 = "EPSG:3035"
 WGS84 = "EPSG:4326"
-GRIDBOX_SIZE = 25000  # MERRA-2 grid
+DEFAULT_GRID_DEGREES = 0.5
 
 
 def _normalise_shape_ids(locations: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -48,33 +50,17 @@ def population_on_weather_grid(
     # with WGS84 projection which will be used to generate which the grid
     # At minimum, the dataset must contain the `site` coordinate and latitude and
     # longitude variables
-    coordinate_ds = xr.open_dataset(path_to_coordinates)
+    coordinate_ds = xr.open_dataset(path_to_coordinates, decode_timedelta=True)
 
     # Locations are parquet shape files at the resolution of interest.
     locations = _normalise_shape_ids(gpd.read_parquet(path_to_locations))
 
-    gridbox_points = gpd.GeoDataFrame(
-        geometry=gpd.points_from_xy(
-            coordinate_ds[lon_name].values, coordinate_ds[lat_name].values
-        ),
-        index=coordinate_ds.site.to_index(),
-        crs=WGS84,
-    )
-    # To go from a grid of points to a grid of boxes filling the entire space,
-    # we `buffer` to create a grid of circles whose edges just touch,
-    # then we define the envelope of that circle to create a square.
-    gridbox_points = gridbox_points.to_crs(EPSG_3035)
-    gridbox = gpd.GeoDataFrame(
-        gridbox_points.index.to_frame(),
-        geometry=gridbox_points.buffer(GRIDBOX_SIZE).envelope,
-        crs=EPSG_3035,
+    gridbox = _weather_gridbox_polygons(coordinate_ds, lat_name, lon_name).to_crs(
+        EPSG_3035
     )
     locations_3035 = locations.to_crs(EPSG_3035)
     minx, miny, maxx, maxy = locations_3035.total_bounds
-    gridbox = gridbox.cx[
-        minx - GRIDBOX_SIZE : maxx + GRIDBOX_SIZE,
-        miny - GRIDBOX_SIZE : maxy + GRIDBOX_SIZE,
-    ]
+    gridbox = gridbox.cx[minx:maxx, miny:maxy]
     if gridbox.empty:
         raise ValueError("No weather gridboxes overlap the provided shapes.")
 
@@ -116,6 +102,55 @@ def population_on_weather_grid(
         gridboxes_mapped_to_locations.set_index(["site", "id"]).population
     )
     population_da.to_netcdf(out_path)
+
+
+def _weather_gridbox_polygons(
+    coordinate_ds: xr.Dataset, lat_name: str, lon_name: str
+) -> gpd.GeoDataFrame:
+    """Build weather grid-cell polygons from grid point coordinates."""
+    fallback_step = float(coordinate_ds.attrs.get("grid_degrees", DEFAULT_GRID_DEGREES))
+    lat_values = np.asarray(coordinate_ds[lat_name].values, dtype=float)
+    lon_values = np.asarray(coordinate_ds[lon_name].values, dtype=float)
+    lat_bounds = _coordinate_bounds(lat_values, fallback_step)
+    lon_bounds = _coordinate_bounds(lon_values, fallback_step)
+
+    geometries = []
+    for lat, lon in zip(lat_values, lon_values, strict=True):
+        south, north = lat_bounds[lat]
+        west, east = lon_bounds[lon]
+        geometries.append(box(west, south, east, north))
+
+    return gpd.GeoDataFrame(
+        {"site": coordinate_ds.site.to_index()},
+        geometry=geometries,
+        crs=WGS84,
+    )
+
+
+def _coordinate_bounds(
+    values: np.ndarray, fallback_step: float
+) -> dict[float, tuple[float, float]]:
+    """Infer grid-cell lower and upper bounds for each coordinate value."""
+    unique_values = np.sort(np.unique(values.astype(float)))
+    if len(unique_values) == 1:
+        half_step = fallback_step / 2
+        value = unique_values[0]
+        return {value: (value - half_step, value + half_step)}
+
+    midpoints = (unique_values[:-1] + unique_values[1:]) / 2
+    lower = np.empty_like(unique_values)
+    upper = np.empty_like(unique_values)
+    lower[0] = unique_values[0] - (unique_values[1] - unique_values[0]) / 2
+    lower[1:] = midpoints
+    upper[:-1] = midpoints
+    upper[-1] = unique_values[-1] + (unique_values[-1] - unique_values[-2]) / 2
+
+    return {
+        value: (lower_bound, upper_bound)
+        for value, lower_bound, upper_bound in zip(
+            unique_values, lower, upper, strict=True
+        )
+    }
 
 
 def _assign_unmapped_locations_to_nearest_gridbox(

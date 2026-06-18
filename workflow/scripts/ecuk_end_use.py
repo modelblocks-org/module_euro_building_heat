@@ -7,6 +7,11 @@ END_USE_TRANSLATION = {
     "hot water": "hot_water",
     "catering": "cooking",
 }
+DOMESTIC_END_USE_TRANSLATION = {
+    "space heating": "space_heat",
+    "water heating": "hot_water",
+    "cooking/catering": "cooking",
+}
 
 CARRIER_TRANSLATION = {
     "electricity": "electricity",
@@ -19,6 +24,7 @@ CARRIER_TRANSLATION = {
     "other": "biofuel",
     "bioenergy and waste": "biofuel",
 }
+ECUK_KTOE_TO_TWH = 0.01163
 
 
 def read_ecuk_service_end_use_shares(path: str, target_years: Iterable[int]):
@@ -28,6 +34,24 @@ def read_ecuk_service_end_use_shares(path: str, target_years: Iterable[int]):
     raw = pd.read_excel(path, sheet_name="Table U5", header=None)
     table = _table_from_raw_ecuk_sheet(raw)
     return ecuk_service_end_use_shares_from_table(table, target_years)
+
+
+def read_ecuk_domestic_final_demand(path: str):
+    """Read ECUK domestic end-use demand for Great Britain in TWh."""
+    import pandas as pd
+
+    raw = pd.read_excel(path, sheet_name="Table U2", header=None)
+    table = _table_from_raw_ecuk_sheet(raw, required_columns=("Year", "Sector", "End use"))
+    return ecuk_domestic_final_demand_from_table(table)
+
+
+def read_ecuk_sector_energy_balance(path: str, sector: str):
+    """Read ECUK sector fuel totals for Great Britain in TWh."""
+    import pandas as pd
+
+    raw = pd.read_excel(path, sheet_name="Table U2", header=None)
+    table = _table_from_raw_ecuk_sheet(raw, required_columns=("Year", "Sector", "End use"))
+    return ecuk_sector_energy_balance_from_table(table, sector)
 
 
 def ecuk_service_end_use_shares_from_table(table, target_years: Iterable[int]):
@@ -99,11 +123,79 @@ def ecuk_service_end_use_shares_from_table(table, target_years: Iterable[int]):
     )
 
 
-def _table_from_raw_ecuk_sheet(raw):
+def ecuk_domestic_final_demand_from_table(table):
+    """Convert an ECUK Table U2-like table to domestic final demand."""
+    records = _ecuk_table_u2_records(table, sector="Domestic", end_use_totals=False)
+    return _ecuk_records_to_frame(
+        records,
+        index_names=["end_use", "carrier_name", "country_code"],
+    )
+
+
+def ecuk_sector_energy_balance_from_table(table, sector: str):
+    """Convert an ECUK Table U2-like table to sector fuel totals."""
+    records = _ecuk_table_u2_records(table, sector=sector, end_use_totals=True)
+    return _ecuk_records_to_frame(records, index_names=["carrier_name", "country_code"])
+
+
+def _ecuk_table_u2_records(table, sector: str, end_use_totals: bool):
+    import pandas as pd
+
+    table = table.copy()
+    table["Year"] = pd.to_numeric(table["Year"], errors="coerce")
+    sector_rows = table["Sector"].astype(str).str.strip().eq(sector)
+    table = table[sector_rows].copy()
+    table["End use"] = table["End use"].astype(str).str.strip()
+    if end_use_totals:
+        table = table[table["End use"].str.casefold().eq("overall total")]
+    else:
+        table["end_use"] = (
+            table["End use"].str.casefold().map(DOMESTIC_END_USE_TRANSLATION)
+        )
+        table = table.dropna(subset=["end_use"])
+
+    records = []
+    for column in table.columns:
+        carrier = CARRIER_TRANSLATION.get(str(column).strip().casefold())
+        if carrier is None:
+            continue
+        values = pd.to_numeric(table[column], errors="coerce")
+        for row, value in zip(table.itertuples(index=False), values):
+            year = getattr(row, "Year")
+            if pd.isna(year) or pd.isna(value):
+                continue
+            record = {
+                "carrier_name": carrier,
+                "country_code": "GBR",
+                "year": int(year),
+                "value": float(value) * ECUK_KTOE_TO_TWH,
+            }
+            if not end_use_totals:
+                record["end_use"] = getattr(row, "end_use")
+            records.append(record)
+
+    if not records:
+        raise ValueError(f"Could not find ECUK Table U2 data for {sector}.")
+    return records
+
+
+def _ecuk_records_to_frame(records, index_names: list[str]):
+    import pandas as pd
+
+    return (
+        pd.DataFrame.from_records(records)
+        .groupby([*index_names, "year"])["value"]
+        .sum()
+        .unstack("year")
+        .rename_axis("year", axis=1)
+    )
+
+
+def _table_from_raw_ecuk_sheet(raw, required_columns=("Year", "Sub-sector")):
     header_row = None
     for row_number, row in raw.iterrows():
         values = row.astype(str).str.strip().tolist()
-        if "Year" in values and "Sub-sector" in values:
+        if set(required_columns).issubset(values):
             header_row = row_number
             break
 

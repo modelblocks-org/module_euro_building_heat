@@ -2,7 +2,6 @@
 resources:
   automatic:
     when2heat_params: https://zenodo.org/records/10965295/files/{dataset}?download=1
-    gridded_weather_data: https://zenodo.org/records/11516744
     heat_pump_characteristics: https://sandbox.zenodo.org/records/45378/files/wamak-heat-pump-characteristics.nc
     population: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A
     population_epochs: [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030]

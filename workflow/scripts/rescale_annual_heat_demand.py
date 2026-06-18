@@ -23,7 +23,7 @@ def read_national_demand(path: str) -> pd.DataFrame:
 
 def shape_population(path: str) -> pd.Series:
     """Read total population assigned to each shape."""
-    population = xr.open_dataarray(path).sum("site").to_series()
+    population = xr.open_dataarray(path, decode_timedelta=True).sum("site").to_series()
     population.index = normalise_shape_ids(population.index)
     if population.index.has_duplicates:
         duplicate_ids = sorted(

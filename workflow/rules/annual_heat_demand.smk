@@ -63,7 +63,7 @@ rule filter_shapes:
     log:
         "<logs>/{shapes}/filter_shapes.log",
     conda:
-        "../envs/geo.yaml"
+        "../envs/heat_demand.yaml"
     params:
         dataset_scopes=internal["scope"]["datasets"],
         data_proxies=config.get("data_proxies", {}),
@@ -83,7 +83,7 @@ checkpoint prepare_shape_country_scope:
     log:
         "<logs>/{shapes}/annual/prepare_shape_country_scope.log",
     conda:
-        "../envs/geo.yaml"
+        "../envs/heat_demand.yaml"
     params:
         dataset_scopes=internal["scope"]["datasets"],
         data_proxies=config.get("data_proxies", {}),
@@ -102,7 +102,7 @@ rule process_jrc_idees_tertiary:
     log:
         "<logs>/{shapes}/annual/process_jrc_idees_tertiary.log",
     conda:
-        "../envs/heat.yaml"
+        "../envs/heat_demand.yaml"
     message:
         "Process tertiary heat data from JRC-IDEES."
     script:
@@ -123,7 +123,7 @@ rule process_annual_energy_balances:
     log:
         "<logs>/annual/process_annual_energy_balances.log",
     conda:
-        "../envs/heat.yaml"
+        "../envs/heat_demand.yaml"
     params:
         first_year=min(config["years"]["start"], 2000),
     message:
@@ -153,7 +153,7 @@ rule process_annual_heat_demand:
     log:
         "<logs>/{shapes}/annual/process_annual_heat_demand.log",
     conda:
-        "../envs/heat.yaml"
+        "../envs/heat_demand.yaml"
     params:
         heat_tech_params=config["heat"]["tech_efficiencies"],
         model_years=MODEL_YEARS,
@@ -178,7 +178,7 @@ rule rescale_annual_heat_demand_to_shapes:
     log:
         "<logs>/{shapes}/annual/rescale_annual_heat_demand_to_shapes.log",
     conda:
-        "../envs/geo.yaml"
+        "../envs/heat_demand.yaml"
     message:
         "Scale national annual heat demand to '{wildcards.shapes}' shapes."
     script:

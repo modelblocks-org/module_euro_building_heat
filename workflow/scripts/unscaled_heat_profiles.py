@@ -46,8 +46,8 @@ def get_unscaled_heat_profiles(
 
     # Weather data is subset by the geographic area covered by model run
     # (given by available population sites)
-    temperature_ds = xr.open_dataset(path_to_temperature)
-    wind_ds = xr.open_dataset(path_to_wind_speed)
+    temperature_ds = xr.open_dataset(path_to_temperature, decode_timedelta=True)
+    wind_ds = xr.open_dataset(path_to_wind_speed, decode_timedelta=True)
 
     # Check units
     assert temperature_ds.attrs["unit"].lower() == "degrees c"
@@ -224,7 +224,7 @@ def get_reference_temperature(
         xr.DataArray: Daily reference temperatures per site.
     """
     # Daily average
-    # pandas manages time resampling much quicker than xarray, so we switch to it here.
+    # pandas manages time resampling much quicker than xarray at the intended grid size.
     daily_average = (
         temperature.rename(time=time_dim)
         .to_series()
@@ -291,7 +291,7 @@ def _hour_and_day_to_datetime(da: xr.DataArray) -> xr.DataArray:
     da = da.stack(new_time=["time", "hour"])
     new_time = da.new_time.to_index()
     datetime_index = new_time.get_level_values(0) + pd.to_timedelta(
-        new_time.get_level_values(1), unit="H"
+        new_time.get_level_values(1), unit="h"
     )
     da = da.drop_vars(["new_time", "time", "hour"])
     da.coords["new_time"] = datetime_index

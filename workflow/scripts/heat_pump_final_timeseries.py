@@ -69,7 +69,9 @@ def _end_use_weighted_ave(
 
 
 if __name__ == "__main__":
-    timeseries_data = xr.open_dataset(snakemake.input.timeseries_data)
+    timeseries_data = xr.open_dataset(
+        snakemake.input.timeseries_data, decode_timedelta=True
+    )
     annual_demand = pd.read_parquet(snakemake.input.annual_demand)
     annual_demand_ds = prepare_annual_demand(annual_demand)
 

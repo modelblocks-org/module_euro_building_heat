@@ -31,6 +31,10 @@ properties:
         type: integer
       end:
         type: integer
+      download_workers:
+        type: integer
+        minimum: 1
+        default: 2
   threads:
     type: object
     additionalProperties: false

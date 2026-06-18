@@ -104,7 +104,9 @@ def prepare_annual_demand(annual_demand: pd.Series) -> xr.DataArray:
 if __name__ == "__main__":
     annual_demand = pd.read_parquet(snakemake.input.annual_demand)
     annual_demand_ds = prepare_annual_demand(annual_demand)
-    unscaled_profiles = xr.open_dataset(snakemake.input.timeseries_data)
+    unscaled_profiles = xr.open_dataset(
+        snakemake.input.timeseries_data, decode_timedelta=True
+    )
     scaled_profiles = scale_heat_demand_profiles(
         annual_demand_ds,
         unscaled_profiles,
