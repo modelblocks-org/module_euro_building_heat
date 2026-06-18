@@ -96,8 +96,7 @@ def read_jrc_heat_tertiary_sector_data(paths_to_national_data: list[str]) -> pd.
 
 def _empty_jrc_heat_series() -> pd.Series:
     index = pd.MultiIndex.from_arrays(
-        [[] for _ in JRC_HEAT_INDEX_NAMES],
-        names=JRC_HEAT_INDEX_NAMES,
+        [[] for _ in JRC_HEAT_INDEX_NAMES], names=JRC_HEAT_INDEX_NAMES
     )
     return pd.Series(index=index, dtype=float)
 

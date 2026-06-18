@@ -45,12 +45,12 @@ def cop(
             Output to which COP timeseries data will be saved.
     """
     # Initial fast-fail checks.
-    assert math.isclose(
-        sum(heat_pump_shares.values()), 1
-    ), "Heat pump technology shares must add up to 1."
-    assert math.isclose(
-        sum(space_heat_sink_shares.values()), 1
-    ), "Space-heating sink method shares must add up to 1."
+    assert math.isclose(sum(heat_pump_shares.values()), 1), (
+        "Heat pump technology shares must add up to 1."
+    )
+    assert math.isclose(sum(space_heat_sink_shares.values()), 1), (
+        "Space-heating sink method shares must add up to 1."
+    )
 
     hot_water_methods = set(sink_temperature) - set(space_heat_sink_shares)
     if len(hot_water_methods) != 1:
@@ -77,9 +77,7 @@ def cop(
     # 3. Combine sink methods into space heating and hot water end uses,
     # using weightings for space heating (hot water is a distinct sink method already).
     heat_pump_characteristics = _group_sink_methods(
-        pre_grouped_heat_pump_characteristics,
-        hot_water_method,
-        space_heat_sink_shares,
+        pre_grouped_heat_pump_characteristics, hot_water_method, space_heat_sink_shares
     )
 
     cop_ashp = temperature_to_cop(

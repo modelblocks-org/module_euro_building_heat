@@ -62,10 +62,7 @@ def weather_time_range(weather_years: list[int]) -> tuple[datetime, datetime]:
     """Return the timestamp range needed by the heat profile calculation."""
     start_year = min(weather_years)
     end_year = max(weather_years)
-    return (
-        datetime(start_year - 1, 12, 25, 0),
-        datetime(end_year + 1, 1, 5, 23),
-    )
+    return (datetime(start_year - 1, 12, 25, 0), datetime(end_year + 1, 1, 5, 23))
 
 
 def time_request_chunks(start: datetime, end: datetime) -> list[dict[str, list[str]]]:
@@ -108,8 +105,7 @@ def shape_weather_bounds(path_to_shapes: str | Path) -> WeatherBounds:
 
 
 def cds_request(
-    area: WeatherBounds,
-    time_chunk: dict[str, list[str]],
+    area: WeatherBounds, time_chunk: dict[str, list[str]]
 ) -> dict[str, Any]:
     """Build a CDS ERA5 request for one time chunk."""
     return {

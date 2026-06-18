@@ -60,9 +60,7 @@ def country_map(path: str) -> pd.Series:
 
 
 def rescale_to_shapes(
-    national_demand: pd.DataFrame,
-    shape_to_country: pd.Series,
-    population: pd.Series,
+    national_demand: pd.DataFrame, shape_to_country: pd.Series, population: pd.Series
 ) -> pd.DataFrame:
     """Distribute national annual demand to shapes using population shares."""
     common_shapes = shape_to_country.index.intersection(population.index)

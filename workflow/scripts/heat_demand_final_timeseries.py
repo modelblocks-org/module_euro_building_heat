@@ -41,9 +41,9 @@ def scale_heat_demand_profiles(
     Returns:
         xr.DataArray: merged and scaled heat demand profiles.
     """
-    assert np.isclose(
-        sum(sfh_mfh_shares.values()), 1
-    ), "Household type (single- vs multi-family home) shares must add up to 1."
+    assert np.isclose(sum(sfh_mfh_shares.values()), 1), (
+        "Household type (single- vs multi-family home) shares must add up to 1."
+    )
 
     sfh_mfh_shares_da = (
         pd.Series({"COM": 1, **sfh_mfh_shares})
@@ -81,7 +81,9 @@ def _scale_demand(
     """Scale one weather year with the annual demand for its paired model year."""
     weather_year = int(one_year_profile.time.dt.year[0])
     if weather_year not in weather_model_years:
-        raise ValueError(f"No model year mapping found for weather year {weather_year}.")
+        raise ValueError(
+            f"No model year mapping found for weather year {weather_year}."
+        )
     model_year = weather_model_years[weather_year]
     normalised_profile = one_year_profile / one_year_profile.sum("time")
     demand = normalised_profile * annual_demand.sel(year=model_year).drop("year")
@@ -100,6 +102,7 @@ def prepare_annual_demand(annual_demand: pd.Series) -> xr.DataArray:
         .unstack("end_use")
         .to_xarray()[["space_heat", "hot_water"]]
     )
+
 
 if __name__ == "__main__":
     annual_demand = pd.read_parquet(snakemake.input.annual_demand)

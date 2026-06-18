@@ -333,20 +333,16 @@ def _get_ch_industry_energy_balance_by_carrier_sheet(path_to_excel):
 
     dfs = []
     for sheet_name, carrier_code in ch_carrier_sheets.items():
-        df = pd.read_excel(
-            excel,
-            sheet_name=sheet_name,
-            skiprows=3,
-            nrows=22,
-            header=0,
-        )
+        df = pd.read_excel(excel, sheet_name=sheet_name, skiprows=3, nrows=22, header=0)
         df = df[df["BranchenNr."].astype(str).isin(ch_subsector_codes)]
         df = df.rename(columns={"BranchenNr.": "cat_code"})
         df["cat_code"] = df["cat_code"].astype(str).map(ch_subsector_codes)
         df = (
             df.drop(columns=["Branchenname", "Sektor"], errors="ignore")
             .set_index("cat_code")
-            .rename(columns=lambda col: str(int(col)) if isinstance(col, float) else col)
+            .rename(
+                columns=lambda col: str(int(col)) if isinstance(col, float) else col
+            )
         )
         df.columns = df.columns.astype(int).rename("year")
         dfs.append(

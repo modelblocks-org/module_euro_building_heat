@@ -20,10 +20,7 @@ def weather_time_range(weather_years: list[int]) -> tuple[datetime, datetime]:
     """Return the timestamp range needed by the heat profile calculation."""
     start_year = min(weather_years)
     end_year = max(weather_years)
-    return (
-        datetime(start_year - 1, 12, 25, 0),
-        datetime(end_year + 1, 1, 5, 23),
-    )
+    return (datetime(start_year - 1, 12, 25, 0), datetime(end_year + 1, 1, 5, 23))
 
 
 def open_grib_dataset(path: Path) -> Any:
@@ -120,7 +117,9 @@ def convert_era5_to_module_datasets(dataset: Any) -> dict[str, Any]:
     return outputs
 
 
-def write_module_weather_outputs(outputs: dict[str, Any], output_paths: dict[str, str]) -> None:
+def write_module_weather_outputs(
+    outputs: dict[str, Any], output_paths: dict[str, str]
+) -> None:
     """Write module weather datasets with compression and atomic renames."""
     for name, dataset in outputs.items():
         output_path = Path(output_paths[name])
@@ -158,9 +157,7 @@ def concat_weather_outputs(weather_outputs: list[dict[str, Any]]) -> dict[str, A
 
 
 def process_gridded_weather_data(
-    raw_weather_dir: str | Path,
-    output_paths: dict[str, str],
-    weather_years: list[int],
+    raw_weather_dir: str | Path, output_paths: dict[str, str], weather_years: list[int]
 ) -> None:
     """Process raw ERA5 GRIB chunks into weather files expected by the heat workflow."""
     start, end = weather_time_range(weather_years)

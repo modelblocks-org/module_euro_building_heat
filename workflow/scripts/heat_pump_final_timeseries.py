@@ -16,7 +16,9 @@ def _group_end_uses(
         .apply(
             _end_use_weighted_ave,
             annual_demand=annual_demand,
-            weather_model_years={int(k): int(v) for k, v in weather_model_years.items()},
+            weather_model_years={
+                int(k): int(v) for k, v in weather_model_years.items()
+            },
         )
     )
     return weighted_average_da
@@ -32,8 +34,7 @@ def prepare_annual_demand(annual_demand: pd.DataFrame) -> xr.DataArray:
         annual_demand.rename_axis(columns="id")
         .stack()
         .unstack("end_use")
-        .to_xarray()
-        [["space_heat", "hot_water"]]
+        .to_xarray()[["space_heat", "hot_water"]]
         .to_array("end_use")
         .sum("cat_name")
     )
@@ -59,7 +60,9 @@ def _end_use_weighted_ave(
     """
     weather_year = int(one_year_profile.time.dt.year[0])
     if weather_year not in weather_model_years:
-        raise ValueError(f"No model year mapping found for weather year {weather_year}.")
+        raise ValueError(
+            f"No model year mapping found for weather year {weather_year}."
+        )
     model_year = weather_model_years[weather_year]
 
     demand = annual_demand.sel(year=model_year).drop("year")
@@ -76,9 +79,7 @@ if __name__ == "__main__":
     annual_demand_ds = prepare_annual_demand(annual_demand)
 
     timeseries_data_group_end_use = _group_end_uses(
-        timeseries_data,
-        annual_demand_ds,
-        snakemake.params.weather_model_years,
+        timeseries_data, annual_demand_ds, snakemake.params.weather_model_years
     )
 
     final_df = (

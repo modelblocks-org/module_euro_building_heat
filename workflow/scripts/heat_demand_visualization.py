@@ -24,7 +24,9 @@ def _read_shapes(path: str, shape_ids: list[str]) -> gpd.GeoDataFrame:
         raise ValueError(f"Missing required shape columns: {sorted(missing)}")
 
     shapes = shapes.copy()
-    shapes["shape_id"] = shapes["shape_id"].astype(str).str.replace(".", "-", regex=False)
+    shapes["shape_id"] = (
+        shapes["shape_id"].astype(str).str.replace(".", "-", regex=False)
+    )
     if "country_id" not in shapes.columns:
         shapes["country_id"] = shapes["shape_id"]
 
@@ -37,21 +39,26 @@ def _read_shapes(path: str, shape_ids: list[str]) -> gpd.GeoDataFrame:
 
 
 def _write_html(
-    output_path: str,
-    shapes: gpd.GeoDataFrame,
-    demand: pd.DataFrame,
+    output_path: str, shapes: gpd.GeoDataFrame, demand: pd.DataFrame
 ) -> None:
-    common_ids = [col for col in demand.columns.astype(str) if col in set(shapes.shape_id)]
+    common_ids = [
+        col for col in demand.columns.astype(str) if col in set(shapes.shape_id)
+    ]
     demand = demand[common_ids]
     shapes = shapes[shapes.shape_id.isin(common_ids)]
 
     if demand.empty:
-        raise ValueError("No overlapping shape IDs between shapes and heat demand data.")
+        raise ValueError(
+            "No overlapping shape IDs between shapes and heat demand data."
+        )
 
     geojson = json.loads(shapes.to_json())
     timestamps = [ts.isoformat() for ts in demand.index]
     values = {
-        shape_id: [None if pd.isna(value) else round(float(value), 6) for value in demand[shape_id]]
+        shape_id: [
+            None if pd.isna(value) else round(float(value), 6)
+            for value in demand[shape_id]
+        ]
         for shape_id in common_ids
     }
     finite_values = demand.to_numpy().ravel()
@@ -200,8 +207,7 @@ HTML_TEMPLATE = """<!doctype html>
 
 if __name__ == "__main__":
     heat_demand = _read_heat_demand(
-        snakemake.input.heat_demand,
-        max_steps=snakemake.params.max_steps,
+        snakemake.input.heat_demand, max_steps=snakemake.params.max_steps
     )
     shape_ids = heat_demand.columns.astype(str).tolist()
     shapes = _read_shapes(snakemake.input.shapes, shape_ids)

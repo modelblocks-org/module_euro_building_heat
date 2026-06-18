@@ -20,7 +20,7 @@ population:
   resolution: 1000
 
 data_proxies:
-# Use proxies to fill missing data for countries with no or incomplete data. 
+# Use proxies to fill missing data for countries with no or incomplete data.
 # Multiple proxy countries can be specified for a single country, in which case the data from the proxy countries will be averaged.
   # annual_energy_balance uses energy balance data from the proxy country and scales with population.
   annual_energy_balance:

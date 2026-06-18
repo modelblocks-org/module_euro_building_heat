@@ -121,9 +121,7 @@ def _weather_gridbox_polygons(
         geometries.append(box(west, south, east, north))
 
     return gpd.GeoDataFrame(
-        {"site": coordinate_ds.site.to_index()},
-        geometry=geometries,
-        crs=WGS84,
+        {"site": coordinate_ds.site.to_index()}, geometry=geometries, crs=WGS84
     )
 
 
@@ -154,9 +152,7 @@ def _coordinate_bounds(
 
 
 def _assign_unmapped_locations_to_nearest_gridbox(
-    gridbox: gpd.GeoDataFrame,
-    locations: gpd.GeoDataFrame,
-    mapped: gpd.GeoDataFrame,
+    gridbox: gpd.GeoDataFrame, locations: gpd.GeoDataFrame, mapped: gpd.GeoDataFrame
 ) -> gpd.GeoDataFrame:
     """Assign locations without gridbox overlap to the nearest weather gridbox."""
     missing_ids = sorted(set(locations["id"]) - set(mapped["id"]))
@@ -175,8 +171,7 @@ def _assign_unmapped_locations_to_nearest_gridbox(
     if nearest["site"].isna().any():
         unmapped_ids = sorted(nearest.loc[nearest["site"].isna(), "id"].unique())
         raise ValueError(
-            "No nearest weather gridbox could be found for shape IDs: "
-            f"{unmapped_ids}"
+            f"No nearest weather gridbox could be found for shape IDs: {unmapped_ids}"
         )
 
     max_distance = nearest["distance_to_weather_gridbox"].max()

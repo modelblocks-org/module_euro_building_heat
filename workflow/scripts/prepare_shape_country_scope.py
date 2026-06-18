@@ -97,9 +97,7 @@ def _check_dataset_country_scope(
 
 
 def _expand_country_ids(
-    country_ids: list[str],
-    proxies: dict[str, list[str]],
-    covered_country_ids: set[str],
+    country_ids: list[str], proxies: dict[str, list[str]], covered_country_ids: set[str]
 ) -> list[str]:
     proxies = _normalise_proxy_map(proxies)
     expanded_country_ids = set(country_ids)
@@ -125,9 +123,7 @@ def _jrc_idees_scope(
     commercial_end_use_scope: list[str],
 ) -> list[str]:
     required_country_ids = _expand_country_ids(
-        country_ids,
-        jrc_idees_proxies,
-        _normalise_country_set(commercial_end_use_scope),
+        country_ids, jrc_idees_proxies, _normalise_country_set(commercial_end_use_scope)
     )
     return sorted(
         jrc_code
@@ -145,13 +141,11 @@ if __name__ == "__main__":
     if not country_ids:
         raise ValueError("The shapes parquet file does not contain any country IDs.")
     _check_dataset_country_scope(
-        country_ids,
-        snakemake.params.dataset_scopes,
-        snakemake.params.data_proxies,
+        country_ids, snakemake.params.dataset_scopes, snakemake.params.data_proxies
     )
-    commercial_end_use_scope = snakemake.params.dataset_scopes[
-        "commercial_end_use"
-    ]["countries"]
+    commercial_end_use_scope = snakemake.params.dataset_scopes["commercial_end_use"][
+        "countries"
+    ]
     source_country_ids = _expand_country_ids(
         country_ids,
         snakemake.params.data_proxies.get("jrc_idees", {}),

@@ -60,11 +60,7 @@ def get_unscaled_heat_profiles(
     grouped_hourly_heat = xr.concat(
         [
             _get_unscaled_heat_profile_for_weather_year(
-                temperature_ds,
-                wind_ds,
-                daily_params,
-                hourly_params,
-                weather_year,
+                temperature_ds, wind_ds, daily_params, hourly_params, weather_year
             )
             for weather_year in weather_years
         ],
@@ -91,9 +87,7 @@ def _get_unscaled_heat_profile_for_weather_year(
     # so we don't compute values for years we don't need, but keep a buffer for the
     # shifts happening when obtaining reference temperature.
     temperature_for_year = temperature_ds.sel(
-        time=slice(
-            str(weather_year - 1) + "-12-25", str(weather_year + 1) + "-01-05"
-        )
+        time=slice(str(weather_year - 1) + "-12-25", str(weather_year + 1) + "-01-05")
     )
 
     # This is a weighted average temperature from 3 days prior to each day in the

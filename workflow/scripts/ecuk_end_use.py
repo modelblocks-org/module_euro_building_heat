@@ -41,7 +41,9 @@ def read_ecuk_domestic_final_demand(path: str):
     import pandas as pd
 
     raw = pd.read_excel(path, sheet_name="Table U2", header=None)
-    table = _table_from_raw_ecuk_sheet(raw, required_columns=("Year", "Sector", "End use"))
+    table = _table_from_raw_ecuk_sheet(
+        raw, required_columns=("Year", "Sector", "End use")
+    )
     return ecuk_domestic_final_demand_from_table(table)
 
 
@@ -50,7 +52,9 @@ def read_ecuk_sector_energy_balance(path: str, sector: str):
     import pandas as pd
 
     raw = pd.read_excel(path, sheet_name="Table U2", header=None)
-    table = _table_from_raw_ecuk_sheet(raw, required_columns=("Year", "Sector", "End use"))
+    table = _table_from_raw_ecuk_sheet(
+        raw, required_columns=("Year", "Sector", "End use")
+    )
     return ecuk_sector_energy_balance_from_table(table, sector)
 
 
@@ -127,8 +131,7 @@ def ecuk_domestic_final_demand_from_table(table):
     """Convert an ECUK Table U2-like table to domestic final demand."""
     records = _ecuk_table_u2_records(table, sector="Domestic", end_use_totals=False)
     return _ecuk_records_to_frame(
-        records,
-        index_names=["end_use", "carrier_name", "country_code"],
+        records, index_names=["end_use", "carrier_name", "country_code"]
     )
 
 

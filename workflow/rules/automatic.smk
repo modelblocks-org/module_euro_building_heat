@@ -19,11 +19,11 @@ rule download_when2heat_params:
             + ",".join(
                 [
                     "daily_demand.csv",
-                    "hourly_factors_COM.csv",
-                    "hourly_factors_MFH.csv",
-                    "hourly_factors_SFH.csv",
-                ]
-            )
+                            "hourly_factors_COM.csv",
+                            "hourly_factors_MFH.csv",
+                            "hourly_factors_SFH.csv",
+                        ]
+                    )
             + "}"
         ),
     message:
@@ -31,11 +31,14 @@ rule download_when2heat_params:
     shell:
         "mkdir -p {output} && curl {params.curl_args} --output '{output}/#1' '{params.url}' 2> {log}"
 
+
 rule download_gridded_weather_data:
     input:
         locations="<shapes>",
     output:
-        raw_weather=directory("<resources>/automatic/shapes/{shapes}/gridded-weather/raw"),
+        raw_weather=directory(
+            "<resources>/automatic/shapes/{shapes}/gridded-weather/raw"
+        ),
     log:
         "<logs>/{shapes}/automatic/download_gridded_weather_data.log",
     conda:
@@ -216,9 +219,7 @@ rule download_swiss_energy_data:
 
 ECUK_END_USE_URLS = internal["resources"]["automatic"]["GBR"]["ecuk_end_use"]
 ECUK_END_USE_YEAR = min(
-    int(year)
-    for year in ECUK_END_USE_URLS
-    if int(year) > config["years"]["end"] - 1
+    int(year) for year in ECUK_END_USE_URLS if int(year) > config["years"]["end"] - 1
 )
 
 
