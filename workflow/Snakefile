@@ -47,6 +47,7 @@ include: "rules/heat_pump_cop.smk"
 # Run additional check on configuration / settings
 additional_config_validation()
 
+
 rule all:
     default_target: True
     output:

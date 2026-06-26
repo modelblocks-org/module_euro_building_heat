@@ -1,11 +1,13 @@
 """Snakemake helper functions and utilities."""
 
+
 # Helpers
 def _get_year_range(group: str) -> list[int]:
     """Get ordered year range (lower->higher)."""
     if group not in ["years", "weather"]:
         raise ValueError(f"Invalid year range requested: '{group}''.")
     return list(range(config[group]["start"], config[group]["end"]))
+
 
 def _get_population_epoch() -> dict[str, str]:
     """Get a valid epoch configuration"""

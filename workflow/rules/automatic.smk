@@ -231,9 +231,9 @@ rule unzip_GBR_end_use:
         "<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx",
     log:
         "<logs>/unzip_GBR_end_use_{ecuk_year}.log",
-    threads: 1
     wildcard_constraints:
         ecuk_year="202[0-5]",
+    threads: 1
     params:
         internal_paths=lambda wc: f"GBR_{wc.ecuk_year}_End_Use_tables.xlsx",
     message:
