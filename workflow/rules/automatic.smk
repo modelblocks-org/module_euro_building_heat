@@ -20,7 +20,7 @@ rule download_when2heat_params:
     message:
         "Download When2Heat demand profile parameters for {wildcards.dataset}."
     shell:
-        "curl -fsS --retry 5 -o {output:q} {params.url:q} 2> {log}"
+        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule download_gridded_weather_data:
@@ -56,7 +56,7 @@ rule download_heat_pump_characteristics:
     message:
         "Download manufacturer heat-pump characteristic data."
     shell:
-        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule download_raw_population:
@@ -75,7 +75,7 @@ rule download_raw_population:
     message:
         f"Download GHSL gridded population data for {GHSL_POPULATION['epoch']} at {GHSL_POPULATION['resolution']} m."
     shell:
-        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule unzip_raw_population:
@@ -110,12 +110,12 @@ rule download_jrc_idees:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        dataset_url=internal["resources"]["automatic"]["jrc_idees"],
+        dataset_url=lambda wc: f'{internal["resources"]["automatic"]["jrc_idees"]}/JRC-IDEES-{JRC_IDEES_VERSION}_{wc.country_code}.zip',
         version=JRC_IDEES_VERSION,
     message:
         "Download JRC-IDEES data for {wildcards.country_code}."
     shell:
-        "curl {params.curl_args} --output {output}.tmp '{params.dataset_url}/JRC-IDEES-{params.version}_{wildcards.country_code}.zip' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output:q} {params.dataset_url:q} 2> {log:q}"
 
 
 rule unzip_jrc_idees:
@@ -148,11 +148,11 @@ rule download_uk_jrc_idees_2015:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        dataset_url=internal["resources"]["automatic"]["GBR"]["jrc_idees_2015"],
+        dataset_url=f'{internal["resources"]["automatic"]["GBR"]["jrc_idees_2015"]}/JRC-IDEES-2015_All_xlsx_UK.zip',
     message:
         "Download legacy JRC-IDEES 2015 data for UK."
     shell:
-        "curl {params.curl_args} --output {output}.tmp '{params.dataset_url}/JRC-IDEES-2015_All_xlsx_UK.zip' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output:q} {params.dataset_url:q} 2> {log:q}"
 
 
 rule unzip_uk_jrc_idees_2015:
@@ -187,7 +187,7 @@ rule download_eurostat_energy_data:
     message:
         "Download {wildcards.dataset} Eurostat data."
     shell:
-        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule download_swiss_energy_data:
@@ -205,7 +205,7 @@ rule download_swiss_energy_data:
     message:
         "Download {wildcards.dataset} Swiss energy statistics."
     shell:
-        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule download_GBR_end_use:
@@ -221,7 +221,7 @@ rule download_GBR_end_use:
     message:
         "Download ECUK end-use data tables."
     shell:
-        "curl {params.curl_args} --output {output:q} '{params.url:q}' 2> {log:q}"
+        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule unzip_GBR_end_use:
