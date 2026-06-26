@@ -70,7 +70,7 @@ rule download_heat_pump_characteristics:
 
 rule download_raw_population:
     output:
-        temp(f"<resources>/automatic/{ghsl_population['stem']}_V1_0.zip"),
+        temp(f"<resources>/automatic/{GHSL_POPULATION['stem']}_V1_0.zip"),
     log:
         "<logs>/automatic/download_raw_population.log",
     conda:
@@ -79,10 +79,10 @@ rule download_raw_population:
         curl_args=CURL_ARGS,
         url=(
             internal["resources"]["automatic"]["population"]
-            + f"/{ghsl_population['stem']}/V1-0/{ghsl_population['stem']}_V1_0.zip"
+            + f"/{GHSL_POPULATION['stem']}/V1-0/{GHSL_POPULATION['stem']}_V1_0.zip"
         ),
     message:
-        f"Download GHSL gridded population data for {ghsl_population['epoch']} at {ghsl_population['resolution']} m."
+        f"Download GHSL gridded population data for {GHSL_POPULATION['epoch']} at {GHSL_POPULATION['resolution']} m."
     shell:
         "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
@@ -91,13 +91,13 @@ rule unzip_raw_population:
     input:
         rules.download_raw_population.output,
     output:
-        f"<resources>/automatic/{ghsl_population['stem']}_V1_0.tif",
+        f"<resources>/automatic/{GHSL_POPULATION['stem']}_V1_0.tif",
     log:
         "<logs>/automatic/unzip_raw_population.log",
     conda:
         "../envs/shell.yaml"
     params:
-        member=f"{ghsl_population['stem']}_V1_0.tif",
+        member=f"{GHSL_POPULATION['stem']}_V1_0.tif",
     message:
         "Extract gridded population data."
     script:
