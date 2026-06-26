@@ -45,13 +45,6 @@ resources:
     GBR:
       jrc_idees_2015: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2015_v1
       end_use_zip: https://zenodo.org/records/20926669/files/GBR_End_Use_tables.zip
-      ecuk_end_use:
-        2020: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/1020160/2020_End_use_tables_-_web_copy.xlsx
-        2021: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/1092943/2021_End_use_tables_July_2022_update.xlsx
-        2022: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/1113673/ECUK_2022_End_Use_tables_27102022.xlsx
-        2023: https://assets.publishing.service.gov.uk/media/66a7e5a5ce1fd0da7b592f0f/ECUK_2023_End_Use_tables.xlsx
-        2024: https://assets.publishing.service.gov.uk/media/66f132b1b4d70bfba161ab06/ECUK_2024_End_Use_tables.xlsx
-        2025: https://assets.publishing.service.gov.uk/media/6937e46392da4705a575d466/ECUK_2025_End_Use_tables_181225.xlsx
 scope:
   datasets:
     annual_energy_balance:
