@@ -95,81 +95,42 @@ rule unzip_raw_population:
         "../scripts/extract_zip_member.py"
 
 
-JRC_IDEES_SPATIAL_SCOPE = internal["resources"]["automatic"]["jrc_idees_spatial_scope"]
-JRC_IDEES_VERSION = internal["resources"]["automatic"]["jrc_idees_version"]
-
-
-rule download_jrc_idees:
+rule download_jrc_idees_generic:
     output:
-        temp("<resources>/automatic/jrc-idees/{country_code}.zip"),
+        temp("<resources>/automatic/jrc-idees-generic/{country_code}_v{version}.zip"),
     log:
-        "<logs>/automatic/download_jrc_idees_{country_code}.log",
+        "<logs>/automatic/download_jrc_idees_{country_code}_v{version}.log",
     wildcard_constraints:
-        country_code="|".join(JRC_IDEES_SPATIAL_SCOPE),
+        country_code="|".join(internal["resources"]["jrc"]["spatial_scope"]),
+        version="|".join(JRC_IDEES_VERSIONS),
     conda:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        dataset_url=lambda wc: f'{internal["resources"]["automatic"]["jrc_idees"]}/JRC-IDEES-{JRC_IDEES_VERSION}_{wc.country_code}.zip',
-        version=JRC_IDEES_VERSION,
+        dataset_url=lambda wc: get_jrc_url(wc.country_code, wc.version),
     message:
-        "Download JRC-IDEES data for {wildcards.country_code}."
+        "Download JRC-IDEES data for {wildcards.country_code}-{wildcards.version}."
     shell:
         "curl {params.curl_args} --output {output:q} {params.dataset_url:q} 2> {log:q}"
 
 
-rule unzip_jrc_idees:
+rule unzip_jrc_idees_generic:
     input:
-        country_data="<resources>/automatic/jrc-idees/{country_code}.zip",
+        rules.download_jrc_idees_generic.output[0],
     output:
-        "<resources>/automatic/jrc-idees/tertiary_{country_code}.xlsx",
+        "<resources>/automatic/jrc-idees-generic/{version}/tertiary_{country_code}.xlsx",
     log:
-        "<logs>/automatic/unzip_jrc_idees_{country_code}.log",
+        "<logs>/automatic/unzip_jrc_idees_generic_{country_code}_v{version}.log",
     wildcard_constraints:
-        country_code="|".join(JRC_IDEES_SPATIAL_SCOPE),
-    conda:
-        "../envs/shell.yaml"
+        country_code="|".join(internal["resources"]["jrc"]["spatial_scope"]),
+        version="|".join(JRC_IDEES_VERSIONS),
+    threads: 1
     params:
-        member=lambda wildcards: (
-            f"JRC-IDEES-{JRC_IDEES_VERSION}_Tertiary_{wildcards.country_code}.xlsx"
-        ),
+        internal_paths=lambda wc: f"JRC-IDEES-{wc.version}_Tertiary_{wc.country_code}.xlsx",
     message:
-        "Extract JRC-IDEES tertiary sector data for {wildcards.country_code}."
-    script:
-        "../scripts/extract_zip_member.py"
-
-
-rule download_uk_jrc_idees_2015:
-    output:
-        temp("<resources>/automatic/GBR/jrc-idees-2015_UK.zip"),
-    log:
-        "<logs>/automatic/download_uk_jrc_idees_2015.log",
-    conda:
-        "../envs/shell.yaml"
-    params:
-        curl_args=CURL_ARGS,
-        dataset_url=f'{internal["resources"]["automatic"]["GBR"]["jrc_idees_2015"]}/JRC-IDEES-2015_All_xlsx_UK.zip',
-    message:
-        "Download legacy JRC-IDEES 2015 data for UK."
-    shell:
-        "curl {params.curl_args} --output {output:q} {params.dataset_url:q} 2> {log:q}"
-
-
-rule unzip_uk_jrc_idees_2015:
-    input:
-        country_data=rules.download_uk_jrc_idees_2015.output,
-    output:
-        "<resources>/automatic/GBR/jrc-idees-2015_Tertiary_UK.xlsx",
-    log:
-        "<logs>/automatic/unzip_uk_jrc_idees_2015.log",
-    conda:
-        "../envs/shell.yaml"
-    params:
-        member="JRC-IDEES-2015_Tertiary_UK.xlsx",
-    message:
-        "Extract legacy JRC-IDEES 2015 tertiary sector data for UK."
-    script:
-        "../scripts/extract_zip_member.py"
+        "Unzip JRC IDEES Tertiary data for {wildcards.country_code}-{wildcards.version}."
+    wrapper:
+        "v9.8.0/utils/libarchive/extract"
 
 
 rule download_eurostat_energy_data:
