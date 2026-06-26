@@ -25,7 +25,10 @@ rule unscaled_heat_profiles:
     input:
         wind_speed=rules.process_gridded_weather_data.output.wind10m,
         temperature=rules.process_gridded_weather_data.output.temperature,
-        when2heat=rules.download_when2heat_params.output[0],
+        when2heat_daily="<resources>/automatic/when2heat/daily_demand.csv",
+        when2heat_hourly_com="<resources>/automatic/when2heat/hourly_factors_COM.csv",
+        when2heat_hourly_mfh="<resources>/automatic/when2heat/hourly_factors_MFH.csv",
+        when2heat_hourly_sfh="<resources>/automatic/when2heat/hourly_factors_SFH.csv",
     output:
         "<resources>/automatic/shapes/{shapes}/gridded-hourly_unscaled_heat_demand.nc",
     log:

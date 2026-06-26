@@ -53,7 +53,7 @@ def generate_annual_energy_balance_nc(
     Switzerland is not included in Eurostat, so we splice in data from their govt.
     statistics.
     """
-    # Names for each consumption category/sub-category and carriers preprepared by hand
+    # Names for each consumption category/sub-category and carriers prepared by hand
     cat_names = pd.read_csv(path_to_cat_names, header=0, index_col=0)
     carrier_names = pd.read_csv(path_to_carrier_names, header=0, index_col=0)
 

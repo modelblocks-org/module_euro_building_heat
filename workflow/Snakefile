@@ -30,39 +30,9 @@ validate(config, workflow.source_path("internal/config.schema.yaml"))
 with open(workflow.source_path("internal/settings.yaml"), "r") as f:
     internal = yaml.safe_load(f)
 
-if config["years"]["start"] >= config["years"]["end"]:
-    raise ValueError(
-        "Configuration error: years.start must be less than years.end. "
-        "The end year is exclusive."
-    )
-if config["weather"]["start"] >= config["weather"]["end"]:
-    raise ValueError(
-        "Configuration error: weather.start must be less than weather.end. "
-        "The end year is exclusive."
-    )
-
-MODEL_YEARS = list(range(config["years"]["start"], config["years"]["end"]))
-WEATHER_YEARS = list(range(config["weather"]["start"], config["weather"]["end"]))
-if len(MODEL_YEARS) != len(WEATHER_YEARS):
-    raise ValueError(
-        "Configuration error: weather year span must match model year span. "
-        f"Got model years {MODEL_YEARS} and weather years {WEATHER_YEARS}."
-    )
-WEATHER_MODEL_YEARS = dict(zip(WEATHER_YEARS, MODEL_YEARS))
-
-population_epoch = min(
-    internal["resources"]["automatic"]["population_epochs"],
-    key=lambda year: abs(year - config["years"]["start"]),
-)
-population_resolution = config["population"]["resolution"]
-ghsl_population = {
-    "epoch": population_epoch,
-    "resolution": population_resolution,
-    "stem": f"GHS_POP_E{population_epoch}_GLOBE_R2023A_54009_{population_resolution}",
-}
-
 
 # Add all your includes here.
+include: "rules/_utils.smk"
 include: "rules/automatic.smk"
 include: "rules/annual_heat_demand.smk"
 include: "rules/heat_timeseries.smk"
@@ -73,6 +43,9 @@ include: "rules/heat_pump_cop.smk"
 # This is needed e.g. for python code files that are never
 # explicitly used as a script or input in a snakemake rule.
 # e.g.: workflow.source_path("scripts/_utils.py")
+
+# Run additional check on configuration / settings
+additional_config_validation()
 
 
 rule all:

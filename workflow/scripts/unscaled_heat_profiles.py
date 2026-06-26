@@ -4,7 +4,6 @@ Functions attributable to When2Heat are explicitly referenced as such in docstri
 When2Heat can be found here: https://github.com/oruhnau/when2heat
 """
 
-import os
 from collections.abc import Callable
 from typing import Literal
 
@@ -25,7 +24,10 @@ AVE_WIND_SPEED_THRESHOLD = 4.4
 def get_unscaled_heat_profiles(
     path_to_wind_speed: str,
     path_to_temperature: str,
-    path_to_when2heat_params: str,
+    path_to_when2heat_daily: str,
+    path_to_when2heat_hourly_com: str,
+    path_to_when2heat_hourly_mfh: str,
+    path_to_when2heat_hourly_sfh: str,
     weather_years: list[str | int],
     out_path: str,
 ) -> None:
@@ -38,7 +40,10 @@ def get_unscaled_heat_profiles(
         path_to_population (str): Gridded population data, which will act as weighting.
         path_to_wind_speed (str): Gridded wind speed data in m/s.
         path_to_temperature (str): Gridded air temperature data in degrees C.
-        path_to_when2heat_params (str): When2heat parameters.
+        path_to_when2heat_daily (str): When2Heat daily demand parameters.
+        path_to_when2heat_hourly_com (str): Commercial hourly profile factors.
+        path_to_when2heat_hourly_mfh (str): Multi-family home hourly profile factors.
+        path_to_when2heat_hourly_sfh (str): Single-family home hourly profile factors.
         weather_years: Weather years used to shape profiles.
         out_path (str): Path to which data will be saved.
     """
@@ -54,8 +59,12 @@ def get_unscaled_heat_profiles(
     assert wind_ds.attrs["unit"].lower() == "m/s"
 
     # Parameters and how to apply them is based on [@BDEW:2015]
-    daily_params = read_daily_parameters(path_to_when2heat_params)
-    hourly_params = read_hourly_parameters(path_to_when2heat_params)
+    daily_params = read_daily_parameters(path_to_when2heat_daily)
+    hourly_params = read_hourly_parameters(
+        path_to_when2heat_hourly_com=path_to_when2heat_hourly_com,
+        path_to_when2heat_hourly_mfh=path_to_when2heat_hourly_mfh,
+        path_to_when2heat_hourly_sfh=path_to_when2heat_hourly_sfh,
+    )
 
     grouped_hourly_heat = xr.concat(
         [
@@ -164,16 +173,19 @@ def get_hourly_heat_profiles(
     return hourly_heat
 
 
-def read_daily_parameters(input_path: str) -> pd.DataFrame:
+def read_daily_parameters(file_path: str) -> pd.DataFrame:
     """Load When2Heat daily parameters.
 
     Direct copy from https://github.com/oruhnau/when2heat/blob/351bd1a2f9392ed50a7bdb732a103c9327c51846/scripts/read.py
     """
-    file = os.path.join(input_path, "daily_demand.csv")
-    return pd.read_csv(file, sep=";", decimal=",", header=[0, 1], index_col=0)
+    return pd.read_csv(file_path, sep=";", decimal=",", header=[0, 1], index_col=0)
 
 
-def read_hourly_parameters(input_path: str) -> xr.DataArray:
+def read_hourly_parameters(
+    path_to_when2heat_hourly_com: str,
+    path_to_when2heat_hourly_mfh: str,
+    path_to_when2heat_hourly_sfh: str,
+) -> xr.DataArray:
     """Load When2Heat hourly parameters.
 
     Modified from https://github.com/oruhnau/when2heat/blob/351bd1a2f9392ed50a7bdb732a103c9327c51846/scripts/read.py
@@ -181,11 +193,14 @@ def read_hourly_parameters(input_path: str) -> xr.DataArray:
     """
     parameters = {}
 
-    parameters["COM"] = _csv_reader("COM", input_path)
+    parameters["COM"] = _csv_reader("COM", path_to_when2heat_hourly_com)
 
-    for building_type in ["SFH", "MFH"]:
+    for building_type, file_path in [
+        ("SFH", path_to_when2heat_hourly_sfh),
+        ("MFH", path_to_when2heat_hourly_mfh),
+    ]:
         parameters[building_type] = (
-            _csv_reader(building_type, input_path)
+            _csv_reader(building_type, file_path)
             .rename_axis(index="time")
             .align(parameters["COM"])[0]
         )
@@ -293,14 +308,11 @@ def _hour_and_day_to_datetime(da: xr.DataArray) -> xr.DataArray:
 
 
 def _csv_reader(
-    building_type: Literal["SFH", "MFH", "COM"], input_path: str
+    building_type: Literal["SFH", "MFH", "COM"], file_path: str
 ) -> pd.DataFrame:
-    filename = f"hourly_factors_{building_type}.csv"
-    filepath = os.path.join(input_path, filename)
-
     # MultiIndex for commercial heat because of weekday dependency
     index_col = [0, 1] if building_type == "COM" else 0
-    return pd.read_csv(filepath, sep=";", decimal=",", index_col=index_col).apply(
+    return pd.read_csv(file_path, sep=";", decimal=",", index_col=index_col).apply(
         pd.to_numeric, downcast="float"
     )
 
@@ -357,7 +369,10 @@ if __name__ == "__main__":
     get_unscaled_heat_profiles(
         path_to_wind_speed=snakemake.input.wind_speed,
         path_to_temperature=snakemake.input.temperature,
-        path_to_when2heat_params=snakemake.input.when2heat,
+        path_to_when2heat_daily=snakemake.input.when2heat_daily,
+        path_to_when2heat_hourly_com=snakemake.input.when2heat_hourly_com,
+        path_to_when2heat_hourly_mfh=snakemake.input.when2heat_hourly_mfh,
+        path_to_when2heat_hourly_sfh=snakemake.input.when2heat_hourly_sfh,
         weather_years=snakemake.params.weather_years,
         out_path=snakemake.output[0],
     )

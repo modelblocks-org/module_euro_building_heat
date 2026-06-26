@@ -56,7 +56,7 @@ xarray = "2025.1.2.*"
 xlrd = "2.0.2.*"
 
 [feature."heat-demand".pypi-dependencies]
-gregor = "==0.0.2"
+gregor = { git = "https://github.com/jnnr/gregor.git", rev = "main" }
 
 [feature.shell]
 channels = ["conda-forge", "bioconda", "nodefaults"]

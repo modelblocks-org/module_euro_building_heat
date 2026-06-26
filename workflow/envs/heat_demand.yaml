@@ -30,4 +30,4 @@ dependencies:
   - xlrd =2.0.2
   - pip =26.1.1
   - pip:
-      - gregor==0.0.2
+    - "gregor @ git+https://github.com/jnnr/gregor.git@main"

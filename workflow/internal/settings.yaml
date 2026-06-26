@@ -2,7 +2,7 @@
 resources:
   automatic:
     when2heat_params: https://zenodo.org/records/10965295/files/{dataset}?download=1
-    heat_pump_characteristics: https://sandbox.zenodo.org/records/45378/files/wamak-heat-pump-characteristics.nc
+    heat_pump_characteristics: https://zenodo.org/records/20926669/files/heat_pump_characteristics.nc
     population: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A
     population_epochs: [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030]
     jrc_idees: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2023_v1
@@ -36,21 +36,15 @@ resources:
       - SI
       - SK
     eurostat:
-      energy-balance: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/nrg_bal_c?format=TSV&compressed=true
-      hh-end-use: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/nrg_d_hhq?format=TSV&compressed=true
+      energy-balance: https://zenodo.org/records/20926669/files/estat_nrg_bal_c.tsv.gz
+      hh-end-use: https://zenodo.org/records/20926669/files/estat_nrg_d_hhq.tsv.gz
     CHE:
-      end-use: https://pubdb.bfe.admin.ch/de/publication/download/12361
-      energy-balance: https://www.bfe.admin.ch/bfe/en/home/versorgung/statistik-und-geodaten/energiestatistiken/gesamtenergiestatistik.exturl.html/aHR0cHM6Ly9wdWJkYi5iZmUuYWRtaW4uY2gvZGUvcHVibGljYX/Rpb24vZG93bmxvYWQvNzUxOQ==.html
-      industry-energy-balance: https://www.bfe.admin.ch/bfe/en/home/versorgung/statistik-und-geodaten/energiestatistiken/teilstatistiken.exturl.html/aHR0cHM6Ly9wdWJkYi5iZmUuYWRtaW4uY2gvZGUvcHVibGljYX/Rpb24vZG93bmxvYWQvODc4OA==.html
+      end-use: https://zenodo.org/records/20926669/files/CHE_energy_consumption_households.xlsx
+      energy-balance: https://zenodo.org/records/20926669/files/CHE_energy_balance.xlsx
+      industry-energy-balance: https://zenodo.org/records/20926669/files/CHE_energy_consumption_industry.xlsx
     GBR:
       jrc_idees_2015: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2015_v1
-      ecuk_end_use:
-        2020: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/1020160/2020_End_use_tables_-_web_copy.xlsx
-        2021: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/1092943/2021_End_use_tables_July_2022_update.xlsx
-        2022: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/1113673/ECUK_2022_End_Use_tables_27102022.xlsx
-        2023: https://assets.publishing.service.gov.uk/media/66a7e5a5ce1fd0da7b592f0f/ECUK_2023_End_Use_tables.xlsx
-        2024: https://assets.publishing.service.gov.uk/media/66f132b1b4d70bfba161ab06/ECUK_2024_End_Use_tables.xlsx
-        2025: https://assets.publishing.service.gov.uk/media/6937e46392da4705a575d466/ECUK_2025_End_Use_tables_181225.xlsx
+      end_use_zip: https://zenodo.org/records/20926669/files/GBR_End_Use_tables.zip
 scope:
   datasets:
     annual_energy_balance:

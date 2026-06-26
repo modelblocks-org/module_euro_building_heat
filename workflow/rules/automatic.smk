@@ -5,31 +5,22 @@ CURL_ARGS = "--fail --silent --show-error --location --retry 5 --retry-delay 5 -
 
 rule download_when2heat_params:
     output:
-        directory("<resources>/automatic/when2heat"),
+        "<resources>/automatic/when2heat/{dataset}.csv",
     log:
-        "<logs>/automatic/download_when2heat_params.log",
+        "<logs>/automatic/download_when2heat_params_{dataset}.log",
+    wildcard_constraints:
+        dataset="|".join(WHEN2HEAT_PARAM_DATASETS),
     conda:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        url=lambda wildcards: internal["resources"]["automatic"][
-            "when2heat_params"
-        ].format(
-            dataset="{"
-            + ",".join(
-                [
-                    "daily_demand.csv",
-                            "hourly_factors_COM.csv",
-                            "hourly_factors_MFH.csv",
-                            "hourly_factors_SFH.csv",
-                        ]
-                    )
-            + "}"
+        url=lambda wc: internal["resources"]["automatic"]["when2heat_params"].format(
+            dataset=f"{wc.dataset}.csv"
         ),
     message:
-        "Download When2Heat demand profile parameters."
+        "Download When2Heat demand profile parameters for {wildcards.dataset}."
     shell:
-        "mkdir -p {output} && curl {params.curl_args} --output '{output}/#1' '{params.url}' 2> {log}"
+        "curl -fsS --retry 5 -o {output:q} {params.url:q} 2> {log}"
 
 
 rule download_gridded_weather_data:
@@ -70,7 +61,7 @@ rule download_heat_pump_characteristics:
 
 rule download_raw_population:
     output:
-        temp(f"<resources>/automatic/{ghsl_population['stem']}_V1_0.zip"),
+        temp(f"<resources>/automatic/{GHSL_POPULATION['stem']}_V1_0.zip"),
     log:
         "<logs>/automatic/download_raw_population.log",
     conda:
@@ -79,10 +70,10 @@ rule download_raw_population:
         curl_args=CURL_ARGS,
         url=(
             internal["resources"]["automatic"]["population"]
-            + f"/{ghsl_population['stem']}/V1-0/{ghsl_population['stem']}_V1_0.zip"
+            + f"/{GHSL_POPULATION['stem']}/V1-0/{GHSL_POPULATION['stem']}_V1_0.zip"
         ),
     message:
-        f"Download GHSL gridded population data for {ghsl_population['epoch']} at {ghsl_population['resolution']} m."
+        f"Download GHSL gridded population data for {GHSL_POPULATION['epoch']} at {GHSL_POPULATION['resolution']} m."
     shell:
         "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
@@ -91,13 +82,13 @@ rule unzip_raw_population:
     input:
         rules.download_raw_population.output,
     output:
-        f"<resources>/automatic/{ghsl_population['stem']}_V1_0.tif",
+        f"<resources>/automatic/{GHSL_POPULATION['stem']}_V1_0.tif",
     log:
         "<logs>/automatic/unzip_raw_population.log",
     conda:
         "../envs/shell.yaml"
     params:
-        member=f"{ghsl_population['stem']}_V1_0.tif",
+        member=f"{GHSL_POPULATION['stem']}_V1_0.tif",
     message:
         "Extract gridded population data."
     script:
@@ -217,25 +208,35 @@ rule download_swiss_energy_data:
         "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
 
-ECUK_END_USE_URLS = internal["resources"]["automatic"]["GBR"]["ecuk_end_use"]
-ECUK_END_USE_YEAR = min(
-    int(year) for year in ECUK_END_USE_URLS if int(year) > config["years"]["end"] - 1
-)
-
-
-rule download_ecuk_end_use:
+rule download_GBR_end_use:
     output:
-        "<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx",
+        "<resources>/automatic/GBR/end-use.zip",
     log:
-        "<logs>/automatic/download_ecuk_end_use_{ecuk_year}.log",
-    wildcard_constraints:
-        ecuk_year="|".join(str(year) for year in sorted(ECUK_END_USE_URLS)),
+        "<logs>/automatic/download_GBR_end_use.log",
     conda:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        url=lambda wc: ECUK_END_USE_URLS[int(wc.ecuk_year)],
+        url=internal["resources"]["automatic"]["GBR"]["end_use_zip"],
     message:
-        "Download ECUK {wildcards.ecuk_year} end-use data tables."
+        "Download ECUK end-use data tables."
     shell:
-        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output:q} '{params.url:q}' 2> {log:q}"
+
+
+rule unzip_GBR_end_use:
+    input:
+        rules.download_GBR_end_use.output[0],
+    output:
+        "<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx",
+    log:
+        "<logs>/unzip_GBR_end_use_{ecuk_year}.log",
+    wildcard_constraints:
+        ecuk_year="202[0-5]",
+    threads: 1
+    params:
+        internal_paths=lambda wc: f"GBR_{wc.ecuk_year}_End_Use_tables.xlsx",
+    message:
+        "Unzip ECUK end-use data table for {wildcards.ecuk_year}."
+    wrapper:
+        "v9.8.0/utils/libarchive/extract"
