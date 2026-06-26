@@ -22,10 +22,16 @@ def _get_population_epoch() -> dict[str, str]:
 
 
 # Globals
+GHSL_POPULATION = _get_population_epoch()
 MODEL_YEARS = _get_year_range("years")
 WEATHER_YEARS = _get_year_range("weather")
 WEATHER_MODEL_YEARS = dict(zip(WEATHER_YEARS, MODEL_YEARS))
-GHSL_POPULATION = _get_population_epoch()
+WHEN2HEAT_PARAM_DATASETS = [
+    "daily_demand",
+    "hourly_factors_COM",
+    "hourly_factors_MFH",
+    "hourly_factors_SFH",
+]
 
 
 def additional_config_validation() -> None:

@@ -5,31 +5,22 @@ CURL_ARGS = "--fail --silent --show-error --location --retry 5 --retry-delay 5 -
 
 rule download_when2heat_params:
     output:
-        directory("<resources>/automatic/when2heat"),
+        "<resources>/automatic/when2heat/{dataset}.csv",
     log:
-        "<logs>/automatic/download_when2heat_params.log",
+        "<logs>/automatic/download_when2heat_params_{dataset}.log",
+    wildcard_constraints:
+        dataset="|".join(WHEN2HEAT_PARAM_DATASETS),
     conda:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        url=lambda wildcards: internal["resources"]["automatic"][
-            "when2heat_params"
-        ].format(
-            dataset="{"
-            + ",".join(
-                [
-                    "daily_demand.csv",
-                            "hourly_factors_COM.csv",
-                            "hourly_factors_MFH.csv",
-                            "hourly_factors_SFH.csv",
-                        ]
-                    )
-            + "}"
+        url=lambda wc: internal["resources"]["automatic"]["when2heat_params"].format(
+            dataset=f"{wc.dataset}.csv"
         ),
     message:
-        "Download When2Heat demand profile parameters."
+        "Download When2Heat demand profile parameters for {wildcards.dataset}."
     shell:
-        "mkdir -p {output} && curl {params.curl_args} --output '{output}/#1' '{params.url}' 2> {log}"
+        "curl -fsS --retry 5 -o {output:q} {params.url:q} 2> {log}"
 
 
 rule download_gridded_weather_data:
