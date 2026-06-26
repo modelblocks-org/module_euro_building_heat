@@ -208,25 +208,35 @@ rule download_swiss_energy_data:
         "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
 
 
-ECUK_END_USE_URLS = internal["resources"]["automatic"]["GBR"]["ecuk_end_use"]
-ECUK_END_USE_YEAR = min(
-    int(year) for year in ECUK_END_USE_URLS if int(year) > config["years"]["end"] - 1
-)
-
-
-rule download_ecuk_end_use:
+rule download_GBR_end_use:
     output:
-        "<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx",
+        "<resources>/automatic/GBR/end-use.zip",
     log:
-        "<logs>/automatic/download_ecuk_end_use_{ecuk_year}.log",
-    wildcard_constraints:
-        ecuk_year="|".join(str(year) for year in sorted(ECUK_END_USE_URLS)),
+        "<logs>/automatic/download_GBR_end_use.log",
     conda:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        url=lambda wc: ECUK_END_USE_URLS[int(wc.ecuk_year)],
+        url=internal["resources"]["automatic"]["GBR"]["end_use_zip"],
     message:
-        "Download ECUK {wildcards.ecuk_year} end-use data tables."
+        "Download ECUK end-use data tables."
     shell:
-        "curl {params.curl_args} --output {output}.tmp '{params.url}' 2> {log} && mv {output}.tmp {output}"
+        "curl {params.curl_args} --output {output:q} '{params.url:q}' 2> {log:q}"
+
+
+rule unzip_GBR_end_use:
+    input:
+        rules.download_GBR_end_use.output[0],
+    output:
+        "<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx",
+    log:
+        "<logs>/unzip_GBR_end_use_{ecuk_year}.log",
+    threads: 1
+    wildcard_constraints:
+        ecuk_year="202[0-5]"
+    params:
+        internal_paths=lambda wc: f"GBR_{wc.ecuk_year}_End_Use_tables.xlsx",
+    message:
+        "Unzip ECUK end-use data table for {wildcards.ecuk_year}."
+    wrapper:
+        "v9.8.0/utils/libarchive/extract"
