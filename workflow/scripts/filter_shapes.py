@@ -1,50 +1,39 @@
 """Filter user-provided shapes to the processable land scope."""
 
+import sys
+from typing import TYPE_CHECKING, Any
+
 import geopandas as gpd
+from _schemas import ShapesSchema
+
+if TYPE_CHECKING:
+    snakemake: Any
 
 
-def _normalise_country_ids(values) -> set[str]:
-    return {
-        str(country_id).strip().upper()
-        for country_id in values
-        if str(country_id).strip()
-    }
-
-
-def _normalise_proxy_map(proxy_map: dict | None) -> dict[str, set[str]]:
-    if not proxy_map:
-        return {}
-    return {
-        str(country_id).strip().upper(): _normalise_country_ids(references)
-        for country_id, references in proxy_map.items()
-    }
-
-
-def _check_dataset_country_scope(
-    shapes: gpd.GeoDataFrame, dataset_scopes: dict | None, data_proxies: dict | None
+def check_proxied_country_scope(
+    shapes: gpd.GeoDataFrame, dataset_scopes: dict, data_proxies: dict
 ) -> None:
-    if dataset_scopes is None:
-        return
-    if "country_id" not in shapes.columns:
-        raise ValueError("The shapes parquet file must include a 'country_id' column.")
-
-    requested_country_ids = _normalise_country_ids(shapes["country_id"].dropna())
-    data_proxies = data_proxies or {}
+    """Country scope must be fully covered by the configured proxies."""
+    shape_country_ids = set(shapes["country_id"].unique())
     failures = []
     for dataset_name, scope in dataset_scopes.items():
-        covered_country_ids = _normalise_country_ids(scope.get("countries", []))
-        proxy_key = scope.get("proxy_config")
-        proxies = _normalise_proxy_map(data_proxies.get(proxy_key))
+        dataset_country_ids = set(scope["countries"])
+        proxies = {
+            country_id: set(proxy_country_ids)
+            for country_id, proxy_country_ids in data_proxies.get(
+                scope["proxy_config"], {}
+            ).items()
+        }
 
-        for country_id in sorted(requested_country_ids - covered_country_ids):
+        for country_id in sorted(shape_country_ids - dataset_country_ids):
             proxy_country_ids = proxies.get(country_id, set())
-            missing_scope = sorted(proxy_country_ids - covered_country_ids)
-            missing_shapes = sorted(proxy_country_ids - requested_country_ids)
+            missing_scope = sorted(proxy_country_ids - dataset_country_ids)
+            missing_shapes = sorted(proxy_country_ids - shape_country_ids)
             if (
                 proxy_country_ids
                 and not missing_scope
                 and (
-                    not scope.get("proxy_requires_shape_population", False)
+                    not scope["proxy_requires_shape_population"]
                     or not missing_shapes
                 )
             ):
@@ -64,36 +53,20 @@ def _check_dataset_country_scope(
         raise ValueError("Unsupported countries: " + "; ".join(failures))
 
 
-def filter_land_shapes(
-    input_path: str,
-    output_path: str,
-    dataset_scopes: dict | None = None,
-    data_proxies: dict | None = None,
-) -> None:
-    """Remove marine region shapes from the user-provided shape file."""
-    shapes = gpd.read_parquet(input_path)
-    if "shape_class" in shapes.columns:
-        shapes = shapes.loc[
-            shapes["shape_class"].astype(str).str.casefold() != "maritime"
-        ].copy()
-    elif "shape_id" in shapes.columns:
-        shapes = shapes.loc[
-            ~shapes["shape_id"]
-            .astype(str)
-            .str.contains("marineregions", case=False, na=False)
-        ].copy()
-
+def main() -> None:
+    """Main snakemake process."""
+    shapes = gpd.read_parquet(snakemake.input.shapes)
+    shapes = shapes.loc[shapes["shape_class"] == "land"]
+    shapes = ShapesSchema.validate(shapes)
     if shapes.empty:
-        raise ValueError("No land shapes remain after filtering marine regions.")
+        raise ValueError("No land shapes remain after filtering non-land regions.")
 
-    _check_dataset_country_scope(shapes, dataset_scopes, data_proxies)
-    shapes.to_parquet(output_path)
+    check_proxied_country_scope(
+        shapes, snakemake.params.dataset_scopes, snakemake.params.data_proxies
+    )
+    shapes.to_parquet(snakemake.output[0])
 
 
 if __name__ == "__main__":
-    filter_land_shapes(
-        snakemake.input.shapes,
-        snakemake.output[0],
-        snakemake.params.dataset_scopes,
-        snakemake.params.data_proxies,
-    )
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
+    main()

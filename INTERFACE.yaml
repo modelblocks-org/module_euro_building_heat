@@ -15,7 +15,8 @@ pathvars:
       default: "<resources>/user/{shapes}/shapes.parquet"
       description: |
         Region-specific polygons to process. The parquet file must include
-        `shape_id`, `country_id` (ISO alpha-3), and `geometry` columns.
+        `shape_id`, `country_id` (ISO alpha-3), `shape_class`, and `geometry`
+        columns. Only rows with `shape_class` set to `land` are processed.
   results:
     annual_heat_demand:
       default: "<results>/{shapes}/annual/heat_demand_twh.parquet"

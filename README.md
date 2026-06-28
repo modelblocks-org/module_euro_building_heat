@@ -105,6 +105,8 @@ columns:
 - `shape_id`: unique identifier for each output region.
 - `country_id`: ISO alpha-3 country code used to match shapes to national heat
   statistics.
+- `shape_class`: shape context. Only rows with the exact value `land` are
+  processed; all other rows are dropped.
 - `geometry`: polygon geometry in a coordinate reference system readable by
   GeoPandas.
 

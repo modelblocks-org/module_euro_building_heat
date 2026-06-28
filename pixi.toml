@@ -54,6 +54,9 @@ scipy = "1.15.2.*"
 shapely = "2.0.7.*"
 xarray = "2025.1.2.*"
 xlrd = "2.0.2.*"
+pandera = "0.31.1.*"
+pandera-geopandas = "0.31.1.*"
+pandera-pandas = "0.31.1.*"
 
 [feature."heat-demand".pypi-dependencies]
 gregor = { git = "https://github.com/jnnr/gregor.git", rev = "main" }

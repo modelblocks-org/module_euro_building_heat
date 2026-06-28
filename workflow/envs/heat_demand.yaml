@@ -28,6 +28,9 @@ dependencies:
   - scipy =1.15.2
   - xarray =2025.1.2
   - xlrd =2.0.2
+  - pandera =0.31.1
+  - pandera-geopandas =0.31.1
+  - pandera-pandas =0.31.1
   - pip =26.1.1
   - pip:
     - "gregor @ git+https://github.com/jnnr/gregor.git@main"

@@ -57,7 +57,7 @@ rule filter_shapes:
         dataset_scopes=internal["scope"]["datasets"],
         data_proxies=config.get("data_proxies", {}),
     message:
-        "Filter marine regions from '{wildcards.shapes}' shapes."
+        "Filter non-land regions from '{wildcards.shapes}' shapes."
     script:
         "../scripts/filter_shapes.py"
 

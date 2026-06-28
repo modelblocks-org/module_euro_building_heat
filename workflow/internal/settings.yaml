@@ -100,6 +100,7 @@ scope:
         - UKR
     household_end_use:
       proxy_config: household_end_use
+      proxy_requires_shape_population: false
       countries:
         - ALB
         - AUT
@@ -142,6 +143,7 @@ scope:
         - UKR
     commercial_end_use:
       proxy_config: jrc_idees
+      proxy_requires_shape_population: false
       countries:
         - AUT
         - BEL
