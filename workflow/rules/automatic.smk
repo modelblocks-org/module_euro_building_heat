@@ -9,13 +9,13 @@ rule download_when2heat_params:
     log:
         "<logs>/automatic/download_when2heat_params_{dataset}.log",
     wildcard_constraints:
-        dataset="|".join(WHEN2HEAT_PARAM_DATASETS),
+        dataset="|".join(internal["resources"]["when2heat"]["datasets"]),
     conda:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        url=lambda wc: internal["resources"]["automatic"]["when2heat_params"].format(
-            dataset=f"{wc.dataset}.csv"
+        url=lambda wc: internal["resources"]["when2heat"]["url"].format(
+            dataset=wc.dataset
         ),
     message:
         "Download When2Heat demand profile parameters for {wildcards.dataset}."
@@ -95,9 +95,9 @@ rule unzip_raw_population:
         "../scripts/extract_zip_member.py"
 
 
-rule download_jrc_idees_generic:
+rule download_jrc_idees:
     output:
-        temp("<resources>/automatic/jrc-idees-generic/{country_code}_v{version}.zip"),
+        temp("<resources>/automatic/jrc-idees/{country_code}_v{version}.zip"),
     log:
         "<logs>/automatic/download_jrc_idees_{country_code}_v{version}.log",
     wildcard_constraints:
@@ -114,13 +114,13 @@ rule download_jrc_idees_generic:
         "curl {params.curl_args} --output {output:q} {params.dataset_url:q} 2> {log:q}"
 
 
-rule unzip_jrc_idees_generic:
+rule unzip_jrc_idees:
     input:
-        rules.download_jrc_idees_generic.output[0],
+        rules.download_jrc_idees.output[0],
     output:
-        "<resources>/automatic/jrc-idees-generic/{version}/tertiary_{country_code}.xlsx",
+        "<resources>/automatic/jrc-idees/{version}/tertiary_{country_code}.xlsx",
     log:
-        "<logs>/automatic/unzip_jrc_idees_generic_{country_code}_v{version}.log",
+        "<logs>/automatic/unzip_jrc_idees_{country_code}_v{version}.log",
     wildcard_constraints:
         country_code="|".join(internal["resources"]["jrc"]["spatial_scope"]),
         version="|".join(JRC_IDEES_VERSIONS),

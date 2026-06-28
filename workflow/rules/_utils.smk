@@ -35,13 +35,6 @@ JRC_IDEES_SPATIAL_SCOPE = [
 ]
 WEATHER_YEARS = _get_year_range("weather")
 WEATHER_MODEL_YEARS = dict(zip(WEATHER_YEARS, MODEL_YEARS))
-WHEN2HEAT_PARAM_DATASETS = [
-    "daily_demand",
-    "hourly_factors_COM",
-    "hourly_factors_MFH",
-    "hourly_factors_SFH",
-]
-
 
 def additional_config_validation() -> None:
     """Run additional validation that JSON schemas do not support."""

@@ -11,7 +11,7 @@ def _jrc_idees_inputs(wildcards):
         shapes=wildcards.shapes
     ).output.jrc_idees_country_codes
     return expand(
-        "<resources>/automatic/jrc-idees-generic/{version}/tertiary_{country_code}.xlsx",
+        "<resources>/automatic/jrc-idees/{version}/tertiary_{country_code}.xlsx",
         country_code=_read_checkpoint_lines(country_data),
         version=JRC_IDEES_VERSION,
     )
@@ -37,7 +37,7 @@ def _uk_jrc_idees_2015_inputs(wildcards):
         return []
     if config["years"]["start"] > 2019:
         return []
-    return ["<resources>/automatic/jrc-idees-generic/2015/tertiary_UK.xlsx"]
+    return ["<resources>/automatic/jrc-idees/2015/tertiary_UK.xlsx"]
 
 
 def _annual_energy_balance_proxy_population_inputs(wildcards):
