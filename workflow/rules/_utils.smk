@@ -9,22 +9,7 @@ def _get_year_range(group: str) -> list[int]:
     return list(range(config[group]["start"], config[group]["end"]))
 
 
-def _get_population_epoch() -> dict[str, str]:
-    """Get a valid epoch configuration"""
-    population_epoch = min(
-        internal["resources"]["automatic"]["population_epochs"],
-        key=lambda year: abs(year - config["years"]["start"]),
-    )
-    population_resolution = config["population"]["resolution"]
-    return {
-        "epoch": population_epoch,
-        "resolution": population_resolution,
-        "stem": f"GHS_POP_E{population_epoch}_GLOBE_R2023A_54009_{population_resolution}",
-    }
-
-
 # Globals
-GHSL_POPULATION = _get_population_epoch()
 MODEL_YEARS = _get_year_range("years")
 JRC_IDEES_VERSION = internal["resources"]["jrc"]["use_version"]
 JRC_IDEES_VERSIONS = [str(i) for i in internal["resources"]["jrc"]["versions"]]
@@ -74,6 +59,16 @@ def get_jrc_url(country: str, version: int | str) -> str:
     else:
         file = f"JRC-IDEES-{version}_{country}.zip"
     return internal["resources"]["jrc"]["url"].format(folder=folder, file=file)
+
+
+def get_configured_population_file() -> str:
+    """Helper to obtain the GHSL population file from the configuration."""
+    epoch = min(
+        internal["resources"]["ghsl"]["epochs"],
+        key=lambda year: abs(year - config["years"]["start"]),
+    )
+    resolution = config["population"]["resolution"]
+    return f"<resources>/automatic/ghsl/pop_{epoch}_{resolution}.tif",
 
 
 def get_supported_ecuk_releases() -> list[int]:

@@ -47,9 +47,11 @@ resources:
      - GBR_End_Use_tables.zip
      - heat_pump_characteristics.nc
     ECUK_releases: [2020, 2025]
-  automatic:
-    population: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A
-    population_epochs: [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030]
+  ghsl:
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A/{stem}/V1-0/{stem}_V1_0.zip
+    stem: GHS_POP_E{epoch}_GLOBE_R2023A_54009_{resolution}
+    epochs: [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030]
+    resolutions: [100, 1000]
 scope:
   datasets:
     annual_energy_balance:

@@ -46,7 +46,7 @@ rule unscaled_heat_profiles:
 rule population_per_weather_gridbox:
     input:
         weather_grid=rules.process_gridded_weather_data.output.grid,
-        population=rules.unzip_raw_population.output[0],
+        population=get_configured_population_file(),
         locations=rules.filter_shapes.output[0],
     output:
         "<resources>/automatic/shapes/{shapes}/population.nc",

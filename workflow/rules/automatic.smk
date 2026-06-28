@@ -63,34 +63,37 @@ rule download_gridded_weather_data:
 
 rule download_raw_population:
     output:
-        temp(f"<resources>/automatic/{GHSL_POPULATION['stem']}_V1_0.zip"),
+        temp(
+            "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip"
+        ),
     log:
-        "<logs>/automatic/download_raw_population.log",
+        "<logs>/automatic/download_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
     conda:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        url=(
-            internal["resources"]["automatic"]["population"]
-            + f"/{GHSL_POPULATION['stem']}/V1-0/{GHSL_POPULATION['stem']}_V1_0.zip"
+        url=lambda wc: internal["resources"]["ghsl"]["url"].format(
+            stem=internal["resources"]["ghsl"]["stem"].format(
+                epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
+            )
         ),
     message:
-        f"Download GHSL gridded population data for {GHSL_POPULATION['epoch']} at {GHSL_POPULATION['resolution']} m."
+        "Download GHSL gridded population data for {wildcards.ghsl_epoch} at {wildcards.ghsl_resolution} m."
     shell:
         "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule unzip_raw_population:
     input:
-        rules.download_raw_population.output,
+        rules.download_raw_population.output[0],
     output:
-        f"<resources>/automatic/{GHSL_POPULATION['stem']}_V1_0.tif",
+        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.tif",
     log:
-        "<logs>/automatic/unzip_raw_population.log",
+        "<logs>/automatic/unzip_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
     conda:
         "../envs/shell.yaml"
     params:
-        member=f"{GHSL_POPULATION['stem']}_V1_0.tif",
+        member=lambda wc: internal["resources"]["ghsl"]["stem"].format(epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution)+ "_V1_0.tif",
     message:
         "Extract gridded population data."
     script:
