@@ -23,6 +23,26 @@ rule download_when2heat_params:
         "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
+rule download_stable_dataset:
+    output:
+        "<resources>/automatic/stable/{dataset}",
+    log:
+        "<logs>/automatic/download_stable_dataset_{dataset}.log",
+    wildcard_constraints:
+        dataset="|".join(internal["resources"]["stable"]["datasets"]),
+    conda:
+        "../envs/shell.yaml"
+    params:
+        curl_args=CURL_ARGS,
+        url=lambda wc: internal["resources"]["stable"]["url"].format(
+            dataset=wc.dataset
+        ),
+    message:
+        "Download stable dataset {wildcards.dataset}."
+    shell:
+        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
+
+
 rule download_gridded_weather_data:
     input:
         locations="<shapes>",
@@ -42,21 +62,6 @@ rule download_gridded_weather_data:
     script:
         "../scripts/download_gridded_weather_data.py"
 
-
-rule download_heat_pump_characteristics:
-    output:
-        "<resources>/automatic/heat-pump-characteristics.nc",
-    log:
-        "<logs>/automatic/download_heat_pump_characteristics.log",
-    conda:
-        "../envs/shell.yaml"
-    params:
-        curl_args=CURL_ARGS,
-        url=internal["resources"]["automatic"]["heat_pump_characteristics"],
-    message:
-        "Download manufacturer heat-pump characteristic data."
-    shell:
-        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule download_raw_population:
@@ -133,71 +138,19 @@ rule unzip_jrc_idees:
         "v9.8.0/utils/libarchive/extract"
 
 
-rule download_eurostat_energy_data:
-    output:
-        "<resources>/automatic/eurostat/{dataset}.tsv.gz",
-    log:
-        "<logs>/automatic/download_eurostat_energy_data_{dataset}.log",
-    wildcard_constraints:
-        dataset="energy-balance|hh-end-use",
-    conda:
-        "../envs/shell.yaml"
-    params:
-        curl_args=CURL_ARGS,
-        url=lambda wc: internal["resources"]["automatic"]["eurostat"][wc.dataset],
-    message:
-        "Download {wildcards.dataset} Eurostat data."
-    shell:
-        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
-
-
-rule download_swiss_energy_data:
-    output:
-        "<resources>/automatic/CHE/{dataset}.xlsx",
-    log:
-        "<logs>/automatic/download_swiss_energy_data_{dataset}.log",
-    wildcard_constraints:
-        dataset="energy-balance|industry-energy-balance|end-use",
-    conda:
-        "../envs/shell.yaml"
-    params:
-        curl_args=CURL_ARGS,
-        url=lambda wc: internal["resources"]["automatic"]["CHE"][wc.dataset],
-    message:
-        "Download {wildcards.dataset} Swiss energy statistics."
-    shell:
-        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
-
-
-rule download_GBR_end_use:
-    output:
-        "<resources>/automatic/GBR/end-use.zip",
-    log:
-        "<logs>/automatic/download_GBR_end_use.log",
-    conda:
-        "../envs/shell.yaml"
-    params:
-        curl_args=CURL_ARGS,
-        url=internal["resources"]["automatic"]["GBR"]["end_use_zip"],
-    message:
-        "Download ECUK end-use data tables."
-    shell:
-        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
-
-
-rule unzip_GBR_end_use:
+rule unzip_ECUK_release:
     input:
-        rules.download_GBR_end_use.output[0],
+        "<resources>/automatic/stable/GBR_End_Use_tables.zip",
     output:
-        "<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx",
+        "<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx",
     log:
-        "<logs>/unzip_GBR_end_use_{ecuk_year}.log",
+        "<logs>/unzip_GBR_end_use_{release}.log",
     wildcard_constraints:
-        ecuk_year="202[0-5]",
+        release="|".join([str(i) for i in get_supported_ecuk_releases()]),
     threads: 1
     params:
-        internal_paths=lambda wc: f"GBR_{wc.ecuk_year}_End_Use_tables.xlsx",
+        internal_paths=lambda wc: f"GBR_{wc.release}_End_Use_tables.xlsx",
     message:
-        "Unzip ECUK end-use data table for {wildcards.ecuk_year}."
+        "Unzip ECUK end-use data table for {wildcards.release}."
     wrapper:
         "v9.8.0/utils/libarchive/extract"

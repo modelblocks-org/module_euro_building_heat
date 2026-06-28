@@ -36,19 +36,20 @@ resources:
   when2heat:
     url: https://zenodo.org/records/10965295/files/{dataset}.csv
     datasets: ["daily_demand", "hourly_factors_COM", "hourly_factors_MFH", "hourly_factors_SFH"]
+  stable:  # Helper Zenodo repository with stable versions of government/manufacturer data.
+    url: https://zenodo.org/records/20926669/files/{dataset}
+    datasets:
+     - CHE_energy_balance.xlsx
+     - CHE_energy_consumption_households.xlsx
+     - CHE_energy_consumption_industry.xlsx
+     - estat_nrg_bal_c.tsv.gz
+     - estat_nrg_d_hhq.tsv.gz
+     - GBR_End_Use_tables.zip
+     - heat_pump_characteristics.nc
+    ECUK_releases: [2020, 2025]
   automatic:
-    heat_pump_characteristics: https://zenodo.org/records/20926669/files/heat_pump_characteristics.nc
     population: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A
     population_epochs: [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030]
-    eurostat:
-      energy-balance: https://zenodo.org/records/20926669/files/estat_nrg_bal_c.tsv.gz
-      hh-end-use: https://zenodo.org/records/20926669/files/estat_nrg_d_hhq.tsv.gz
-    CHE:
-      end-use: https://zenodo.org/records/20926669/files/CHE_energy_consumption_households.xlsx
-      energy-balance: https://zenodo.org/records/20926669/files/CHE_energy_balance.xlsx
-      industry-energy-balance: https://zenodo.org/records/20926669/files/CHE_energy_consumption_industry.xlsx
-    GBR:
-      end_use_zip: https://zenodo.org/records/20926669/files/GBR_End_Use_tables.zip
 scope:
   datasets:
     annual_energy_balance:

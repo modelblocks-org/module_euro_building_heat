@@ -36,7 +36,7 @@ JRC_IDEES_SPATIAL_SCOPE = [
 WEATHER_YEARS = _get_year_range("weather")
 WEATHER_MODEL_YEARS = dict(zip(WEATHER_YEARS, MODEL_YEARS))
 
-
+# Helper functions
 def additional_config_validation() -> None:
     """Run additional validation that JSON schemas do not support."""
     if config["years"]["start"] >= config["years"]["end"]:
@@ -73,3 +73,25 @@ def get_jrc_url(country: str, version: int | str) -> str:
     else:
         file = f"JRC-IDEES-{version}_{country}.zip"
     return internal["resources"]["jrc"]["url"].format(folder=folder, file=file)
+
+
+def get_supported_ecuk_releases() -> list[int]:
+    """Helper for supported ECUK releases in the stable repo."""
+    release_range = internal["resources"]["stable"]["ECUK_releases"]
+    # the internal range is inclusive, so extend by one
+    return list(range(release_range[0], release_range[-1]+1))
+
+
+# Checkpoint helpers
+def checkpoint_ecuk_end_use_input(wildcards) -> list[str]:
+    country_data = checkpoints.prepare_shape_country_scope.get(
+        shapes=wildcards.shapes
+    ).output.source_country_ids
+    ecuk_file = []
+    if "GBR" in _read_checkpoint_lines(country_data):
+        supported_releases = get_supported_ecuk_releases()
+        ecuk_year = min(
+            year for year in supported_releases if year > config["years"]["end"] - 1
+        )
+        ecuk_file = [f"<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx"]
+    return ecuk_file

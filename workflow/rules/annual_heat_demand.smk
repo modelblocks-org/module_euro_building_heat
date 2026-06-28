@@ -17,17 +17,6 @@ def _jrc_idees_inputs(wildcards):
     )
 
 
-def _ecuk_end_use_inputs(wildcards):
-    country_data = checkpoints.prepare_shape_country_scope.get(
-        shapes=wildcards.shapes
-    ).output.source_country_ids
-    if "GBR" not in _read_checkpoint_lines(country_data):
-        return []
-    return expand(
-        "<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx",
-        ecuk_year=ECUK_END_USE_YEAR,
-    )
-
 
 def _uk_jrc_idees_2015_inputs(wildcards):
     country_data = checkpoints.prepare_shape_country_scope.get(
@@ -112,9 +101,9 @@ rule process_jrc_idees_tertiary:
 
 rule process_annual_energy_balances:
     input:
-        energy_balance="<resources>/automatic/eurostat/energy-balance.tsv.gz",
-        ch_energy_balance="<resources>/automatic/CHE/energy-balance.xlsx",
-        ch_industry_energy_balance="<resources>/automatic/CHE/industry-energy-balance.xlsx",
+        energy_balance="<resources>/automatic/stable/estat_nrg_bal_c.tsv.gz",
+        ch_energy_balance="<resources>/automatic/stable/CHE_energy_balance.xlsx",
+        ch_industry_energy_balance="<resources>/automatic/stable/CHE_energy_consumption_industry.xlsx",
         cat_names=workflow.source_path("../internal/energy-balance-category-names.csv"),
         carrier_names=workflow.source_path(
             "../internal/energy-balance-carrier-names.csv"
@@ -135,13 +124,13 @@ rule process_annual_energy_balances:
 
 rule process_annual_heat_demand:
     input:
-        hh_end_use="<resources>/automatic/eurostat/hh-end-use.tsv.gz",
-        ch_end_use="<resources>/automatic/CHE/end-use.xlsx",
+        hh_end_use="<resources>/automatic/stable/estat_nrg_d_hhq.tsv.gz",
+        ch_end_use="<resources>/automatic/stable/CHE_energy_consumption_households.xlsx",
         energy_balance=rules.process_annual_energy_balances.output[0],
         commercial_demand=rules.process_jrc_idees_tertiary.output[0],
         shapes=rules.filter_shapes.output[0],
         population=_annual_energy_balance_proxy_population_inputs,
-        ecuk_end_use=_ecuk_end_use_inputs,
+        ecuk_end_use=checkpoint_ecuk_end_use_input,
         uk_jrc_idees_2015=_uk_jrc_idees_2015_inputs,
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
         source_country_ids="<resources>/automatic/shapes/{shapes}/source_country_ids.txt",
