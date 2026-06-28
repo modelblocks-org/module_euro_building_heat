@@ -17,7 +17,6 @@ def _jrc_idees_inputs(wildcards):
     )
 
 
-
 def _uk_jrc_idees_2015_inputs(wildcards):
     country_data = checkpoints.prepare_shape_country_scope.get(
         shapes=wildcards.shapes

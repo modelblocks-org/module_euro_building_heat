@@ -36,6 +36,7 @@ JRC_IDEES_SPATIAL_SCOPE = [
 WEATHER_YEARS = _get_year_range("weather")
 WEATHER_MODEL_YEARS = dict(zip(WEATHER_YEARS, MODEL_YEARS))
 
+
 # Helper functions
 def additional_config_validation() -> None:
     """Run additional validation that JSON schemas do not support."""
@@ -79,7 +80,7 @@ def get_supported_ecuk_releases() -> list[int]:
     """Helper for supported ECUK releases in the stable repo."""
     release_range = internal["resources"]["stable"]["ECUK_releases"]
     # the internal range is inclusive, so extend by one
-    return list(range(release_range[0], release_range[-1]+1))
+    return list(range(release_range[0], release_range[-1] + 1))
 
 
 # Checkpoint helpers

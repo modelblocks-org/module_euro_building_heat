@@ -34,9 +34,7 @@ rule download_stable_dataset:
         "../envs/shell.yaml"
     params:
         curl_args=CURL_ARGS,
-        url=lambda wc: internal["resources"]["stable"]["url"].format(
-            dataset=wc.dataset
-        ),
+        url=lambda wc: internal["resources"]["stable"]["url"].format(dataset=wc.dataset),
     message:
         "Download stable dataset {wildcards.dataset}."
     shell:
@@ -61,7 +59,6 @@ rule download_gridded_weather_data:
         "Download raw ERA5 gridded weather data for '{wildcards.shapes}'."
     script:
         "../scripts/download_gridded_weather_data.py"
-
 
 
 rule download_raw_population:
