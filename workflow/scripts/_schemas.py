@@ -1,6 +1,5 @@
 """Schema validation generics."""
 
-
 from pandera import pandas as pa
 from pandera.typing.geopandas import GeoSeries
 from pandera.typing.pandas import Series

@@ -32,10 +32,7 @@ def check_proxied_country_scope(
             if (
                 proxy_country_ids
                 and not missing_scope
-                and (
-                    not scope["proxy_requires_shape_population"]
-                    or not missing_shapes
-                )
+                and (not scope["proxy_requires_shape_population"] or not missing_shapes)
             ):
                 continue
             failures.append(
