@@ -63,9 +63,7 @@ rule download_gridded_weather_data:
 
 rule download_raw_population:
     output:
-        temp(
-            "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip"
-        ),
+        temp("<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip"),
     log:
         "<logs>/automatic/download_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
     conda:
@@ -93,7 +91,10 @@ rule unzip_raw_population:
     conda:
         "../envs/shell.yaml"
     params:
-        member=lambda wc: internal["resources"]["ghsl"]["stem"].format(epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution)+ "_V1_0.tif",
+        member=lambda wc: internal["resources"]["ghsl"]["stem"].format(
+            epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
+        )
+        + "_V1_0.tif",
     message:
         "Extract gridded population data."
     script:

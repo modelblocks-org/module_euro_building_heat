@@ -33,7 +33,9 @@ with open(workflow.source_path("internal/settings.yaml"), "r") as f:
 
 wildcard_constraints:
     ghsl_epoch="|".join(str(i) for i in internal["resources"]["ghsl"]["epochs"]),
-    ghsl_resolution="|".join(str(i) for i in internal["resources"]["ghsl"]["resolutions"]),
+    ghsl_resolution="|".join(
+        str(i) for i in internal["resources"]["ghsl"]["resolutions"]
+    ),
 
 
 # Add all your includes here.

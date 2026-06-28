@@ -68,7 +68,7 @@ def get_configured_population_file() -> str:
         key=lambda year: abs(year - config["years"]["start"]),
     )
     resolution = config["population"]["resolution"]
-    return f"<resources>/automatic/ghsl/pop_{epoch}_{resolution}.tif",
+    return (f"<resources>/automatic/ghsl/pop_{epoch}_{resolution}.tif",)
 
 
 def get_supported_ecuk_releases() -> list[int]:
