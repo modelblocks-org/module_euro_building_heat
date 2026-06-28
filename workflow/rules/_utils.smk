@@ -36,6 +36,7 @@ JRC_IDEES_SPATIAL_SCOPE = [
 WEATHER_YEARS = _get_year_range("weather")
 WEATHER_MODEL_YEARS = dict(zip(WEATHER_YEARS, MODEL_YEARS))
 
+
 def additional_config_validation() -> None:
     """Run additional validation that JSON schemas do not support."""
     if config["years"]["start"] >= config["years"]["end"]:
