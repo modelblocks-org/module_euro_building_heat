@@ -9,8 +9,6 @@ module_euro_building_heat:
     aggregation: 1
   population:
     resolution: 1000
-  scaling:
-    power: 0.00001
   heat:
     tech_efficiencies:
       space_heat:

@@ -11,7 +11,6 @@ def scale_heat_demand_profiles(
     annual_demand_twh: xr.Dataset,
     unscaled_demand_profiles: xr.Dataset,
     sfh_mfh_shares: dict,
-    model_scaling_factor: float,
     weather_model_years: dict[int, int],
 ) -> xr.DataArray:
     """Create demand timeseries for space heat and hot water across all building types.
@@ -31,9 +30,6 @@ def scale_heat_demand_profiles(
         sfh_mfh_shares (dict):
             Share of single- and multi-family households, used to combine respective
             unscaled demand profiles into one "household" profile.
-        model_scaling_factor (float):
-            Scaling factor to go from MWh to the units of energy used in the final
-            Calliope model.
         weather_model_years:
             Mapping from weather years in the profile timestamps to model years in
             annual demand totals.
@@ -69,7 +65,7 @@ def scale_heat_demand_profiles(
     )
 
     return (
-        scaled_demand_profiles.to_array("end_use") * TWH_TO_MWH * model_scaling_factor
+        scaled_demand_profiles.to_array("end_use") * TWH_TO_MWH
     )
 
 
@@ -114,7 +110,6 @@ if __name__ == "__main__":
         annual_demand_ds,
         unscaled_profiles,
         snakemake.params.sfh_mfh_shares,
-        snakemake.params.scaling_factor,
         snakemake.params.weather_model_years,
     )
 

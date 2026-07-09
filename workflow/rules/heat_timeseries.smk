@@ -92,7 +92,6 @@ rule heat_demand_final_timeseries:
         "../envs/heat_demand.yaml"
     params:
         sfh_mfh_shares=config["heat"]["sfh_mfh_shares"],
-        scaling_factor=config["scaling"]["power"],
         weather_model_years=WEATHER_MODEL_YEARS,
     message:
         "Scale heat demand time series for '{wildcards.shapes}' shapes."

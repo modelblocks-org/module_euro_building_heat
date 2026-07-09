@@ -49,9 +49,6 @@ data_proxies:
     SMR: [ITA]
     SRB: [BGR, HRV, HUN, ROU, GRC]
 
-scaling:
-  # Convert MWh to the power unit expected by the downstream model.
-  power: 0.00001
 
 heat:
   tech_efficiencies:

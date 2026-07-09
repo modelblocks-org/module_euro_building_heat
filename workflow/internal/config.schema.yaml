@@ -6,7 +6,6 @@ required:
   - years
   - weather
   - threads
-  - scaling
   - heat
 properties:
   years:
@@ -60,14 +59,6 @@ properties:
         $ref: "#/$defs/country_proxy_map"
       jrc_idees:
         $ref: "#/$defs/country_proxy_map"
-  scaling:
-    type: object
-    additionalProperties: false
-    required: [power]
-    properties:
-      power:
-        type: number
-        exclusiveMinimum: 0
   heat:
     type: object
     additionalProperties: false
