@@ -64,9 +64,7 @@ def scale_heat_demand_profiles(
         weather_model_years={int(k): int(v) for k, v in weather_model_years.items()},
     )
 
-    return (
-        scaled_demand_profiles.to_array("end_use") * TWH_TO_MWH
-    )
+    return scaled_demand_profiles.to_array("end_use") * TWH_TO_MWH
 
 
 def _scale_demand(
