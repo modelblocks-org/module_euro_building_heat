@@ -1,5 +1,6 @@
 """Rules for cleaning and preparation of user/downloaded files."""
 
+
 rule unzip_jrc_idees:
     input:
         rules.download_jrc_idees.output[0],
@@ -47,7 +48,8 @@ rule unzip_raw_population:
     params:
         internal_paths=lambda wc: internal["resources"]["ghsl"]["stem"].format(
             epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
-        ) + "_V1_0.tif"
+        )
+        + "_V1_0.tif",
     message:
         "Extract gridded population data."
     wrapper:
@@ -77,11 +79,11 @@ rule clip_population:
         raster=get_configured_population_file(),
         like_vector=rules.prepare_shapes.output[0],
     output:
-        path="<resources>/automatic/shapes/{shapes}/proxy.tif"
+        path="<resources>/automatic/shapes/{shapes}/proxy.tif",
+    log:
+        "<logs>/{shapes}/clip_population.log",
     params:
         buffer=0,
-    log:
-        "<logs>/{shapes}/clip_population.log"
     message:
         "Clipping proxy raster with '{wildcards.shapes}' shapes."
     wrapper:
