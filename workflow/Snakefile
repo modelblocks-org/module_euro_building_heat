@@ -41,6 +41,7 @@ wildcard_constraints:
 # Add all your includes here.
 include: "rules/_utils.smk"
 include: "rules/automatic.smk"
+include: "rules/prepare.smk"
 include: "rules/annual_heat_demand.smk"
 include: "rules/heat_timeseries.smk"
 include: "rules/heat_pump_cop.smk"
@@ -49,7 +50,7 @@ include: "rules/heat_pump_cop.smk"
 # Add additional files to be delivered alongside the workflow here.
 # This is needed e.g. for python code files that are never
 # explicitly used as a script or input in a snakemake rule.
-# e.g.: workflow.source_path("scripts/_utils.py")
+workflow.source_path("scripts/_schemas.py")
 
 # Run additional check on configuration / settings
 additional_config_validation()

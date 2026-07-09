@@ -81,26 +81,6 @@ rule download_raw_population:
         "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
-rule unzip_raw_population:
-    input:
-        rules.download_raw_population.output[0],
-    output:
-        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.tif",
-    log:
-        "<logs>/automatic/unzip_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
-    conda:
-        "../envs/shell.yaml"
-    params:
-        member=lambda wc: internal["resources"]["ghsl"]["stem"].format(
-            epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
-        )
-        + "_V1_0.tif",
-    message:
-        "Extract gridded population data."
-    script:
-        "../scripts/extract_zip_member.py"
-
-
 rule download_jrc_idees:
     output:
         temp("<resources>/automatic/jrc-idees/{country_code}_v{version}.zip"),
@@ -118,40 +98,3 @@ rule download_jrc_idees:
         "Download JRC-IDEES data for {wildcards.country_code}-{wildcards.version}."
     shell:
         "curl {params.curl_args} --output {output:q} {params.dataset_url:q} 2> {log:q}"
-
-
-rule unzip_jrc_idees:
-    input:
-        rules.download_jrc_idees.output[0],
-    output:
-        "<resources>/automatic/jrc-idees/{version}/tertiary_{country_code}.xlsx",
-    log:
-        "<logs>/automatic/unzip_jrc_idees_{country_code}_v{version}.log",
-    wildcard_constraints:
-        country_code="|".join(internal["resources"]["jrc"]["spatial_scope"]),
-        version="|".join(JRC_IDEES_VERSIONS),
-    threads: 1
-    params:
-        internal_paths=lambda wc: f"JRC-IDEES-{wc.version}_Tertiary_{wc.country_code}.xlsx",
-    message:
-        "Unzip JRC IDEES Tertiary data for {wildcards.country_code}-{wildcards.version}."
-    wrapper:
-        "v9.8.0/utils/libarchive/extract"
-
-
-rule unzip_ECUK_release:
-    input:
-        "<resources>/automatic/stable/GBR_End_Use_tables.zip",
-    output:
-        "<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx",
-    log:
-        "<logs>/unzip_GBR_end_use_{release}.log",
-    wildcard_constraints:
-        release="|".join([str(i) for i in get_supported_ecuk_releases()]),
-    threads: 1
-    params:
-        internal_paths=lambda wc: f"GBR_{wc.release}_End_Use_tables.xlsx",
-    message:
-        "Unzip ECUK end-use data table for {wildcards.release}."
-    wrapper:
-        "v9.8.0/utils/libarchive/extract"

@@ -44,27 +44,9 @@ def _annual_energy_balance_proxy_population_inputs(wildcards):
     return []
 
 
-rule filter_shapes:
-    input:
-        shapes="<shapes>",
-    output:
-        "<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
-    log:
-        "<logs>/{shapes}/filter_shapes.log",
-    conda:
-        "../envs/heat_demand.yaml"
-    params:
-        dataset_scopes=internal["scope"]["datasets"],
-        data_proxies=config.get("data_proxies", {}),
-    message:
-        "Filter non-land regions from '{wildcards.shapes}' shapes."
-    script:
-        "../scripts/filter_shapes.py"
-
-
 checkpoint prepare_shape_country_scope:
     input:
-        shapes=rules.filter_shapes.output[0],
+        shapes=rules.prepare_shapes.output[0],
     output:
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
         source_country_ids="<resources>/automatic/shapes/{shapes}/source_country_ids.txt",
@@ -127,7 +109,7 @@ rule process_annual_heat_demand:
         ch_end_use="<resources>/automatic/stable/CHE_energy_consumption_households.xlsx",
         energy_balance=rules.process_annual_energy_balances.output[0],
         commercial_demand=rules.process_jrc_idees_tertiary.output[0],
-        shapes=rules.filter_shapes.output[0],
+        shapes=rules.prepare_shapes.output[0],
         population=_annual_energy_balance_proxy_population_inputs,
         ecuk_end_use=checkpoint_ecuk_end_use_input,
         uk_jrc_idees_2015=_uk_jrc_idees_2015_inputs,
@@ -160,7 +142,7 @@ rule process_annual_heat_demand:
 rule rescale_annual_heat_demand_to_shapes:
     input:
         annual_demand=rules.process_annual_heat_demand.output.total_demand,
-        shapes=rules.filter_shapes.output[0],
+        shapes=rules.prepare_shapes.output[0],
         population="<resources>/automatic/shapes/{shapes}/population.nc",
     output:
         "<annual_heat_demand>",

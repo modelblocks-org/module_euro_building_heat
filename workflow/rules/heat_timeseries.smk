@@ -46,8 +46,8 @@ rule unscaled_heat_profiles:
 rule population_per_weather_gridbox:
     input:
         weather_grid=rules.process_gridded_weather_data.output.grid,
-        population=get_configured_population_file(),
-        locations=rules.filter_shapes.output[0],
+        population=rules.clip_population.output.path,
+        locations=rules.prepare_shapes.output[0],
     output:
         "<resources>/automatic/shapes/{shapes}/population.nc",
     log:
@@ -103,7 +103,7 @@ rule heat_demand_final_timeseries:
 rule heat_demand_visualization:
     input:
         heat_demand="<heat_demand>",
-        shapes=rules.filter_shapes.output[0],
+        shapes=rules.prepare_shapes.output[0],
     output:
         "<heat_demand_visualization>",
     log:
