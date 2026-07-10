@@ -78,6 +78,17 @@ def get_supported_ecuk_releases() -> list[int]:
     return list(range(release_range[0], release_range[-1] + 1))
 
 
+def get_era5_heat_files(shapes: str) -> list[str]:
+    """Return monthly ERA5 files: previous December, weather years, following January."""
+    raw_dir = f"<resources>/automatic/shapes/{shapes}/era5"
+    months = (
+        [(WEATHER_YEARS[0] - 1, 12)]
+        + [(year, month) for year in WEATHER_YEARS for month in range(1, 13)]
+        + [(WEATHER_YEARS[-1] + 1, 1)]
+    )
+    return [f"{raw_dir}/heat_{year:04d}_{month:02d}.nc" for year, month in months]
+
+
 # Checkpoint helpers
 def checkpoint_ecuk_end_use_input(wildcards) -> list[str]:
     country_data = checkpoints.prepare_shape_country_scope.get(

@@ -1,12 +1,13 @@
-"""Process raw ERA5 GRIB files into module weather files."""
+"""Process monthly ERA5 NetCDF files into module weather files."""
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+
+import numpy as np
+import xarray as xr
 
 GRID_DEGREES = 0.5
 KELVIN_TO_CELSIUS = 273.15
-TIMESERIES_VARIABLES = ("temperature", "wind10m", "tsoil5")
 
 VARIABLE_ALIASES = {
     "temperature": ("t2m", "2t", "2m_temperature"),
@@ -23,19 +24,11 @@ def weather_time_range(weather_years: list[int]) -> tuple[datetime, datetime]:
     return (datetime(start_year - 1, 12, 25, 0), datetime(end_year + 1, 1, 5, 23))
 
 
-def open_grib_dataset(path: Path) -> Any:
-    """Open one GRIB file and merge compatible cfgrib datasets."""
-    import cfgrib
-    import xarray as xr
-
-    return xr.merge(cfgrib.open_datasets(path), compat="override")
-
-
-def _data_var(dataset: Any, aliases: tuple[str, ...]) -> Any:
+def _data_var(dataset: xr.Dataset, aliases: tuple[str, ...]) -> xr.DataArray:
     return next(dataset[alias] for alias in aliases if alias in dataset.data_vars)
 
 
-def normalise_era5_dataset(dataset: Any) -> Any:
+def normalise_era5_dataset(dataset: xr.Dataset) -> xr.Dataset:
     """Normalise ERA5 coordinate names to time, lat, and lon."""
     rename = {
         name: target
@@ -56,11 +49,8 @@ def normalise_era5_dataset(dataset: Any) -> Any:
     return dataset.sortby("lat").sortby("lon").sortby("time")
 
 
-def flatten_dataarray(field: Any, variable_name: str) -> Any:
+def flatten_dataarray(field: xr.DataArray, variable_name: str) -> xr.Dataset:
     """Flatten a lat/lon weather field to the module's site/time schema."""
-    import numpy as np
-    import xarray as xr
-
     stacked = field.stack(site=("lat", "lon")).transpose("site", "time")
     lat = stacked["lat"].values.astype(float)
     lon = stacked["lon"].values.astype(float)
@@ -77,11 +67,8 @@ def flatten_dataarray(field: Any, variable_name: str) -> Any:
     )
 
 
-def convert_era5_to_module_datasets(dataset: Any) -> dict[str, Any]:
+def convert_era5_to_module_datasets(dataset: xr.Dataset) -> dict[str, xr.Dataset]:
     """Convert ERA5 variables to grid, temperature, wind10m, and tsoil5 datasets."""
-    import numpy as np
-    import xarray as xr
-
     dataset = normalise_era5_dataset(dataset)
     temperature = (
         _data_var(dataset, VARIABLE_ALIASES["temperature"]).squeeze(drop=True)
@@ -118,7 +105,7 @@ def convert_era5_to_module_datasets(dataset: Any) -> dict[str, Any]:
 
 
 def write_module_weather_outputs(
-    outputs: dict[str, Any], output_paths: dict[str, str]
+    outputs: dict[str, xr.Dataset], output_paths: dict[str, str]
 ) -> None:
     """Write module weather datasets with compression and atomic renames."""
     for name, dataset in outputs.items():
@@ -134,56 +121,41 @@ def write_module_weather_outputs(
         tmp_path.replace(output_path)
 
 
-def concat_weather_outputs(weather_outputs: list[dict[str, Any]]) -> dict[str, Any]:
-    """Concatenate already flattened weather outputs by variable."""
-    import xarray as xr
-
-    outputs = {}
-    for variable in TIMESERIES_VARIABLES:
-        combined = xr.concat(
-            [weather[variable][[variable]] for weather in weather_outputs],
-            dim="time",
-            compat="override",
-            coords="minimal",
-        ).sortby("time")
-        first_weather = weather_outputs[0][variable]
-        outputs[variable] = combined.assign(
-            site_id=first_weather["site_id"],
-            lat=first_weather["lat"],
-            lon=first_weather["lon"],
-        )
-    outputs["grid"] = weather_outputs[0]["grid"]
-    return outputs
-
-
 def process_gridded_weather_data(
-    raw_weather_dir: str | Path, output_paths: dict[str, str], weather_years: list[int]
+    era5_files: list[str | Path],
+    output_paths: dict[str, str],
+    weather_years: list[int],
 ) -> None:
-    """Process raw ERA5 GRIB chunks into weather files expected by the heat workflow."""
+    """Combine monthly ERA5 files into weather files expected by the workflow."""
     start, end = weather_time_range(weather_years)
-    grib_paths = sorted(Path(raw_weather_dir).glob("*.grib"))
-    if not grib_paths:
-        raise ValueError(f"No GRIB files found in {raw_weather_dir}.")
-
-    weather_outputs = [
-        convert_era5_to_module_datasets(open_grib_dataset(path)) for path in grib_paths
-    ]
-    outputs = concat_weather_outputs(weather_outputs)
-    for dataset in outputs.values():
-        dataset.attrs.update(
-            {
-                "dataset": "era5",
-                "date_from": start.strftime("%Y-%m-%d"),
-                "date_to": end.strftime("%Y-%m-%d"),
-                "grid_degrees": GRID_DEGREES,
-            }
-        )
-    write_module_weather_outputs(outputs, output_paths)
+    with xr.open_mfdataset(
+        era5_files,
+        combine="nested",
+        concat_dim="time",
+        data_vars="minimal",
+        coords="minimal",
+        compat="override",
+        join="exact",
+        combine_attrs="override",
+        decode_timedelta=True,
+    ) as monthly_era5:
+        selected_era5 = monthly_era5.sel(time=slice(start, end))
+        outputs = convert_era5_to_module_datasets(selected_era5)
+        for dataset in outputs.values():
+            dataset.attrs.update(
+                {
+                    "dataset": "era5",
+                    "date_from": start.strftime("%Y-%m-%d"),
+                    "date_to": end.strftime("%Y-%m-%d"),
+                    "grid_degrees": GRID_DEGREES,
+                }
+            )
+        write_module_weather_outputs(outputs, output_paths)
 
 
 if __name__ == "__main__":
     process_gridded_weather_data(
-        raw_weather_dir=snakemake.input.raw_weather,
+        era5_files=list(snakemake.input.era5_heat),
         output_paths={
             "grid": snakemake.output.grid,
             "temperature": snakemake.output.temperature,

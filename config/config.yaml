@@ -8,8 +8,6 @@ weather:
   # Weather years used to shape hourly heat demand profiles. End year is exclusive.
   start: 2018
   end: 2019
-  # Number of monthly CDS ERA5 requests to submit in parallel.
-  download_workers: 2
 
 threads:
   aggregation: 8

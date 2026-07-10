@@ -59,10 +59,8 @@ The main configuration groups are:
   hourly heat-demand profiles. The weather-year span must match the model-year
   span. Output time series keep weather-year timestamps while annual scaling
   uses the paired model years. Weather data is downloaded from CDS/ERA5 for
-  the requested shapes only. Monthly ERA5 requests are downloaded as GRIB files
-  with all required weather variables in each request. Set
-  `weather.download_workers` to control how many monthly requests run in
-  parallel; the default is `2`.
+  the requested shapes only. Monthly ERA5 requests include all required weather
+  variables and are stored as reusable NetCDF files.
 - `threads.aggregation`: number of threads used when aggregating gridded heat
   profiles to shapes.
 - `population.resolution`: GHSL GHS-POP resolution in metres. The default is

@@ -41,24 +41,22 @@ rule download_stable_dataset:
         "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
-rule download_gridded_weather_data:
+rule download_era5_data:
     input:
-        locations="<shapes>",
+        shapes="<shapes>",
     output:
-        raw_weather=directory(
-            "<resources>/automatic/shapes/{shapes}/gridded-weather/raw"
-        ),
+        era5_heat="<resources>/automatic/shapes/{shapes}/era5/heat_{year}_{month}.nc",
     log:
-        "<logs>/{shapes}/automatic/download_gridded_weather_data.log",
+        "<logs>/{shapes}/era5/download_era5_data_{year}_{month}.log",
+    wildcard_constraints:
+        month="0[1-9]|1[0-2]",
+        year="[0-9]{4}",
     conda:
-        "../envs/shell.yaml"
-    params:
-        weather_years=WEATHER_YEARS,
-        download_workers=config["weather"].get("download_workers", 2),
+        "../envs/heat_demand.yaml"
     message:
-        "Download raw ERA5 gridded weather data for '{wildcards.shapes}'."
+        "Download ERA5 weather data for '{wildcards.shapes}:{wildcards.year}:{wildcards.month}'."
     script:
-        "../scripts/download_gridded_weather_data.py"
+        "../scripts/download_era5_data.py"
 
 
 rule download_raw_population:

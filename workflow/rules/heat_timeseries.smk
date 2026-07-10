@@ -3,12 +3,12 @@
 
 rule process_gridded_weather_data:
     input:
-        raw_weather=rules.download_gridded_weather_data.output.raw_weather,
+        era5_heat=lambda wc: get_era5_heat_files(wc.shapes),
     output:
-        grid="<resources>/automatic/shapes/{shapes}/gridded-weather/grid.nc",
-        temperature="<resources>/automatic/shapes/{shapes}/gridded-weather/temperature.nc",
-        wind10m="<resources>/automatic/shapes/{shapes}/gridded-weather/wind10m.nc",
-        tsoil5="<resources>/automatic/shapes/{shapes}/gridded-weather/tsoil5.nc",
+        grid="<resources>/automatic/shapes/{shapes}/gridded_weather/grid.nc",
+        temperature="<resources>/automatic/shapes/{shapes}/gridded_weather/temperature.nc",
+        wind10m="<resources>/automatic/shapes/{shapes}/gridded_weather/wind10m.nc",
+        tsoil5="<resources>/automatic/shapes/{shapes}/gridded_weather/tsoil5.nc",
     log:
         "<logs>/{shapes}/timeseries/process_gridded_weather_data.log",
     conda:
@@ -16,7 +16,7 @@ rule process_gridded_weather_data:
     params:
         weather_years=WEATHER_YEARS,
     message:
-        "Process raw ERA5 weather data for '{wildcards.shapes}'."
+        "Process monthly ERA5 weather data for '{wildcards.shapes}'."
     script:
         "../scripts/process_gridded_weather_data.py"
 
