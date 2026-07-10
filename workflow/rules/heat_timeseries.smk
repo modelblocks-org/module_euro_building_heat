@@ -12,7 +12,7 @@ rule process_gridded_weather_data:
     log:
         "<logs>/{shapes}/timeseries/process_gridded_weather_data.log",
     conda:
-        "../envs/heat_demand.yaml"
+        "../envs/module.yaml"
     params:
         weather_years=WEATHER_YEARS,
     message:
@@ -34,7 +34,7 @@ rule unscaled_heat_profiles:
     log:
         "<logs>/{shapes}/timeseries/unscaled_heat_profiles.log",
     conda:
-        "../envs/heat_demand.yaml"
+        "../envs/module.yaml"
     params:
         weather_years=WEATHER_YEARS,
     message:
@@ -53,7 +53,7 @@ rule population_per_weather_gridbox:
     log:
         "<logs>/{shapes}/timeseries/population_per_weather_gridbox.log",
     conda:
-        "../envs/heat_demand.yaml"
+        "../envs/module.yaml"
     params:
         lat_name="lat",
         lon_name="lon",
@@ -72,7 +72,7 @@ rule group_gridded_timeseries_heat_demand:
     log:
         "<logs>/{shapes}/timeseries/group_gridded_timeseries_heat_demand.log",
     conda:
-        "../envs/heat_demand.yaml"
+        "../envs/module.yaml"
     threads: config["threads"]["aggregation"]
     message:
         "Aggregate gridded heat demand profiles to '{wildcards.shapes}' shapes."
@@ -89,7 +89,7 @@ rule heat_demand_final_timeseries:
     log:
         "<logs>/{shapes}/timeseries/heat_demand_final_timeseries.log",
     conda:
-        "../envs/heat_demand.yaml"
+        "../envs/module.yaml"
     params:
         sfh_mfh_shares=config["heat"]["sfh_mfh_shares"],
         weather_model_years=WEATHER_MODEL_YEARS,
@@ -108,7 +108,7 @@ rule heat_demand_visualization:
     log:
         "<logs>/{shapes}/visualization/heat_demand_visualization.log",
     conda:
-        "../envs/heat_demand.yaml"
+        "../envs/module.yaml"
     params:
         max_steps=1000,
     message:

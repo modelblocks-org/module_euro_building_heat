@@ -1,4 +1,6 @@
 # Module Input-Output structure for automated docs generation
+convention_version: v1.0.0
+
 pathvars:
   snakemake_defaults:
     logs:
@@ -6,10 +8,10 @@ pathvars:
       description: location of snakemake log files.
     resources:
       default: "<resources>"
-      description: location of module resource/input files.
+      description: "location of module resource (input) files."
     results:
       default: "<results>"
-      description: location of module result/output files.
+      description: "location of module result (output) files."
   user_resources:
     shapes:
       default: "<resources>/user/{shapes}/shapes.parquet"

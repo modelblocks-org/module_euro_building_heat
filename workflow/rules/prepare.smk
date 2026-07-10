@@ -64,7 +64,7 @@ rule prepare_shapes:
     log:
         "<logs>/{shapes}/prepare_shapes.log",
     conda:
-        "../envs/heat_demand.yaml"
+        "../envs/module.yaml"
     params:
         dataset_scopes=internal["scope"]["datasets"],
         data_proxies=config.get("data_proxies", {}),

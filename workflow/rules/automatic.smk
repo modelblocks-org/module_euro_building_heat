@@ -11,7 +11,7 @@ rule download_when2heat_params:
     wildcard_constraints:
         dataset="|".join(internal["resources"]["when2heat"]["datasets"]),
     conda:
-        "../envs/shell.yaml"
+        "../envs/module.yaml"
     params:
         curl_args=CURL_ARGS,
         url=lambda wc: internal["resources"]["when2heat"]["url"].format(
@@ -31,7 +31,7 @@ rule download_stable_dataset:
     wildcard_constraints:
         dataset="|".join(internal["resources"]["stable"]["datasets"]),
     conda:
-        "../envs/shell.yaml"
+        "../envs/module.yaml"
     params:
         curl_args=CURL_ARGS,
         url=lambda wc: internal["resources"]["stable"]["url"].format(dataset=wc.dataset),
@@ -52,7 +52,7 @@ rule download_era5_data:
         month="0[1-9]|1[0-2]",
         year="[0-9]{4}",
     conda:
-        "../envs/heat_demand.yaml"
+        "../envs/module.yaml"
     message:
         "Download ERA5 weather data for '{wildcards.shapes}:{wildcards.year}:{wildcards.month}'."
     script:
@@ -65,7 +65,7 @@ rule download_raw_population:
     log:
         "<logs>/automatic/download_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
     conda:
-        "../envs/shell.yaml"
+        "../envs/module.yaml"
     params:
         curl_args=CURL_ARGS,
         url=lambda wc: internal["resources"]["ghsl"]["url"].format(
@@ -88,7 +88,7 @@ rule download_jrc_idees:
         country_code="|".join(internal["resources"]["jrc"]["spatial_scope"]),
         version="|".join(JRC_IDEES_VERSIONS),
     conda:
-        "../envs/shell.yaml"
+        "../envs/module.yaml"
     params:
         curl_args=CURL_ARGS,
         dataset_url=lambda wc: get_jrc_url(wc.country_code, wc.version),

@@ -1,8 +1,11 @@
-# Euro building heat
+# European Building Heat
 
 This module prepares time series of heat demand and heat supply technologies for buildings in European countries.
 
 <!-- Place an attractive image of module outputs here -->
+<p align="center">
+  <img src="./figures/module.png" width="75%">
+</p>
 
 
 ## About
@@ -138,6 +141,21 @@ cd module_euro_building_heat
 pixi install --all
 ```
 
+Please be aware that this is a multi-environment project (see [pixi.toml](./pixi.toml) for details).
+- `default`: used for development and integration testing.
+Because it contains `Snakemake`, `conda` and `pytest` as dependencies it **should not be used** in `Snakemake` rules.
+- `module`: contains minimal dependencies used in `Snakemake` rules.
+If modified, be sure to export it to `Snakemake` so it can be recreated by module users:
+
+```shell
+# create module.yaml and conda-spec pin files in workflow/envs/
+pixi run export-snakemake-env module
+```
+
+
+## Testing
+<!-- Please do not modify this templated section -->
+
 For testing, simply run:
 
 ```shell
@@ -174,3 +192,16 @@ This module is based on the following research and datasets:
 - Swiss Federal Office of Energy statistics for Swiss energy balances and
   end-use demand:
   <https://www.bfe.admin.ch/bfe/en/home/versorgung/statistik-und-geodaten/energiestatistiken.html>
+
+## Contributors ✨
+
+Thanks goes to these wonderful people, sorted alphabetically ([emoji key](https://allcontributors.org/en/reference/emoji-key/)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
