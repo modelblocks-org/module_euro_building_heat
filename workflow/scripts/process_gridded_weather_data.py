@@ -122,9 +122,7 @@ def write_module_weather_outputs(
 
 
 def process_gridded_weather_data(
-    era5_files: list[str | Path],
-    output_paths: dict[str, str],
-    weather_years: list[int],
+    era5_files: list[str | Path], output_paths: dict[str, str], weather_years: list[int]
 ) -> None:
     """Combine monthly ERA5 files into weather files expected by the workflow."""
     start, end = weather_time_range(weather_years)
