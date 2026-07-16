@@ -21,6 +21,7 @@ ruff = ">=0.9.9"
 snakefmt = ">=0.10.2"
 snakemake-minimal = ">=9.19.0"
 pytz = ">=2026.1.post1"
+pyarrow = ">=24.0.0"
 
 [feature.module.dependencies]
 curl = ">=8.9.1"
@@ -53,6 +54,8 @@ pandera-geopandas = ">=0.31.1"
 pandera-pandas = ">=0.31.1"
 cdsapi = ">=0.7.7"
 gregor = ">=0.1.0"
+pint = ">=0.25.3"
+pint-pandas = ">=0.7.1"
 
 [environments]
 module = { features = ["module"], no-default-feature = true }
