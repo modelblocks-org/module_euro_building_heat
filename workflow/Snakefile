@@ -42,6 +42,7 @@ wildcard_constraints:
 include: "rules/_utils.smk"
 include: "rules/automatic.smk"
 include: "rules/prepare.smk"
+include: "rules/baseline.smk"
 include: "rules/annual_heat_demand.smk"
 include: "rules/heat_timeseries.smk"
 include: "rules/heat_pump_cop.smk"
