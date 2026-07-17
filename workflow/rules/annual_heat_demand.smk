@@ -11,7 +11,7 @@ def _jrc_idees_inputs(wildcards):
         shapes=wildcards.shapes
     ).output.jrc_idees_country_codes
     return expand(
-        "<resources>/automatic/jrc-idees/{version}/tertiary_{country_code}.xlsx",
+        "<resources>/automatic/jrc-idees/{version}/Tertiary_{country_code}.xlsx",
         country_code=_read_checkpoint_lines(country_data),
         version=JRC_IDEES_VERSION,
     )

@@ -1,28 +1,45 @@
 
 JRC_SPATIAL_SCOPE = internal["resources"]["jrc"]["spatial_scope"]
 
-rule baseline_jrc_idees_tertiary:
+SECTOR_TO_JRC_DATASET = {
+    "services": "Tertiary",
+    "residential": "Residential"
+}
+
+
+def _get_jrc_baseline_files(sector: str) -> list[str]:
+    """Get all the files needed to construct a JRC-IDEES baseline."""
+    jrc_version = internal["resources"]["jrc"]["use_version"]
+    countries = JRC_SPATIAL_SCOPE
+    dataset = SECTOR_TO_JRC_DATASET[sector]
+    uk_missing = jrc_version > 2015
+
+    file = "<resources>/automatic/jrc-idees/{version}/{dataset}_{country}.xlsx"
+    requested_files = [
+        file.format(version=jrc_version, country=country, dataset=dataset)
+        for country in countries
+        if not (country == "UK" and uk_missing)
+    ]
+
+    if uk_missing:
+        requested_files.append(file.format(version=2015, country="UK", dataset=dataset))
+
+    return requested_files
+
+rule baseline_jrc_idees_sector:
     input:
-        latest_jrc=expand(
-            "<resources>/automatic/jrc-idees/{version}/tertiary_{country_code}.xlsx",
-            country_code=[
-                i for i in JRC_SPATIAL_SCOPE
-                if not (i == "UK" and JRC_IDEES_VERSION > 2015)
-            ],
-            version=JRC_IDEES_VERSION,
-        ),
-        uk_2015="<resources>/automatic/jrc-idees/2015/tertiary_UK.xlsx"
+        jrc_files=lambda wc: _get_jrc_baseline_files(wc.sector)
     output:
-        final="<resources>/automatic/baseline/jrc_idees/tertiary_final.csv",
-        useful="<resources>/automatic/baseline/jrc_idees/tertiary_useful.csv",
-        plot="<resources>/automatic/baseline/jrc_idees/tertiary.pdf",
+        final="<resources>/automatic/baseline/jrc_idees/{sector}_final.csv",
+        useful="<resources>/automatic/baseline/jrc_idees/{sector}_useful.csv",
+        plot="<resources>/automatic/baseline/jrc_idees/{sector}.pdf",
     log:
-        "<logs>/baseline/baseline_jrc_idees_tertiary.log",
+        "<logs>/baseline/baseline_jrc_idees_{sector}.log",
     conda:
         "../envs/module.yaml"
     params:
-        countries=JRC_SPATIAL_SCOPE
+        countries=JRC_SPATIAL_SCOPE,
     message:
-        "Baseline for commercial demand using JRC-IDEES tertiary data."
+        "Create JRC-IDEES baseline for {wildcards.sector}."
     script:
-        "../scripts/baseline_jrc_idees_tertiary.py"
+        "../scripts/baseline_jrc_idees_sector.py"

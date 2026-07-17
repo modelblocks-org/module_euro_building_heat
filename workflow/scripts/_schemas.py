@@ -10,6 +10,7 @@ from pandera.typing.pandas import Series
 from shapely.geometry import MultiPolygon, Polygon
 
 ENERGY_TYPES: set[str] = {"useful_energy", "final_energy"}
+SECTORS: set[str] = {"residential", "services"}
 
 
 class ShapesSchema(pa.DataFrameModel):
@@ -41,17 +42,27 @@ class ShapesSchema(pa.DataFrameModel):
         return country_id.str.isupper()
 
 
-class TertiaryJRCSchema(pa.DataFrameModel):
+class JRCIDEESSchema(pa.DataFrameModel):
     """Schema for tertiary JRC data."""
 
     class Config:
         coerce = False
         strict = True
-        unique = ["carrier_name", "end_use", "country_code", "unit", "energy", "year"]
+        unique = [
+            "carrier_name",
+            "sector",
+            "end_use",
+            "country_code",
+            "unit",
+            "energy",
+            "year",
+        ]
 
-    carrier_name: Series[str] = pa.Field(isin=set(_jrc.TERTIARY_CARRIERS.values()))
+    carrier_name: Series[str] = pa.Field(isin=set(_jrc.CARRIERS.values()))
     "Name of the carrier."
-    end_use: Series[str] = pa.Field(isin=set(_jrc.TERTIARY_END_USES.values()))
+    sector: Series[str] = pa.Field(isin=SECTORS)
+    "Energy sector."
+    end_use: Series[str] = pa.Field(isin=set(_jrc.END_USES.values()))
     "End use for the carrier."
     country_code: Series[str]
     "Country code."
