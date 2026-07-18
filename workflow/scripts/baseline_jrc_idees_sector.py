@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 import _jrc
 import _plots
 import _schemas
+import _utils
 import pandas as pd
 
 if TYPE_CHECKING:
@@ -19,8 +20,12 @@ def get_combined_sector_demand(
 ) -> pd.DataFrame:
     """Get a validated sector demand dataset."""
     df = _jrc.get_sector_data(jrc_files, SECTOR_MAP[sector], energy_type)
+
+    # FIXME: data in settings.yaml should be in alpha3 already
+    country_translator = {i: _utils.convert_country_code(i, "alpha3") for i in countries}
+    df["country_code"] = df["country_code"].map(country_translator)
     df["sector"] = sector
-    df = _schemas.JRCIDEESSchema.validate_countries(df, countries)
+    df = _schemas.JRCIDEESSchema.validate_countries(df, country_translator.values())
     return df
 
 
