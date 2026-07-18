@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 import _plots
 import numpy as np
 import pandas as pd
+from _schemas import BaselineSchema
 
 if TYPE_CHECKING:
     snakemake: Any
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
 PJ_TO_TWH = 1 / 3.6
 
 # FIXME: these should be standard across all baseline sources
-CH_ENERGY_CARRIER_TRANSLATION = {
+CARRIER_MAPPING = {
     "Heizöl": "oil",
     "Erdgas": "gas",
     "El. Widerstandsheizungen": "direct_electric",
@@ -27,17 +28,7 @@ CH_ENERGY_CARRIER_TRANSLATION = {
     "Umweltwärme": "ambient_heat",
     "Solar": "solar_thermal",
 }
-NON_HEAT_ELECTRICAL_USES = [
-    # "Raumwärme",
-    # "Warmwasser",
-    "Klima, Lüftung, HT",
-    "I&K, inklusive Unterhaltung",
-    # "Kochherde",
-    "Beleuchtung",
-    "Antriebe, Prozesse",
-    "sonstige Elektrogeräte",
-]
-CH_HH_END_USE_TRANSLATION = {
+END_USE_MAPPING = {
     "Raumwärme": "space_heat",
     "Warmwasser": "hot_water",
     "Prozesswärme": "cooking",
@@ -48,26 +39,41 @@ CH_HH_END_USE_TRANSLATION = {
     "sonstige": "end_use_electricity",
 }
 SUPPORTED_YEARS = [2000, 2024]  # Right and left inclusive
+CHECKSUM_RTOL = 5e-5
+ELECTRIC_HEATING_CARRIERS = {"electricity", "direct_electric", "heat_pump"}
+BASELINE_COLUMNS = BaselineSchema.get_column_names()
+COMMON_METADATA = {"country_code": "CHE", "unit": "twh", "energy": "final_energy"}
 
 
 def _ch_sheet_year_columns(raw: pd.DataFrame) -> tuple[int, list[int], list[int]]:
     for row_number, row in raw.iterrows():
-        year_columns = []
-        years = []
-        for column_number, value in row.items():
-            try:
-                year = int(value)
-            except (TypeError, ValueError):
-                continue
-            if 1900 <= year <= 2100:
-                year_columns.append(column_number)
-                years.append(year)
-        if year_columns:
-            return row_number, year_columns, years
+        years = pd.to_numeric(row, errors="coerce").dropna().astype(int)
+        years = years.loc[years.between(1900, 2100)]
+        if not years.empty:
+            return row_number, years.index.to_list(), years.to_list()
     raise ValueError("Could not find year columns.")
 
 
+def _checksum_totals(
+    actual: pd.Series, expected: pd.Series, label: str, rtol: float = 1e-5
+) -> None:
+    """Check calculated values against source totals."""
+    if not np.allclose(actual.reindex(expected.index), expected, rtol=rtol):
+        raise RuntimeError(f"{label} had a checksum failure.")
+
+
+def _to_baseline(df: pd.DataFrame, sector: str, **fixed_columns: str) -> pd.DataFrame:
+    """Convert a wide dataframe to the standard baseline format."""
+    return (
+        df.stack()
+        .rename("value")
+        .reset_index()
+        .assign(**fixed_columns, sector=sector, **COMMON_METADATA)[BASELINE_COLUMNS]
+    )
+
+
 def parse_sheet(path_to_excel: str, sheet: str) -> pd.DataFrame:
+    """Get a long formatted dataframe from a sheet in the CHE file."""
     raw = pd.read_excel(path_to_excel, sheet_name=sheet, header=None)
     header_row, year_columns, years = _ch_sheet_year_columns(raw)
     label_column = min(year_columns) - 1
@@ -94,19 +100,22 @@ def parse_sheet(path_to_excel: str, sheet: str) -> pd.DataFrame:
 
 
 def translate_sheet(
-    path_to_excel: str, sheet: str, translator: dict[str, str]
+    path_to_excel: str,
+    sheet: str,
+    translator: dict[str, str],
+    total_label: str = "Total",
 ) -> pd.DataFrame:
     """Run parsing on an Excel sheet and and convert it to our internal schema."""
     df = parse_sheet(path_to_excel, sheet)
-    expected_total = df.loc["Total"].sum()
-
     result = df.groupby(translator).sum()
-    if not np.isclose(result.to_numpy().sum(), expected_total):
-        raise RuntimeError(f"Parsing for {sheet!r} had a checksum failure.")
+    # Some published annual totals differ slightly from their displayed components.
+    _checksum_totals(
+        result.sum(), df.loc[total_label], f"Parsing for {sheet!r}", rtol=CHECKSUM_RTOL
+    )
     return result
 
 
-def get_residential_demand(path_to_ch_end_use: str) -> pd.DataFrame:
+def get_residential_demand(raw_file_path: str) -> pd.DataFrame:
     """Get Swiss residential end-use demand in TWh."""
     sheets = {
         "space_heat": "Tabelle20",
@@ -120,18 +129,19 @@ def get_residential_demand(path_to_ch_end_use: str) -> pd.DataFrame:
         "energy": "final_energy",
     }
 
-    heating_df = (
-        pd.concat(
-            {
-                end_use: translate_sheet(
-                    path_to_ch_end_use, sheet, translator=CH_ENERGY_CARRIER_TRANSLATION
-                )
-                for end_use, sheet in sheets.items()
-            },
-            names=["end_use", "carrier_name"],
-        )
-        .rename(columns=int)
-        .rename_axis(columns="year")
+    heat = pd.concat(
+        {
+            end_use: translate_sheet(raw_file_path, sheet, translator=CARRIER_MAPPING)
+            for end_use, sheet in sheets.items()
+        },
+        names=["end_use", "carrier_name"],
+    )
+    direct_electricity = parse_sheet(raw_file_path, "Tabelle24").loc[["Total"]]
+    direct_electricity.index = pd.MultiIndex.from_tuples(
+        [("end_use_electricity", "electricity")], names=["end_use", "carrier_name"]
+    )
+    res_df = (
+        pd.concat([heat, direct_electricity])
         .assign(**metadata)
         .set_index(list(metadata), append=True)
         .stack()
@@ -139,95 +149,91 @@ def get_residential_demand(path_to_ch_end_use: str) -> pd.DataFrame:
         .reset_index()
     )
 
-    direct_elec_df = (
-        parse_sheet(path_to_ch_end_use, "Tabelle24")
-        .loc["Total"]
-        .rename_axis("year")
-        .rename("value")
-        .reset_index()
-        .assign(end_use="end_use_electricity", carrier_name="electricity", **metadata)
+    totals = parse_sheet(raw_file_path, "Tabelle17").loc["Total Endenergieverbrauch"]
+    _checksum_totals(
+        res_df.groupby("year")["value"].sum(), totals, "Parsing for residential demand"
     )
 
-    res_df = pd.concat([heating_df, direct_elec_df], ignore_index=True)
-
-    totals = parse_sheet(path_to_ch_end_use, "Tabelle17").loc[
-        "Total Endenergieverbrauch"
-    ]
-
-    if not np.isclose(res_df["value"].sum(), totals.sum()):
-        raise RuntimeError("Parsing for residential demand had a checksum failure.")
-
-    return res_df
+    return BaselineSchema.validate(res_df)
 
 
-def _read_ch_non_hh_non_electricity_demand(
-    path_to_ch_end_use: str, hh_final_energy_demand: pd.DataFrame
-):
-    ch_con = translate_sheet(
-        path_to_ch_end_use, "Tabelle27", translator=CH_HH_END_USE_TRANSLATION
-    )
+def _get_services_fuel_demand(
+    raw_file_path: str, residential_demand: pd.DataFrame
+) -> pd.DataFrame:
+    ch_con = translate_sheet(raw_file_path, "Tabelle27", translator=END_USE_MAPPING)
     # NOTE: non-electric energy in services is not very detailed,
-    # so we assume carrier ratios are the same as in households
-    hh_con = hh_final_energy_demand.xs(
-        ("CHE", "household"), level=("country_code", "cat_name")
+    # so we assume carrier ratios are the same as in households.
+    # Electrical heating is reported separately in Tabelle28.
+    hh_con = (
+        residential_demand.loc[
+            residential_demand["end_use"].isin(ch_con.index)
+            & ~residential_demand["carrier_name"].isin(ELECTRIC_HEATING_CARRIERS)
+        ]
+        .set_index(["end_use", "carrier_name", "year"])["value"]
+        .unstack("year", sort=False)
     )
-    hh_ratios = hh_con.div(
-        hh_con.drop("electricity", level="carrier_name", errors="ignore")
-        .groupby(level=["end_use"])
-        .sum(),
-        axis=0,
-    ).reindex(columns=ch_con.columns)
-    ch_con_disaggregated = hh_ratios.mul(ch_con, level="end_use", axis=0).dropna(
-        how="all"
+    carrier_ratios = hh_con.div(
+        hh_con.groupby(level="end_use", sort=False).transform("sum")
     )
+    result = carrier_ratios.mul(ch_con, level="end_use")
 
-    assert np.allclose(
-        ch_con_disaggregated.groupby(level="end_use").sum().reindex_like(ch_con), ch_con
+    _checksum_totals(
+        result.groupby(level="end_use").sum().stack(),
+        ch_con.stack(),
+        "Service non-electric carrier allocation",
     )
-    ch_con = ch_con_disaggregated.reset_index("carrier_name")
-    return (
-        ch_con.assign(country_code="CHE")
-        .set_index(["country_code", "carrier_name"], append=True)
-        .stack()
-        .rename_axis(index=["end_use", "country_code", "carrier_name", "year"])
-        .mul(PJ_TO_TWH)  # PJ -> TWh
-    )
+    return _to_baseline(result, "services")
 
 
-def _read_ch_non_hh_electricity_demand(path_to_ch_end_use: str) -> pd.DataFrame:
-    return (
+def _get_services_electric_demand(raw_file_path: str) -> pd.DataFrame:
+    return _to_baseline(
         translate_sheet(
-            path_to_ch_end_use, "Tabelle28", translator=CH_HH_END_USE_TRANSLATION
-        )
-        .assign(carrier_name="electricity", country_code="CHE")
-        .set_index(["country_code", "carrier_name"], append=True)
-        .stack()
-        .rename_axis(index=["end_use", "country_code", "carrier_name", "year"])
-        .mul(PJ_TO_TWH)
+            raw_file_path,
+            "Tabelle28",
+            translator=END_USE_MAPPING,
+            total_label="Total Elektrizität",
+        ).rename_axis(index="end_use"),
+        "services",
+        carrier_name="electricity",
     )
 
 
-def get_services_demand(path_to_ch_end_use: str, residential_df: pd.DataFrame):
-    fuel_con = _read_ch_non_hh_non_electricity_demand(
-        path_to_ch_end_use, residential_df
+def get_services_demand(
+    raw_file_path: str, residential_df: pd.DataFrame
+) -> pd.DataFrame:
+    """Get Swiss service-sector end-use demand in TWh."""
+    services_df = pd.concat(
+        [
+            _get_services_fuel_demand(raw_file_path, residential_df),
+            _get_services_electric_demand(raw_file_path),
+        ],
+        ignore_index=True,
     )
-    elec_con = _read_ch_non_hh_electricity_demand(path_to_ch_end_use)
+
+    totals = parse_sheet(raw_file_path, "Tabelle26").loc["Total Endenergie"]
+    _checksum_totals(
+        services_df.groupby("year")["value"].sum(),
+        totals,
+        "Parsing for services demand",
+    )
+    return BaselineSchema.validate(services_df)
 
 
 def main() -> None:
     """Main snakemake process."""
-    # sector = snakemake.wildcards.sector
     raw_file = snakemake.input.raw_stats
 
     residential_df = get_residential_demand(raw_file)
-    residential_df.to_csv(snakemake.output.residential)
-    fig, _ = _plots.plot_bar_histogram(
-        residential_df, "end_use", container_col="country_code", unit="TWh"
-    )
-    fig.suptitle("Residential final energy demand")
-    fig.savefig(snakemake.output.plot, bbox_inches="tight")
+    services_df = get_services_demand(raw_file, residential_df)
 
-    # services_df = get_services_demand(raw_file, residential_df)
+    for df in [residential_df, services_df]:
+        sector = df["sector"].iat[0]
+        df.to_csv(snakemake.output[sector], index=False)
+        fig, _ = _plots.plot_bar_histogram(
+            df, "end_use", container_col="country_code", unit="TWh"
+        )
+        fig.suptitle(f"{sector.capitalize()} final energy demand")
+        fig.savefig(snakemake.output[f"{sector}_plot"], bbox_inches="tight")
 
 
 if __name__ == "__main__":

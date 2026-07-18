@@ -1,10 +1,6 @@
-
 JRC_SPATIAL_SCOPE = internal["resources"]["jrc"]["spatial_scope"]
 
-SECTOR_TO_JRC_DATASET = {
-    "services": "Tertiary",
-    "residential": "Residential"
-}
+SECTOR_TO_JRC_DATASET = {"services": "Tertiary", "residential": "Residential"}
 
 
 def _get_jrc_baseline_files(sector: str) -> list[str]:
@@ -26,9 +22,10 @@ def _get_jrc_baseline_files(sector: str) -> list[str]:
 
     return requested_files
 
+
 rule baseline_jrc_idees_sector:
     input:
-        jrc_files=lambda wc: _get_jrc_baseline_files(wc.sector)
+        jrc_files=lambda wc: _get_jrc_baseline_files(wc.sector),
     output:
         final="<resources>/automatic/baseline/jrc_idees/{sector}_final.csv",
         useful="<resources>/automatic/baseline/jrc_idees/{sector}_useful.csv",
@@ -47,10 +44,12 @@ rule baseline_jrc_idees_sector:
 
 rule baseline_che_final_demand:
     input:
-        raw_stats="<resources>/automatic/stable/CHE_energy_consumption_households.xlsx"
+        raw_stats="<resources>/automatic/stable/CHE_energy_consumption_households.xlsx",
     output:
         residential="<resources>/automatic/baseline/che/residential_final.csv",
-        plot="<resources>/automatic/baseline/che/residential.pdf",
+        services="<resources>/automatic/baseline/che/services_final.csv",
+        residential_plot="<resources>/automatic/baseline/che/residential.pdf",
+        services_plot="<resources>/automatic/baseline/che/services.pdf",
     log:
         "<logs>/baseline/baseline_che.log",
     conda:

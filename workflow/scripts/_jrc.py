@@ -5,7 +5,7 @@ import pandas as pd
 
 SECTORS = ["RES", "SER"]
 
-CARRIERS = {
+CARRIER_MAPPING = {
     "Air conditioning": "electricity",
     "Advanced electric heating": "electricity",
     "Biomass": "biofuel",
@@ -30,7 +30,7 @@ CARRIERS = {
     "Solar": "renewable_heat",
     "Solids": "solid_fossil",
 }
-END_USES = {
+END_USE_MAPPING = {
     "Space heating": "space_heat",
     "Space cooling": "end_use_electricity",
     "Hot water": "hot_water",
@@ -77,15 +77,15 @@ def _clean_df(df: pd.DataFrame, energy_type: str):
     year_columns = df.columns
     df = df.assign(end_use=pd.NA)
     df["end_use"] = df["end_use"].astype("object")
-    end_use_rows = df.index.isin(END_USES.keys())
+    end_use_rows = df.index.isin(END_USE_MAPPING.keys())
     df.loc[end_use_rows, "end_use"] = df.index[end_use_rows]
     df.end_use = df.end_use.fillna(df.end_use.ffill())
 
     df = (
         df.dropna(how="all", subset=year_columns)
         .set_index("end_use", append=True)
-        .drop(END_USES.keys(), level=0, errors="ignore")
-        .groupby([CARRIERS, END_USES], level=[0, 1])
+        .drop(END_USE_MAPPING.keys(), level=0, errors="ignore")
+        .groupby([CARRIER_MAPPING, END_USE_MAPPING], level=[0, 1])
         .sum()
         .assign(country_code=country_code, unit="ktoe", energy=energy_type)
         .set_index(["country_code", "unit", "energy"], append=True)

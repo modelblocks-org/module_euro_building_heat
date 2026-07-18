@@ -2,15 +2,28 @@
 
 from collections.abc import Iterable
 
-import _jrc
 import pandas as pd
 from pandera import pandas as pa
 from pandera.typing.geopandas import GeoSeries
 from pandera.typing.pandas import Series
 from shapely.geometry import MultiPolygon, Polygon
 
-ENERGY_TYPES: set[str] = {"useful_energy", "final_energy"}
-SECTORS: set[str] = {"residential", "services"}
+ENERGY_TYPES: tuple[str, ...] = ("useful_energy", "final_energy")
+SECTORS: tuple[str, ...] = ("residential", "services")
+CARRIERS: tuple[str, ...] = (
+    "ambient_heat",
+    "biofuel",
+    "direct_electric",
+    "electricity",
+    "gas",
+    "heat",
+    "heat_pump",
+    "oil",
+    "renewable_heat",
+    "solar_thermal",
+    "solid_fossil",
+)
+END_USES: tuple[str, ...] = ("cooking", "end_use_electricity", "hot_water", "space_heat")
 
 
 class ShapesSchema(pa.DataFrameModel):
@@ -42,8 +55,8 @@ class ShapesSchema(pa.DataFrameModel):
         return country_id.str.isupper()
 
 
-class JRCIDEESSchema(pa.DataFrameModel):
-    """Schema for tertiary JRC data."""
+class BaselineSchema(pa.DataFrameModel):
+    """Schema for baseline files."""
 
     class Config:
         coerce = False
@@ -58,11 +71,11 @@ class JRCIDEESSchema(pa.DataFrameModel):
             "year",
         ]
 
-    carrier_name: Series[str] = pa.Field(isin=set(_jrc.CARRIERS.values()))
+    carrier_name: Series[str] = pa.Field(isin=CARRIERS)
     "Name of the carrier."
     sector: Series[str] = pa.Field(isin=SECTORS)
     "Energy sector."
-    end_use: Series[str] = pa.Field(isin=set(_jrc.END_USES.values()))
+    end_use: Series[str] = pa.Field(isin=END_USES)
     "End use for the carrier."
     country_code: Series[str]
     "Country code."
@@ -88,3 +101,8 @@ class JRCIDEESSchema(pa.DataFrameModel):
             raise ValueError(f"Found countries outside scope: {mismatch}")
 
         return validated
+
+    @classmethod
+    def get_column_names(cls) -> list[str]:
+        """Get the schema column names."""
+        return list(cls.to_schema().columns.keys())
