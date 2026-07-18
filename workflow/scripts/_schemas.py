@@ -68,6 +68,7 @@ class JRCIDEESSchema(pa.DataFrameModel):
     "Country code."
     unit: Series[str]
     "Unit of the value."
+    # FIXME: needs better name
     energy: Series[str] = pa.Field(isin=ENERGY_TYPES)
     "Type of energy measurement."
     year: Series[int] = pa.Field(ge=2000)

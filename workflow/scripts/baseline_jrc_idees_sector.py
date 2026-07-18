@@ -1,4 +1,4 @@
-"""Process JRC-IDEES tertiary sector heat demand data."""
+"""Process JRC-IDEES heat demand data."""
 
 import sys
 from typing import TYPE_CHECKING, Any

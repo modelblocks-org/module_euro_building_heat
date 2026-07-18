@@ -36,7 +36,7 @@ def _histogram_subplot(n_rows: int, n_columns: int) -> tuple[Figure, np.ndarray]
         squeeze=False,
     )
 
-
+# FIXME: color ordering should be deterministic
 def plot_bar_histogram(
     df: pd.DataFrame,
     stacked_col: str,
@@ -70,7 +70,7 @@ def plot_bar_histogram(
     x_label = inflection.humanize(year_col)
     y_label = inflection.humanize(stacked_col)
     if unit:
-        y_label += f" ({inflection.humanize(unit)})"
+        y_label += f" ({unit})"
 
     for ax, container in zip(axes_flat, containers):
         container_df = df.loc[df[container_col].eq(container)]

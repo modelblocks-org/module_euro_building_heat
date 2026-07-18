@@ -43,3 +43,21 @@ rule baseline_jrc_idees_sector:
         "Create JRC-IDEES baseline for {wildcards.sector}."
     script:
         "../scripts/baseline_jrc_idees_sector.py"
+
+
+rule baseline_che_final_demand:
+    input:
+        raw_stats="<resources>/automatic/stable/CHE_energy_consumption_households.xlsx"
+    output:
+        residential="<resources>/automatic/baseline/che/residential_final.csv",
+        plot="<resources>/automatic/baseline/che/residential.pdf",
+    log:
+        "<logs>/baseline/baseline_che.log",
+    conda:
+        "../envs/module.yaml"
+    # params:
+    #     countries=JRC_SPATIAL_SCOPE,
+    message:
+        "Create CHE baseline."
+    script:
+        "../scripts/baseline_che_final_demand.py"
