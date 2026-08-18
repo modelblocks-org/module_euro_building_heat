@@ -21,6 +21,7 @@ ruff = ">=0.9.9"
 snakefmt = ">=0.10.2"
 snakemake-minimal = ">=9.19.0"
 pytz = ">=2026.1.post1"
+pyarrow = ">=24.0.0"
 
 [feature.module.dependencies]
 curl = ">=8.9.1"
@@ -38,6 +39,7 @@ bottleneck = ">=1.6.0"
 dask = ">=2026.6.0"
 ipdb = ">=0.13.13"
 jinja2 = ">=3.1.6"
+matplotlib = ">=3.10.0"
 netcdf4 = ">=1.7.2"
 networkx = ">=3.4.2"
 numpy = ">=2.2.4"
@@ -53,6 +55,10 @@ pandera-geopandas = ">=0.31.1"
 pandera-pandas = ">=0.31.1"
 cdsapi = ">=0.7.7"
 gregor = ">=0.1.0"
+pint = ">=0.25.3"
+pint-pandas = ">=0.7.1"
+cmap = ">=0.7.2"
+inflection = ">=0.5.1"
 
 [environments]
 module = { features = ["module"], no-default-feature = true }

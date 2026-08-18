@@ -11,7 +11,7 @@ def _jrc_idees_inputs(wildcards):
         shapes=wildcards.shapes
     ).output.jrc_idees_country_codes
     return expand(
-        "<resources>/automatic/jrc-idees/{version}/tertiary_{country_code}.xlsx",
+        "<resources>/automatic/jrc-idees/{version}/Tertiary_{country_code}.xlsx",
         country_code=_read_checkpoint_lines(country_data),
         version=JRC_IDEES_VERSION,
     )
@@ -56,8 +56,10 @@ checkpoint prepare_shape_country_scope:
     conda:
         "../envs/module.yaml"
     params:
-        dataset_scopes=internal["scope"]["datasets"],
-        data_proxies=config.get("data_proxies", {}),
+        commercial_end_use_scope=internal["scope"]["datasets"]["commercial_end_use"][
+            "countries"
+        ],
+        jrc_idees_proxies=config.get("data_proxies", {}).get("jrc_idees", {}),
         jrc_idees_spatial_scope=JRC_IDEES_SPATIAL_SCOPE,
     message:
         "Determine heat-demand country scope for '{wildcards.shapes}' shapes."
