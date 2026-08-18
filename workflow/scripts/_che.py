@@ -130,8 +130,7 @@ def get_residential_demand(raw_file_path: str) -> pd.DataFrame:
     )
     direct_electricity = parse_sheet(raw_file_path, "Tabelle24").loc[["Total"]]
     direct_electricity.index = pd.MultiIndex.from_tuples(
-        [("end_use_electricity", "electricity")],
-        names=["end_use", "carrier_name"],
+        [("end_use_electricity", "electricity")], names=["end_use", "carrier_name"]
     )
     result = (
         pd.concat([heat, direct_electricity])
@@ -144,9 +143,7 @@ def get_residential_demand(raw_file_path: str) -> pd.DataFrame:
 
     totals = parse_sheet(raw_file_path, "Tabelle17").loc["Total Endenergieverbrauch"]
     _checksum_totals(
-        result.groupby("year")["value"].sum(),
-        totals,
-        "Parsing for residential demand",
+        result.groupby("year")["value"].sum(), totals, "Parsing for residential demand"
     )
     return result[BASELINE_COLUMNS]
 
@@ -205,8 +202,6 @@ def get_services_demand(
 
     totals = parse_sheet(raw_file_path, "Tabelle26").loc["Total Endenergie"]
     _checksum_totals(
-        result.groupby("year")["value"].sum(),
-        totals,
-        "Parsing for services demand",
+        result.groupby("year")["value"].sum(), totals, "Parsing for services demand"
     )
     return result
