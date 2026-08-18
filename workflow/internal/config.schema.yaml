@@ -60,6 +60,9 @@ properties:
     additionalProperties: false
     required: [tech_efficiencies, sfh_mfh_shares]
     properties:
+      useful_heat_demand:
+        type: string
+        enum: [actual, calculate_all]
       tech_efficiencies:
         type: object
         additionalProperties:

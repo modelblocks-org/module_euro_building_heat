@@ -87,18 +87,3 @@ def get_era5_heat_files(shapes: str) -> list[str]:
         + [(WEATHER_YEARS[-1] + 1, 1)]
     )
     return [f"{raw_dir}/heat_{year:04d}_{month:02d}.nc" for year, month in months]
-
-
-# Checkpoint helpers
-def checkpoint_ecuk_end_use_input(wildcards) -> list[str]:
-    country_data = checkpoints.prepare_shape_country_scope.get(
-        shapes=wildcards.shapes
-    ).output.source_country_ids
-    ecuk_file = []
-    if "GBR" in _read_checkpoint_lines(country_data):
-        supported_releases = get_supported_ecuk_releases()
-        ecuk_year = min(
-            year for year in supported_releases if year > config["years"]["end"] - 1
-        )
-        ecuk_file = [f"<resources>/automatic/GBR/ecuk-end-use-{ecuk_year}.xlsx"]
-    return ecuk_file

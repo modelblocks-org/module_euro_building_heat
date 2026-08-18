@@ -36,8 +36,9 @@ Data processing steps:
 3. Process national annual heat demand. Household demand is derived from
    Eurostat and Swiss end-use statistics; commercial demand is estimated using
    energy balances and JRC-IDEES tertiary-sector end-use data.
-4. Convert final energy demand to useful heat demand with the configured
-   technology efficiencies for space heat, hot water, and cooking.
+4. Use published JRC-IDEES useful heat demand where available, or convert final
+   energy demand with the configured technology efficiencies for space heat,
+   hot water, and cooking.
 5. Allocate national annual useful heat demand to the requested shapes using
    population shares calculated on the weather grid.
 6. Generate unscaled hourly heat-demand profiles from gridded temperature and
@@ -74,6 +75,9 @@ The main configuration groups are:
   expected by the downstream model.
 - `heat.tech_efficiencies`: carrier-specific efficiencies used to convert final
   energy demand into useful heat demand by end use.
+- `heat.useful_heat_demand`: `actual` (the default) prioritizes published
+  JRC-IDEES useful heat demand; `calculate_all` applies the configured
+  efficiencies consistently to final energy demand for every country.
 - `heat.sfh_mfh_shares`: shares of single-family and multi-family households
   used when combining household heat profiles.
 

@@ -6,26 +6,18 @@ def _read_checkpoint_lines(path):
         return [line.strip() for line in f if line.strip()]
 
 
-def _jrc_idees_inputs(wildcards):
-    country_data = checkpoints.prepare_shape_country_scope.get(
-        shapes=wildcards.shapes
-    ).output.jrc_idees_country_codes
-    return expand(
-        "<resources>/automatic/jrc-idees/{version}/Tertiary_{country_code}.xlsx",
-        country_code=_read_checkpoint_lines(country_data),
-        version=JRC_IDEES_VERSION,
-    )
-
-
-def _uk_jrc_idees_2015_inputs(wildcards):
+def _official_baseline_inputs(wildcards, sector):
+    """Return official baselines needed for countries in the shape scope."""
     country_data = checkpoints.prepare_shape_country_scope.get(
         shapes=wildcards.shapes
     ).output.source_country_ids
-    if "GBR" not in _read_checkpoint_lines(country_data):
-        return []
-    if config["years"]["start"] > 2019:
-        return []
-    return ["<resources>/automatic/jrc-idees/2015/tertiary_UK.xlsx"]
+    countries = set(_read_checkpoint_lines(country_data))
+    inputs = []
+    if "CHE" in countries:
+        inputs.append(f"<resources>/automatic/baseline/che/{sector}_final.csv")
+    if "GBR" in countries:
+        inputs.append(f"<resources>/automatic/baseline/ecuk/{sector}_final.csv")
+    return inputs
 
 
 def _annual_energy_balance_proxy_population_inputs(wildcards):
@@ -67,21 +59,6 @@ checkpoint prepare_shape_country_scope:
         "../scripts/prepare_shape_country_scope.py"
 
 
-rule process_jrc_idees_tertiary:
-    input:
-        data=_jrc_idees_inputs,
-    output:
-        "<resources>/automatic/shapes/{shapes}/jrc-idees/tertiary_processed.csv",
-    log:
-        "<logs>/{shapes}/annual/process_jrc_idees_tertiary.log",
-    conda:
-        "../envs/module.yaml"
-    message:
-        "Process tertiary heat data from JRC-IDEES."
-    script:
-        "../scripts/jrc_idees_heat.py"
-
-
 rule process_annual_energy_balances:
     input:
         energy_balance="<resources>/automatic/stable/estat_nrg_bal_c.tsv.gz",
@@ -107,16 +84,18 @@ rule process_annual_energy_balances:
 
 rule process_annual_heat_demand:
     input:
-        hh_end_use="<resources>/automatic/stable/estat_nrg_d_hhq.tsv.gz",
-        ch_end_use="<resources>/automatic/stable/CHE_energy_consumption_households.xlsx",
         energy_balance=rules.process_annual_energy_balances.output[0],
-        commercial_demand=rules.process_jrc_idees_tertiary.output[0],
+        residential_baseline="<resources>/automatic/baseline/jrc_idees/residential_final.csv",
+        services_baseline="<resources>/automatic/baseline/jrc_idees/services_final.csv",
+        residential_useful_baseline="<resources>/automatic/baseline/jrc_idees/residential_useful.csv",
+        services_useful_baseline="<resources>/automatic/baseline/jrc_idees/services_useful.csv",
+        official_residential_baselines=lambda wc: _official_baseline_inputs(
+            wc, "residential"
+        ),
+        official_services_baselines=lambda wc: _official_baseline_inputs(wc, "services"),
         shapes=rules.prepare_shapes.output[0],
         population=_annual_energy_balance_proxy_population_inputs,
-        ecuk_end_use=checkpoint_ecuk_end_use_input,
-        uk_jrc_idees_2015=_uk_jrc_idees_2015_inputs,
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
-        source_country_ids="<resources>/automatic/shapes/{shapes}/source_country_ids.txt",
         carrier_names=workflow.source_path(
             "../internal/energy-balance-carrier-names.csv"
         ),
@@ -129,11 +108,9 @@ rule process_annual_heat_demand:
         "../envs/module.yaml"
     params:
         heat_tech_params=config["heat"]["tech_efficiencies"],
+        useful_heat_demand=config["heat"].get("useful_heat_demand", "actual"),
         model_years=MODEL_YEARS,
         countries=lambda wildcards, input: _read_checkpoint_lines(input.country_ids),
-        source_countries=lambda wildcards, input: _read_checkpoint_lines(
-            input.source_country_ids
-        ),
         data_proxies=config.get("data_proxies", {}),
     message:
         "Calculate national annual heat demand for household and commercial sectors."

@@ -23,6 +23,16 @@ def _get_jrc_baseline_files(sector: str) -> list[str]:
     return requested_files
 
 
+def _get_ecuk_baseline_file() -> str:
+    """Select the first ECUK release covering the configured model period."""
+    release = min(
+        year
+        for year in get_supported_ecuk_releases()
+        if year > config["years"]["end"] - 1
+    )
+    return f"<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"
+
+
 rule baseline_jrc_idees_sector:
     input:
         jrc_files=lambda wc: _get_jrc_baseline_files(wc.sector),
@@ -60,3 +70,21 @@ rule baseline_che_final_demand:
         "Create CHE baseline."
     script:
         "../scripts/baseline_che_final_demand.py"
+
+
+rule baseline_ecuk_final_demand:
+    input:
+        raw_stats=_get_ecuk_baseline_file(),
+    output:
+        residential="<resources>/automatic/baseline/ecuk/residential_final.csv",
+        services="<resources>/automatic/baseline/ecuk/services_final.csv",
+        residential_plot="<resources>/automatic/baseline/ecuk/residential.pdf",
+        services_plot="<resources>/automatic/baseline/ecuk/services.pdf",
+    log:
+        "<logs>/baseline/baseline_ecuk.log",
+    conda:
+        "../envs/module.yaml"
+    message:
+        "Create ECUK baseline."
+    script:
+        "../scripts/baseline_ecuk_final_demand.py"

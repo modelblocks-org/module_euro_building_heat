@@ -1,9 +1,9 @@
-"""Create standardised CHE final energy demand baselines."""
+"""Create standardised ECUK final energy demand baselines."""
 
 import sys
 from typing import TYPE_CHECKING, Any
 
-import _che
+import _ecuk
 import _plots
 import _schemas
 
@@ -12,16 +12,14 @@ if TYPE_CHECKING:
 
 
 def main() -> None:
-    """Main snakemake process."""
+    """Create and plot residential and services baselines."""
     raw_file = snakemake.input.raw_stats
 
-    residential_df = _che.get_residential_demand(raw_file)
-    services_df = _che.get_services_demand(raw_file, residential_df)
-
-    for df in [residential_df, services_df]:
-        df = _schemas.BaselineSchema.validate(df)
-        sector = df["sector"].iat[0]
+    for sector in ["residential", "services"]:
+        df = _ecuk.get_sector_demand(raw_file, sector)
+        df = _schemas.BaselineSchema.validate_countries(df, ["GBR"])
         df.to_csv(snakemake.output[sector], index=False)
+
         fig, _ = _plots.plot_bar_histogram(
             df, "end_use", container_col="country_code", unit="TWh"
         )

@@ -49,6 +49,9 @@ data_proxies:
 
 
 heat:
+  # Use published JRC-IDEES useful heat where available (actual), or convert all
+  # countries from final energy with the efficiencies below (calculate_all).
+  useful_heat_demand: actual
   tech_efficiencies:
     space_heat:
       gas-eff: 0.97

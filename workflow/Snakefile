@@ -53,6 +53,8 @@ include: "rules/heat_pump_cop.smk"
 # explicitly used as a script or input in a snakemake rule.
 workflow.source_path("scripts/_schemas.py")
 workflow.source_path("scripts/_jrc.py")
+workflow.source_path("scripts/_che.py")
+workflow.source_path("scripts/_ecuk.py")
 
 # Run additional check on configuration / settings
 additional_config_validation()
