@@ -11,7 +11,7 @@ rule unzip_jrc_idees:
     wildcard_constraints:
         country_code="|".join(internal["resources"]["jrc"]["spatial_scope"]),
         version="|".join(JRC_IDEES_VERSIONS),
-        dataset="|".join(["Tertiary", "Residential"])
+        dataset="|".join(["Tertiary", "Residential"]),
     threads: 1
     params:
         internal_paths=lambda wc: f"JRC-IDEES-{wc.version}_{wc.dataset}_{wc.country_code}.xlsx",

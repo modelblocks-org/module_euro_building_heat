@@ -56,7 +56,9 @@ checkpoint prepare_shape_country_scope:
     conda:
         "../envs/module.yaml"
     params:
-        commercial_end_use_scope=internal["scope"]["datasets"]["commercial_end_use"]["countries"],
+        commercial_end_use_scope=internal["scope"]["datasets"]["commercial_end_use"][
+            "countries"
+        ],
         jrc_idees_proxies=config.get("data_proxies", {}).get("jrc_idees", {}),
         jrc_idees_spatial_scope=JRC_IDEES_SPATIAL_SCOPE,
     message:

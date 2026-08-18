@@ -36,6 +36,7 @@ def _histogram_subplot(n_rows: int, n_columns: int) -> tuple[Figure, np.ndarray]
         squeeze=False,
     )
 
+
 # FIXME: color ordering should be deterministic
 def plot_bar_histogram(
     df: pd.DataFrame,
@@ -87,7 +88,7 @@ def plot_bar_histogram(
             legend=False,
             rot=45,
             lw=0.5,
-            edgecolor="black"
+            edgecolor="black",
         )
 
         if format_container:

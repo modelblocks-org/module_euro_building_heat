@@ -23,7 +23,12 @@ CARRIERS: tuple[str, ...] = (
     "solar_thermal",
     "solid_fossil",
 )
-END_USES: tuple[str, ...] = ("cooking", "end_use_electricity", "hot_water", "space_heat")
+END_USES: tuple[str, ...] = (
+    "cooking",
+    "end_use_electricity",
+    "hot_water",
+    "space_heat",
+)
 
 
 class ShapesSchema(pa.DataFrameModel):

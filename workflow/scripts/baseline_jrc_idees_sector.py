@@ -22,7 +22,9 @@ def get_combined_sector_demand(
     df = _jrc.get_sector_data(jrc_files, SECTOR_MAP[sector], energy_type)
 
     # FIXME: data in settings.yaml should be in alpha3 already
-    country_translator = {i: _utils.convert_country_code(i, "alpha3") for i in countries}
+    country_translator = {
+        i: _utils.convert_country_code(i, "alpha3") for i in countries
+    }
     df["country_code"] = df["country_code"].map(country_translator)
     df["sector"] = sector
     df = _schemas.BaselineSchema.validate_countries(df, country_translator.values())

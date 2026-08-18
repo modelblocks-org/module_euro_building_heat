@@ -41,8 +41,9 @@ END_USE_MAPPING = {
 SHEETS = {"summary": "summary", "final_energy": "hh_fec", "useful_energy": "hh_tes"}
 ELECTRIC_END_USE_ROW = {
     "RES": "Specific electricity uses (appliances and lighting)",
-    "SER": "Specific electricity uses"
+    "SER": "Specific electricity uses",
 }
+
 
 def _get_sheet(sector: str, sheet_type: str):
     if sector not in SECTORS:
