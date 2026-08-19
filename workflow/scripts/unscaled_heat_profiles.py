@@ -285,16 +285,6 @@ def when2heat_daily(
     )
 
 
-def _group_gridcells(gridded_data: xr.DataArray, weight: xr.DataArray) -> xr.DataArray:
-    # `hourly_heat` has dims [x, y, datetime], `weight` has dims [x, y, id],
-    # we want a final array with dims [id, datetime]
-
-    return xr.concat(
-        [(gridded_data * weight.sel({"id": id})).sum(["site"]) for id in weight.id],
-        dim="id",
-    )
-
-
 def _hour_and_day_to_datetime(da: xr.DataArray) -> xr.DataArray:
     """Combine hour and date ('time') into one datetime ('time') dimension."""
     da = da.stack(new_time=["time", "hour"])

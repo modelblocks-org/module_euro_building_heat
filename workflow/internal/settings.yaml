@@ -43,10 +43,9 @@ resources:
      - CHE_energy_consumption_households.xlsx
      - CHE_energy_consumption_industry.xlsx
      - estat_nrg_bal_c.tsv.gz
-     - estat_nrg_d_hhq.tsv.gz
      - GBR_End_Use_tables.zip
      - heat_pump_characteristics.nc
-    ECUK_releases: [2020, 2025]
+    ECUK_releases: [2021, 2025]
   ghsl:
     url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A/{stem}/V1-0/{stem}_V1_0.zip
     stem: GHS_POP_E{epoch}_GLOBE_R2023A_54009_{resolution}
@@ -102,11 +101,9 @@ scope:
       proxy_config: household_end_use
       proxy_requires_shape_population: false
       countries:
-        - ALB
         - AUT
         - BEL
         - BGR
-        - BIH
         - CHE
         - CYP
         - CZE
@@ -116,7 +113,6 @@ scope:
         - FIN
         - FRA
         - GBR
-        - GEO
         - GRC
         - HRV
         - HUN
@@ -125,22 +121,15 @@ scope:
         - LVA
         - LTU
         - LUX
-        - MDA
-        - MKD
         - MLT
-        - MNE
         - NLD
-        - NOR
         - POL
         - PRT
         - ROU
-        - SRB
         - SVK
         - SVN
         - ESP
         - SWE
-        - TUR
-        - UKR
     commercial_end_use:
       proxy_config: jrc_idees
       proxy_requires_shape_population: false

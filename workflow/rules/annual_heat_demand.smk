@@ -6,8 +6,8 @@ def _read_checkpoint_lines(path):
         return [line.strip() for line in f if line.strip()]
 
 
-def _official_baseline_inputs(wildcards, sector):
-    """Return official baselines needed for countries in the shape scope."""
+def _official_final_demand_inputs(wildcards, sector):
+    """Return country statistics that provide absolute final demand."""
     country_data = checkpoints.prepare_shape_country_scope.get(
         shapes=wildcards.shapes
     ).output.source_country_ids
@@ -42,7 +42,6 @@ checkpoint prepare_shape_country_scope:
     output:
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
         source_country_ids="<resources>/automatic/shapes/{shapes}/source_country_ids.txt",
-        jrc_idees_country_codes="<resources>/automatic/shapes/{shapes}/jrc_idees_country_codes.txt",
     log:
         "<logs>/{shapes}/annual/prepare_shape_country_scope.log",
     conda:
@@ -52,7 +51,6 @@ checkpoint prepare_shape_country_scope:
             "countries"
         ],
         jrc_idees_proxies=config.get("data_proxies", {}).get("jrc_idees", {}),
-        jrc_idees_spatial_scope=JRC_IDEES_SPATIAL_SCOPE,
     message:
         "Determine heat-demand country scope for '{wildcards.shapes}' shapes."
     script:
@@ -64,6 +62,8 @@ rule process_annual_energy_balances:
         energy_balance="<resources>/automatic/stable/estat_nrg_bal_c.tsv.gz",
         ch_energy_balance="<resources>/automatic/stable/CHE_energy_balance.xlsx",
         ch_industry_energy_balance="<resources>/automatic/stable/CHE_energy_consumption_industry.xlsx",
+        gbr_residential=rules.baseline_ecuk_final_demand.output.residential,
+        gbr_services=rules.baseline_ecuk_final_demand.output.services,
         cat_names=workflow.source_path("../internal/energy-balance-category-names.csv"),
         carrier_names=workflow.source_path(
             "../internal/energy-balance-carrier-names.csv"
@@ -77,22 +77,22 @@ rule process_annual_energy_balances:
     params:
         first_year=min(config["years"]["start"], 2000),
     message:
-        "Process annual energy balances from Eurostat and Swiss statistics."
+        "Process annual energy balances from Eurostat, Swiss, and ECUK statistics."
     script:
         "../scripts/annual_energy_balance.py"
 
 
-rule process_annual_heat_demand:
+rule process_final_heat_demand:
     input:
         energy_balance=rules.process_annual_energy_balances.output[0],
-        residential_baseline="<resources>/automatic/baseline/jrc_idees/residential_final.csv",
-        services_baseline="<resources>/automatic/baseline/jrc_idees/services_final.csv",
-        residential_useful_baseline="<resources>/automatic/baseline/jrc_idees/residential_useful.csv",
-        services_useful_baseline="<resources>/automatic/baseline/jrc_idees/services_useful.csv",
-        official_residential_baselines=lambda wc: _official_baseline_inputs(
+        residential_baselines="<resources>/automatic/baseline/jrc_idees/residential_final.csv",
+        services_baselines="<resources>/automatic/baseline/jrc_idees/services_final.csv",
+        official_residential_demand=lambda wc: _official_final_demand_inputs(
             wc, "residential"
         ),
-        official_services_baselines=lambda wc: _official_baseline_inputs(wc, "services"),
+        official_services_demand=lambda wc: _official_final_demand_inputs(
+            wc, "services"
+        ),
         shapes=rules.prepare_shapes.output[0],
         population=_annual_energy_balance_proxy_population_inputs,
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
@@ -100,27 +100,47 @@ rule process_annual_heat_demand:
             "../internal/energy-balance-carrier-names.csv"
         ),
     output:
-        total_demand="<resources>/automatic/shapes/{shapes}/annual-heat-demand-twh.csv",
-        electricity="<resources>/automatic/shapes/{shapes}/annual-heat-electricity-demand-twh.csv",
+        final_demand=temp(
+            "<resources>/automatic/shapes/{shapes}/annual-final-heat-demand-twh.csv"
+        ),
     log:
-        "<logs>/{shapes}/annual/process_annual_heat_demand.log",
+        "<logs>/{shapes}/annual/process_final_heat_demand.log",
     conda:
         "../envs/module.yaml"
     params:
-        heat_tech_params=config["heat"]["tech_efficiencies"],
-        useful_heat_demand=config["heat"].get("useful_heat_demand", "actual"),
         model_years=MODEL_YEARS,
         countries=lambda wildcards, input: _read_checkpoint_lines(input.country_ids),
         data_proxies=config.get("data_proxies", {}),
     message:
-        "Calculate national annual heat demand for household and commercial sectors."
+        "Prepare national annual final heat demand for household and commercial sectors."
     script:
-        "../scripts/annual_heat_demand.py"
+        "../scripts/final_heat_demand.py"
+
+
+rule process_useful_heat:
+    input:
+        final_demand=rules.process_final_heat_demand.output.final_demand,
+        residential_useful_baseline="<resources>/automatic/baseline/jrc_idees/residential_useful.csv",
+        services_useful_baseline="<resources>/automatic/baseline/jrc_idees/services_useful.csv",
+    output:
+        total_demand="<resources>/automatic/shapes/{shapes}/annual-heat-demand-twh.csv",
+    log:
+        "<logs>/{shapes}/annual/process_useful_heat.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        model_years=MODEL_YEARS,
+        heat_tech_params=config["heat"]["tech_efficiencies"],
+        useful_heat_demand=config["heat"].get("useful_heat_demand", "actual"),
+    message:
+        "Calculate national annual useful heat demand."
+    script:
+        "../scripts/useful_heat.py"
 
 
 rule rescale_annual_heat_demand_to_shapes:
     input:
-        annual_demand=rules.process_annual_heat_demand.output.total_demand,
+        annual_demand=rules.process_useful_heat.output.total_demand,
         shapes=rules.prepare_shapes.output[0],
         population="<resources>/automatic/shapes/{shapes}/population.nc",
     output:

@@ -4,13 +4,14 @@ import numpy as np
 import pandas as pd
 
 SECTORS = ["RES", "SER"]
+KTOE_TO_TWH = 0.01163
 
 CARRIER_MAPPING = {
     "Air conditioning": "electricity",
     "Advanced electric heating": "electricity",
-    "Biomass": "biofuel",
-    "Biomass and waste": "biofuel",
-    "Biomass and wastes": "biofuel",
+    "Biomass": "biomass_and_waste",
+    "Biomass and waste": "biomass_and_waste",
+    "Biomass and wastes": "biomass_and_waste",
     "Conventional electric heating": "electricity",
     "Conventional gas heaters": "gas",
     "Derived heat": "heat",
@@ -178,4 +179,11 @@ def get_sector_data(
     if not dfs:
         raise RuntimeError(f"Data parsing result was empty for: {sector}-{energy_type}")
 
-    return pd.concat(dfs).stack().rename("value").reset_index()
+    result = pd.concat(dfs).stack().rename("value").reset_index()
+    result["value"] *= KTOE_TO_TWH
+    result["unit"] = "twh"
+    if sector == "RES":
+        result["carrier_name"] = result["carrier_name"].replace(
+            {"renewable_heat": "solar_thermal"}
+        )
+    return result

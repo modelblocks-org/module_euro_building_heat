@@ -28,11 +28,17 @@ data_proxies:
     SMR: [ITA]
   # household_end_use uses household end use data from the proxy country to scale annual energy balance data.
   household_end_use:
+    ALB: [BGR, HRV, HUN, ROU, GRC]
     AND: [ESP]
+    BIH: [BGR, HRV, HUN, ROU, GRC]
     ISL: [SWE, DNK]
     LIE: [CHE]
+    MKD: [BGR, HRV, HUN, ROU, GRC]
     MCO: [GBR]
+    MNE: [BGR, HRV, HUN, ROU, GRC]
+    NOR: [SWE, DNK]
     SMR: [ITA]
+    SRB: [BGR, HRV, HUN, ROU, GRC]
   # jrc_idees uses the JRC IDEES dataset from the proxy country to shape hourly profiles.
   jrc_idees:
     ALB: [BGR, HRV, HUN, ROU, GRC]
@@ -49,29 +55,30 @@ data_proxies:
 
 
 heat:
-  # Use published JRC-IDEES useful heat where available (actual), or convert all
-  # countries from final energy with the efficiencies below (calculate_all).
+  # Use published JRC-IDEES useful heat where available (actual), except for the
+  # UK where ECUK final demand is always converted with the efficiencies below.
+  # Use calculate_all to convert final energy for every country.
   useful_heat_demand: actual
   tech_efficiencies:
     space_heat:
       gas-eff: 0.97
       oil-eff: 0.9
       solid-fossil-eff: 0.8
-      biofuel-eff: 0.8
+      biowaste-eff: 0.8
       solar-thermal-eff: 1
       electricity-eff: 1
     hot_water:
       gas-eff: 0.97
       oil-eff: 0.9
       solid-fossil-eff: 0.8
-      biofuel-eff: 0.8
+      biowaste-eff: 0.8
       solar-thermal-eff: 1
       electricity-eff: 1
     cooking:
       gas-eff: 0.28
       oil-eff: 0.28
       solid-fossil-eff: 0.15
-      biofuel-eff: 0.1
+      biowaste-eff: 0.1
       electricity-eff: 0.5
   sfh_mfh_shares:
     MFH: 0.45

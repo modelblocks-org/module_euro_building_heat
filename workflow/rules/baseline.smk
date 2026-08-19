@@ -55,6 +55,7 @@ rule baseline_jrc_idees_sector:
 rule baseline_che_final_demand:
     input:
         raw_stats="<resources>/automatic/stable/CHE_energy_consumption_households.xlsx",
+        parser=workflow.source_path("../scripts/_che.py"),
     output:
         residential="<resources>/automatic/baseline/che/residential_final.csv",
         services="<resources>/automatic/baseline/che/services_final.csv",
@@ -64,8 +65,6 @@ rule baseline_che_final_demand:
         "<logs>/baseline/baseline_che.log",
     conda:
         "../envs/module.yaml"
-    # params:
-    #     countries=JRC_SPATIAL_SCOPE,
     message:
         "Create CHE baseline."
     script:
@@ -75,6 +74,7 @@ rule baseline_che_final_demand:
 rule baseline_ecuk_final_demand:
     input:
         raw_stats=_get_ecuk_baseline_file(),
+        parser=workflow.source_path("../scripts/_ecuk.py"),
     output:
         residential="<resources>/automatic/baseline/ecuk/residential_final.csv",
         services="<resources>/automatic/baseline/ecuk/services_final.csv",

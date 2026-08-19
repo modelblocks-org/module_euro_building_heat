@@ -15,21 +15,21 @@ module_euro_building_heat:
         gas-eff: 0.97
         oil-eff: 0.9
         solid-fossil-eff: 0.8
-        biofuel-eff: 0.8
+        biowaste-eff: 0.8
         solar-thermal-eff: 1
         electricity-eff: 1
       hot_water:
         gas-eff: 0.97
         oil-eff: 0.9
         solid-fossil-eff: 0.8
-        biofuel-eff: 0.8
+        biowaste-eff: 0.8
         solar-thermal-eff: 1
         electricity-eff: 1
       cooking:
         gas-eff: 0.28
         oil-eff: 0.28
         solid-fossil-eff: 0.15
-        biofuel-eff: 0.1
+        biowaste-eff: 0.1
         electricity-eff: 0.5
     sfh_mfh_shares:
       MFH: 0.45

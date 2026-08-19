@@ -14,7 +14,7 @@ CARRIER_MAPPING = {
     "El. Ohm'sche Anlagen": "direct_electric",
     "El. Wärmepumpen": "heat_pump",
     "Elektrizität": "electricity",
-    "Holz": "biofuel",
+    "Holz": "biomass_and_waste",
     "Kohle": "solid_fossil",
     "Fernwärme": "heat",
     "Umweltwärme": "ambient_heat",

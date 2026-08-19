@@ -22,9 +22,7 @@ def get_combined_sector_demand(
     df = _jrc.get_sector_data(jrc_files, SECTOR_MAP[sector], energy_type)
 
     # FIXME: data in settings.yaml should be in alpha3 already
-    country_translator = {
-        i: _utils.convert_country_code(i, "alpha3") for i in countries
-    }
+    country_translator = {i: _utils.eurostat_to_alpha3(i) for i in countries}
     df["country_code"] = df["country_code"].map(country_translator)
     df["sector"] = sector
     df = _schemas.BaselineSchema.validate_countries(df, country_translator.values())
@@ -47,7 +45,11 @@ def main() -> None:
     useful_df.to_csv(snakemake.output.useful, index=False)
 
     fig, axes = _plots.plot_bar_histogram(
-        final_df, "end_use", container_col="country_code", format_container=False
+        final_df,
+        "end_use",
+        container_col="country_code",
+        format_container=False,
+        unit="TWh",
     )
     _plots.plot_value_histogram(
         useful_df,
@@ -55,7 +57,7 @@ def main() -> None:
         label="useful_energy",
         fig=fig,
         axes=axes,
-        unit="ktoe",
+        unit="TWh",
     )
     fig.suptitle(f"{sector.capitalize()} energy demand")
     fig.savefig(snakemake.output.plot, bbox_inches="tight")

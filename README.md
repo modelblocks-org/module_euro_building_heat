@@ -76,7 +76,8 @@ The main configuration groups are:
 - `heat.tech_efficiencies`: carrier-specific efficiencies used to convert final
   energy demand into useful heat demand by end use.
 - `heat.useful_heat_demand`: `actual` (the default) prioritizes published
-  JRC-IDEES useful heat demand; `calculate_all` applies the configured
+  JRC-IDEES useful heat demand, except for the UK where useful heat is always
+  calculated from ECUK final demand; `calculate_all` applies the configured
   efficiencies consistently to final energy demand for every country.
 - `heat.sfh_mfh_shares`: shares of single-family and multi-family households
   used when combining household heat profiles.

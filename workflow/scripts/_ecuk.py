@@ -4,7 +4,7 @@ import _schemas
 import numpy as np
 import pandas as pd
 
-BASELINE_END_USE_TRANSLATION = {
+END_USE_MAPPING = {
     "space heating": "space_heat",
     "water heating": "hot_water",
     "cooking/catering": "cooking",
@@ -15,7 +15,7 @@ BASELINE_END_USE_TRANSLATION = {
     "other": "end_use_electricity",
 }
 
-CARRIER_TRANSLATION = {
+CARRIER_MAPPING = {
     "electricity": "electricity",
     "natural gas": "gas",
     "oil": "oil",
@@ -23,9 +23,9 @@ CARRIER_TRANSLATION = {
     "heat": "heat",
     "heat sold": "heat",
     "district heating": "heat",
-    "other": "biofuel",
-    "bioenergy & waste": "biofuel",
-    "bioenergy and waste": "biofuel",
+    "other": "biomass_and_waste",
+    "bioenergy & waste": "biomass_and_waste",
+    "bioenergy and waste": "biomass_and_waste",
 }
 
 SECTOR_TRANSLATION = {"residential": "Domestic", "services": "Services"}
@@ -52,13 +52,13 @@ def get_sector_demand(path: str, sector: str) -> pd.DataFrame:
 
     overall_totals = table.loc[table["source_end_use"].eq("overall total")]
 
-    table["end_use"] = table["source_end_use"].map(BASELINE_END_USE_TRANSLATION)
+    table["end_use"] = table["source_end_use"].map(END_USE_MAPPING)
     components = table.dropna(subset=["Year", "end_use"])
 
     carrier_columns = {
-        column: CARRIER_TRANSLATION[str(column).strip().casefold()]
+        column: CARRIER_MAPPING[str(column).strip().casefold()]
         for column in table.columns
-        if str(column).strip().casefold() in CARRIER_TRANSLATION
+        if str(column).strip().casefold() in CARRIER_MAPPING
     }
 
     values = components.melt(

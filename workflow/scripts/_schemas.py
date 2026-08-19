@@ -12,7 +12,7 @@ ENERGY_TYPES: tuple[str, ...] = ("useful_energy", "final_energy")
 SECTORS: tuple[str, ...] = ("residential", "services")
 CARRIERS: tuple[str, ...] = (
     "ambient_heat",
-    "biofuel",
+    "biomass_and_waste",
     "direct_electric",
     "electricity",
     "gas",
@@ -84,7 +84,7 @@ class BaselineSchema(pa.DataFrameModel):
     "End use for the carrier."
     country_code: Series[str]
     "Country code."
-    unit: Series[str]
+    unit: Series[str] = pa.Field(eq="twh")
     "Unit of the value."
     # FIXME: needs better name
     energy: Series[str] = pa.Field(isin=ENERGY_TYPES)

@@ -4,13 +4,12 @@ import warnings
 from enum import Enum
 from string import digits
 
+import _utils
 import pandas as pd
 
-idx = pd.IndexSlice
-
-EUROSTAT_TO_ALPHA3 = {"EL": "GRC", "UK": "GBR"}
 GWH_TO_TJ = 3.6
 TJ_TO_TWH = 1 / 3600
+TWH_TO_TJ = 3600
 
 warnings.filterwarnings(
     "ignore",
@@ -18,16 +17,6 @@ warnings.filterwarnings(
     category=UserWarning,
     module="openpyxl.reader.workbook",
 )
-
-
-def eurostat_to_alpha3(country_code: str) -> str:
-    """Convert Eurostat alpha-2-like country codes to ISO alpha-3."""
-    if country_code in EUROSTAT_TO_ALPHA3:
-        return EUROSTAT_TO_ALPHA3[country_code]
-
-    import pycountry
-
-    return pycountry.countries.get(alpha_2=country_code).alpha_3
 
 
 class CAT_CODE(Enum):
@@ -44,14 +33,15 @@ def generate_annual_energy_balance_nc(
     path_to_carrier_names: str,
     path_to_ch_excel: str,
     path_to_ch_industry_excel: str,
+    paths_to_gbr_baselines: list[str],
     path_to_result: str,
     first_year: int,
 ) -> None:
     """Open a TSV file and reprocess it into a xarray dataset.
 
     Final dataset will include long names for Eurostat codes.
-    Switzerland is not included in Eurostat, so we splice in data from their govt.
-    statistics.
+    Switzerland is not included in Eurostat, and post-Brexit UK coverage is
+    incomplete, so national statistics are spliced in for both countries.
     """
     # Names for each consumption category/sub-category and carriers prepared by hand
     cat_names = pd.read_csv(path_to_cat_names, header=0, index_col=0)
@@ -67,7 +57,7 @@ def generate_annual_energy_balance_nc(
     df = (
         df.drop(axis=0, level="country", labels=not_countries)
         .reset_index(level="country")
-        .assign(country=lambda df: df.country.map(eurostat_to_alpha3))
+        .assign(country=lambda df: df.country.map(_utils.eurostat_to_alpha3))
         .set_index("country", append=True)
     )
     keep_rows = (
@@ -80,16 +70,89 @@ def generate_annual_energy_balance_nc(
 
     tdf = df.stack()
 
-    # Add CH energy use
+    # Add CH energy use.
     # Only covers a subset of sectors and carriers, but should be enough
     ch_energy_use_tdf = _add_ch_energy_balance(
         path_to_ch_excel, path_to_ch_industry_excel, index_levels=tdf.index.names
     )
     tdf = pd.concat([tdf, ch_energy_use_tdf]).sort_index(axis=0)
 
+    # Replace overlapping UK household and service data with ECUK totals.
+    tdf = _overlay_gbr_energy_balance(
+        tdf,
+        paths_to_gbr_baselines,
+        carrier_names,
+        index_levels=tdf.index.names,
+    )
+
     # TODO treat missing values if necessary
 
-    tdf.rename("value").to_csv(path_to_result)
+    result = tdf.mul(TJ_TO_TWH).rename("value").reset_index()
+    result["unit"] = "twh"
+    result.set_index(["cat_code", "carrier_code", "unit", "country", "year"])[
+        "value"
+    ].to_csv(path_to_result)
+
+
+def _overlay_gbr_energy_balance(
+    energy_balance: pd.Series,
+    baseline_paths: list[str],
+    carrier_names: pd.DataFrame,
+    index_levels: list[str],
+) -> pd.Series:
+    """Replace GBR household and service totals with standardized ECUK data."""
+    sector_metadata = {
+        "residential": ("FC_OTH_HH_E", "residential_carrier_name"),
+        "services": ("FC_OTH_CP_E", "services_carrier_name"),
+    }
+    additions = []
+    for path in baseline_paths:
+        baseline = pd.read_csv(path)
+        sector = baseline["sector"].iat[0]
+        cat_code, carrier_column = sector_metadata[sector]
+        carrier_codes = (
+            carrier_names[carrier_column]
+            .dropna()
+            .reset_index()
+            .drop_duplicates(carrier_column)
+            .set_index(carrier_column)["carrier_code"]
+        )
+        baseline["carrier_code"] = baseline["carrier_name"].map(carrier_codes)
+        if baseline["carrier_code"].isna().any():
+            missing = sorted(
+                baseline.loc[baseline["carrier_code"].isna(), "carrier_name"].unique()
+            )
+            raise ValueError(f"Missing energy-balance carrier codes for ECUK: {missing}.")
+
+        additions.append(
+            baseline.assign(
+                cat_code=cat_code,
+                unit="TJ",
+                country="GBR",
+                value=lambda df: df["value"] * TWH_TO_TJ,
+            )
+            .groupby(index_levels, sort=False)["value"]
+            .sum()
+        )
+
+    official = pd.concat(additions).sort_index()
+    official_country_category_years = set(
+        zip(
+            official.index.get_level_values("country"),
+            official.index.get_level_values("cat_code"),
+            official.index.get_level_values("year"),
+        )
+    )
+    existing_country_category_years = zip(
+        energy_balance.index.get_level_values("country"),
+        energy_balance.index.get_level_values("cat_code"),
+        energy_balance.index.get_level_values("year"),
+    )
+    keep = [
+        country_category_year not in official_country_category_years
+        for country_category_year in existing_country_category_years
+    ]
+    return pd.concat([energy_balance.loc[keep], official]).sort_index()
 
 
 def _read_eurostat_tsv(path: str, index_names: list[str]) -> pd.DataFrame:
@@ -295,12 +358,6 @@ def _get_ch_transport_energy_balance(path_to_excel):
 
 
 def _get_ch_industry_energy_balance(path_to_excel):
-    if "Überblick_tot" in pd.ExcelFile(path_to_excel).sheet_names:
-        return _get_ch_industry_energy_balance_legacy(path_to_excel)
-    return _get_ch_industry_energy_balance_by_carrier_sheet(path_to_excel)
-
-
-def _get_ch_industry_energy_balance_by_carrier_sheet(path_to_excel):
     ch_subsector_codes = {
         "1": "FC_IND_FBT_E",  # 'Food, beverages & tobacco',
         "2": "FC_IND_TL_E",  # 'Textile & leather',
@@ -360,97 +417,15 @@ def _get_ch_industry_energy_balance_by_carrier_sheet(path_to_excel):
     )
 
 
-def _get_ch_industry_energy_balance_legacy(path_to_excel):
-    ch_subsectors = {
-        "1 Nahrg.": "FC_IND_FBT_E",  # 'Food, beverages & tobacco',
-        "2 Textil": "FC_IND_TL_E",  # 'Textile & leather',
-        "3 Papier": "FC_IND_PPP_E",  # 'Paper, pulp & printing',
-        "4 Chemie": "FC_IND_CPC_E",  # 'Chemical & petrochemical',
-        "5 Zement": "FC_IND_NMM_E",  # 'Non-metallic minerals',
-        "6 andere": "FC_IND_NMM_E",  # 'Non-metallic minerals',
-        "7 Metall": "FC_IND_IS_E",  # 'Iron & steel',
-        "8 NE": "FC_IND_NFM_E",  # 'Non-ferrous metals',
-        "9 Metall": "FC_IND_MAC_E",  # 'Machinery',
-        "10 Masch": "FC_IND_MAC_E",  # 'Machinery',
-        "11 and.": "FC_IND_NSP_E",  # 'Not elsewhere specified (industry)', 'Wood & wood products, Mining & quarrying, Transport equipment  # noqa: E501
-        "12 Bau": "FC_IND_CON_E",  # 'Construction'
-    }
-
-    ch_carriers = {  # first row in which carriers are defined in the file
-        25: "E7000",  # 'electricity',
-        52: "O4000XBIO",  # 'oil',
-        79: "G3000",  # 'gas',
-        105: "C0000X0350-0370",  # 'solid_fuel',
-        128: "W6100_6220",  # 'waste',
-        151: "O4000XBIO",  # 'oil',
-        191: "H8000",  # 'heat',  # purchased
-        228: "R5110-5150_W6000RI",  # 'biofuel'
-    }
-
-    column_names = (
-        pd.read_excel(
-            path_to_excel,
-            sheet_name="Überblick_tot",
-            skiprows=5,
-            usecols="A,E:P",
-            nrows=0,
-            header=0,
-        )
-        .rename(columns=ch_subsectors)
-        .iloc[:, 1:]  # ignore index column
-    )
-    column_names = ["year"] + list(column_names)
-
-    return (
-        pd.concat(
-            [
-                _read_industry_subsector(
-                    path_to_excel, first_row, column_names, carrier_name
-                )
-                for first_row, carrier_name in ch_carriers.items()
-            ],
-            axis=0,
-        )
-        .groupby(level=[0, 1])  # group carriers
-        .sum()
-        .stack()
-        .rename("value")
-    )
-
-
-def _read_industry_subsector(
-    path: str, first_row: int, column_names: list[str], carrier_code: str
-) -> pd.DataFrame:
-    return (
-        pd.read_excel(
-            path,
-            sheet_name="Überblick_tot",
-            skiprows=first_row - 1,
-            usecols="A,E:P",
-            nrows=10,
-            header=None,
-            names=column_names,
-            index_col=0,
-        )
-        .rename_axis(columns="cat_code")
-        .rename(index=lambda year: str(year)[:4])
-        .rename(
-            columns=lambda sector: sector.split(".")[0]
-        )  # pandas adds dots and numbers to duplicates, remove
-        .assign(carrier_code=carrier_code)
-        .reset_index()
-        .set_index(["carrier_code", "year"])
-        .T.groupby(level=0)  # group sectors
-        .sum()
-        .T
-    )
-
-
 if __name__ == "__main__":
     generate_annual_energy_balance_nc(
         path_to_energy_balance=snakemake.input.energy_balance,
         path_to_ch_excel=snakemake.input.ch_energy_balance,
         path_to_ch_industry_excel=snakemake.input.ch_industry_energy_balance,
+        paths_to_gbr_baselines=[
+            snakemake.input.gbr_residential,
+            snakemake.input.gbr_services,
+        ],
         path_to_cat_names=snakemake.input.cat_names,
         path_to_carrier_names=snakemake.input.carrier_names,
         first_year=snakemake.params.first_year,
