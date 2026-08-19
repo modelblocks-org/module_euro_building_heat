@@ -79,10 +79,7 @@ def generate_annual_energy_balance_nc(
 
     # Replace overlapping UK household and service data with ECUK totals.
     tdf = _overlay_gbr_energy_balance(
-        tdf,
-        paths_to_gbr_baselines,
-        carrier_names,
-        index_levels=tdf.index.names,
+        tdf, paths_to_gbr_baselines, carrier_names, index_levels=tdf.index.names
     )
 
     # TODO treat missing values if necessary
@@ -122,7 +119,9 @@ def _overlay_gbr_energy_balance(
             missing = sorted(
                 baseline.loc[baseline["carrier_code"].isna(), "carrier_name"].unique()
             )
-            raise ValueError(f"Missing energy-balance carrier codes for ECUK: {missing}.")
+            raise ValueError(
+                f"Missing energy-balance carrier codes for ECUK: {missing}."
+            )
 
         additions.append(
             baseline.assign(

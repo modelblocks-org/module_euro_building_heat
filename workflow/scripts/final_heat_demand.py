@@ -148,9 +148,7 @@ def read_official_final_demand(paths: list[str], model_years: list[int]) -> pd.S
     baseline = pd.concat([pd.read_csv(path) for path in paths], ignore_index=True)
     values = baseline.set_index(index_names)["value"].sort_index()
     return match_model_years(
-        values,
-        model_years,
-        ["carrier_name", "end_use", "country_code"],
+        values, model_years, ["carrier_name", "end_use", "country_code"]
     )
 
 

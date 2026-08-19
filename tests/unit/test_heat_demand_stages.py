@@ -95,8 +95,7 @@ def test_energy_balance_slicing_requires_no_conversion():
     )
     balance = pd.Series([3.5], index=index)
     carriers = pd.DataFrame(
-        {"residential_carrier_name": ["electricity"]},
-        index=pd.Index(["E7000"]),
+        {"residential_carrier_name": ["electricity"]}, index=pd.Index(["E7000"])
     )
 
     result = final_heat_demand._slice_energy_balance_by_sector(
@@ -119,8 +118,8 @@ def test_ecuk_replaces_gbr_sector_year_in_energy_balance(tmp_path):
             names=index_names,
         ),
     )
-    residential = _baseline().iloc[:2].assign(
-        country_code="GBR", year=2020, value=[3.0, 1.0]
+    residential = (
+        _baseline().iloc[:2].assign(country_code="GBR", year=2020, value=[3.0, 1.0])
     )
     services = residential.assign(sector="services", value=[2.0, 2.0])
     paths = []
@@ -129,10 +128,7 @@ def test_ecuk_replaces_gbr_sector_year_in_energy_balance(tmp_path):
         baseline.to_csv(path, index=False)
         paths.append(path)
     carrier_names = pd.DataFrame(
-        {
-            "residential_carrier_name": ["gas"],
-            "services_carrier_name": ["gas"],
-        },
+        {"residential_carrier_name": ["gas"], "services_carrier_name": ["gas"]},
         index=pd.Index(["G3000"], name="carrier_code"),
     )
 
@@ -207,9 +203,7 @@ def test_official_demand_uses_nearest_year_and_replaces_country_year(tmp_path):
     official_path = tmp_path / "ecuk.csv"
     official_source.to_csv(official_path, index=False)
 
-    official = final_heat_demand.read_official_final_demand(
-        [official_path], [2021]
-    )
+    official = final_heat_demand.read_official_final_demand([official_path], [2021])
     calculated = pd.Series(
         [9.0, 7.0, 5.0],
         index=pd.MultiIndex.from_tuples(
@@ -237,16 +231,14 @@ def test_official_demand_supplies_country_without_model_year_balance(country):
     calculated = pd.Series(
         dtype=float,
         index=pd.MultiIndex.from_arrays(
-            [[], [], [], []],
-            names=["carrier_name", "end_use", "country_code", "year"],
+            [[], [], [], []], names=["carrier_name", "end_use", "country_code", "year"]
         ),
         name="value",
     )
     official = pd.Series(
         [8.0],
         index=pd.MultiIndex.from_tuples(
-            [("gas", "space_heat", country, 2021)],
-            names=calculated.index.names,
+            [("gas", "space_heat", country, 2021)], names=calculated.index.names
         ),
         name="value",
     )
@@ -261,10 +253,7 @@ def test_proxy_can_use_overlaid_official_reference():
     official = pd.Series(
         [6.0, 2.0],
         index=pd.MultiIndex.from_tuples(
-            [
-                ("gas", "space_heat", "GBR", 2021),
-                ("gas", "hot_water", "GBR", 2021),
-            ],
+            [("gas", "space_heat", "GBR", 2021), ("gas", "hot_water", "GBR", 2021)],
             names=["carrier_name", "end_use", "country_code", "year"],
         ),
         name="value",
@@ -332,9 +321,7 @@ def test_end_use_proxy_treats_ambient_only_country_as_missing():
         ],
         names=demand.index.names,
     )
-    ambient = pd.DataFrame(
-        [[1.0], [2.0]], index=ambient_index, columns=demand.columns
-    )
+    ambient = pd.DataFrame([[1.0], [2.0]], index=ambient_index, columns=demand.columns)
     demand = pd.concat([demand, ambient])
     balance_index = pd.MultiIndex.from_tuples(
         [
@@ -346,17 +333,11 @@ def test_end_use_proxy_treats_ambient_only_country_as_missing():
         names=["carrier_name", "country_code"],
     )
     balance = pd.DataFrame(
-        [8.0, 8.0, 1.0, 2.0],
-        index=balance_index,
-        columns=pd.Index([2021], name="year"),
+        [8.0, 8.0, 1.0, 2.0], index=balance_index, columns=pd.Index([2021], name="year")
     )
 
     result = final_heat_demand.proxy_end_use_demand(
-        demand,
-        balance,
-        {"LIE": ["AUT"]},
-        ["AUT", "LIE"],
-        "residential",
+        demand, balance, {"LIE": ["AUT"]}, ["AUT", "LIE"], "residential"
     )
 
     assert result.index.is_unique

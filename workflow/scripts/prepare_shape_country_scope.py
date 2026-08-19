@@ -9,6 +9,7 @@ import geopandas as gpd
 if TYPE_CHECKING:
     snakemake: Any
 
+
 def _country_scope_w_proxies(
     country_ids: list[str],
     proxies: dict[str, list[str]],
