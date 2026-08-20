@@ -10,7 +10,10 @@ import pytest
 
 SCRIPTS = Path(__file__).parents[2] / "workflow" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
-sys.modules.setdefault("xarray", MagicMock())
+try:
+    import xarray  # noqa: F401
+except ImportError:
+    sys.modules.setdefault("xarray", MagicMock())
 
 _jrc = importlib.import_module("_jrc")
 annual_energy_balance = importlib.import_module("annual_energy_balance")

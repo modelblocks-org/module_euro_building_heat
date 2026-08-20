@@ -10,15 +10,23 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 import xarray as xr
+from dask import config as dask_config
 
 # ASSUME (from When2Heat):
 # 1. Below 15 °C, the water heating demand is not defined and assumed to stay constant
 HOT_WATER_LOWER_BOUND_TEMP = 15
 # 2. the reference temperature is always 30C for hot water demand calcs
 HOT_WATER_REF_TEMP = 30
+# The BDEW sigmoid is not defined at or above its 40 °C pole. At these
+# temperatures, total heating demand is assumed to consist only of hot water.
+SPACE_HEATING_UPPER_BOUND_TEMP = 40
 # All locations are separated by the average wind speed with the threshold
 # 4.4 m/s separating windy and not-windy (normal) locations
 AVE_WIND_SPEED_THRESHOLD = 4.4
+# Keep each annual output chunk small enough for low-memory laptops while avoiding
+# the large task graph created by the weather files' two-dimensional storage chunks.
+PROFILE_SITE_CHUNK_SIZE = 512
+PROFILE_WORKERS = 2
 
 
 def get_unscaled_heat_profiles(
@@ -37,7 +45,6 @@ def get_unscaled_heat_profiles(
     They must be later scaled so their magnitude matches annual heat demand data!
 
     Args:
-        path_to_population (str): Gridded population data, which will act as weighting.
         path_to_wind_speed (str): Gridded wind speed data in m/s.
         path_to_temperature (str): Gridded air temperature data in degrees C.
         path_to_when2heat_daily (str): When2Heat daily demand parameters.
@@ -49,15 +56,6 @@ def get_unscaled_heat_profiles(
     """
     weather_years = [int(year) for year in weather_years]
 
-    # Weather data is subset by the geographic area covered by model run
-    # (given by available population sites)
-    temperature_ds = xr.open_dataset(path_to_temperature, decode_timedelta=True)
-    wind_ds = xr.open_dataset(path_to_wind_speed, decode_timedelta=True)
-
-    # Check units
-    assert temperature_ds.attrs["unit"].lower() == "degrees c"
-    assert wind_ds.attrs["unit"].lower() == "m/s"
-
     # Parameters and how to apply them is based on [@BDEW:2015]
     daily_params = read_daily_parameters(path_to_when2heat_daily)
     hourly_params = read_hourly_parameters(
@@ -66,19 +64,46 @@ def get_unscaled_heat_profiles(
         path_to_when2heat_hourly_sfh=path_to_when2heat_hourly_sfh,
     )
 
-    grouped_hourly_heat = xr.concat(
-        [
-            _get_unscaled_heat_profile_for_weather_year(
-                temperature_ds, wind_ds, daily_params, hourly_params, weather_year
-            )
-            for weather_year in weather_years
-        ],
-        dim="time",
-    ).sortby("time")
-    encoding = {
-        k: {"zlib": True, "complevel": 4} for k in grouped_hourly_heat.data_vars
-    }
-    grouped_hourly_heat.to_netcdf(out_path, encoding=encoding)
+    # Open lazily using the files' native chunks, then reshape those chunks below for
+    # the daily-to-hourly calculation.
+    with (
+        xr.open_dataset(
+            path_to_temperature, decode_timedelta=True, chunks={}
+        ) as temperature_ds,
+        xr.open_dataset(
+            path_to_wind_speed, decode_timedelta=True, chunks={}
+        ) as wind_ds,
+    ):
+        temperature_ds = temperature_ds.chunk(
+            {"site": PROFILE_SITE_CHUNK_SIZE, "time": -1}
+        )
+        wind_ds = wind_ds.chunk({"site": PROFILE_SITE_CHUNK_SIZE, "time": -1})
+
+        # Check units
+        assert temperature_ds.attrs["unit"].lower() == "degrees c"
+        assert wind_ds.attrs["unit"].lower() == "m/s"
+
+        grouped_hourly_heat = xr.concat(
+            [
+                _get_unscaled_heat_profile_for_weather_year(
+                    temperature_ds,
+                    wind_ds,
+                    daily_params,
+                    hourly_params,
+                    weather_year,
+                )
+                for weather_year in weather_years
+            ],
+            dim="time",
+        ).sortby("time")
+        encoding = {
+            k: {"zlib": True, "complevel": 4}
+            for k in grouped_hourly_heat.data_vars
+        }
+        # NetCDF writes are serialized internally, so a small worker pool provides
+        # useful compute overlap without multiplying the per-chunk memory footprint.
+        with dask_config.set(scheduler="threads", num_workers=PROFILE_WORKERS):
+            grouped_hourly_heat.to_netcdf(out_path, encoding=encoding)
 
 
 def _get_unscaled_heat_profile_for_weather_year(
@@ -151,7 +176,7 @@ def get_hourly_heat_profiles(
     Args:
         reference_temperature (xr.DataArray): Daily reference temperature in degrees C.
         daily_heat (xr.DataArray): Relative daily heat demand per site.
-        hourly_params (pd.Series): Parameters from When2Heat.
+       hourly_params: xr.DataArray: Parameters from When2Heat.
 
     Returns:
         xr.DataArray: Hourly heat demand profiles (must be re-scaled later).
@@ -232,21 +257,21 @@ def get_reference_temperature(
     Returns:
         xr.DataArray: Daily reference temperatures per site.
     """
-    # Daily average
-    # pandas manages time resampling much quicker than xarray at the intended grid size.
+    # The weather producer guarantees complete, midnight-aligned hourly data, making
+    # 24-hour coarsening equivalent to daily resampling with far fewer Dask tasks.
+    # Keeping this in xarray also avoids the eager pandas MultiIndex memory spike.
     daily_average = (
-        temperature.rename(time=time_dim)
-        .to_series()
-        .unstack("time")
-        .T.resample("1D")
+        temperature.coarsen(
+            {time_dim: 24}, boundary="exact", coord_func={time_dim: "min"}
+        )
         .mean()
-        .stack()
-        .to_xarray()
+        .transpose(time_dim, ...)
     )
 
     # Weighted mean, method for which is given in [@Ruhnau:2019]
     return sum(
-        (0.5**i) * daily_average.shift({"time": i}).bfill("time") for i in range(4)
+        (0.5**i) * daily_average.shift({time_dim: i}).bfill(time_dim)
+        for i in range(4)
     ) / sum(0.5**i for i in range(4))
 
 
@@ -270,15 +295,12 @@ def when2heat_daily(
 
     return xr.concat(
         [
-            func(
-                temperature.where(wind <= AVE_WIND_SPEED_THRESHOLD),
-                all_parameters[(building, "normal")],
-            ).fillna(
-                func(
-                    temperature.where(wind > AVE_WIND_SPEED_THRESHOLD),
-                    all_parameters[(building, "windy")],
-                )
+            xr.where(
+                wind <= AVE_WIND_SPEED_THRESHOLD,
+                func(temperature, all_parameters[(building, "normal")]),
+                func(temperature, all_parameters[(building, "windy")]),
             )
+            .where(wind.notnull())
             for building in buildings
         ],
         dim=pd.Index(buildings, name="building"),
@@ -312,7 +334,8 @@ def _heat_function(temperature: xr.DataArray, parameters: pd.DataFrame) -> xr.Da
 
     Derived from [@BDEW:2015].
 
-    Direct copy from https://github.com/oruhnau/when2heat/blob/351bd1a2f9392ed50a7bdb732a103c9327c51846/scripts/demand.py
+    Modified from https://github.com/oruhnau/when2heat/blob/351bd1a2f9392ed50a7bdb732a103c9327c51846/scripts/demand.py
+    so temperatures outside the BDEW sigmoid domain produce hot-water-only demand.
 
     Args:
         temperature (xr.DataArray): Reference daily temperature in degrees C.
@@ -321,18 +344,38 @@ def _heat_function(temperature: xr.DataArray, parameters: pd.DataFrame) -> xr.Da
     Returns:
         xr.DataArray: Daily relative heat demand.
     """
+    below_space_heating_bound = temperature < SPACE_HEATING_UPPER_BOUND_TEMP
+    # xr.where evaluates both branches, so give the sigmoid a valid temperature even
+    # where its result will be replaced by hot-water-only demand in the final result.
+    temperature_for_sigmoid = xr.where(
+        below_space_heating_bound, temperature, SPACE_HEATING_UPPER_BOUND_TEMP - 1
+    )
     sigmoid = (
         parameters["A"]
-        / (1 + (parameters["B"] / (temperature - 40)) ** parameters["C"])
+        / (
+            1
+            + (
+                parameters["B"]
+                / (temperature_for_sigmoid - SPACE_HEATING_UPPER_BOUND_TEMP)
+            )
+            ** parameters["C"]
+        )
         + parameters["D"]
     )
 
     linear = xr.concat(
-        [parameters[f"m_{i}"] * temperature + parameters[f"b_{i}"] for i in ["s", "w"]],
+        [
+            parameters[f"m_{i}"] * temperature_for_sigmoid + parameters[f"b_{i}"]
+            for i in ["s", "w"]
+        ],
         dim="param",
     ).max("param")
 
-    return sigmoid + linear
+    return xr.where(
+        below_space_heating_bound,
+        sigmoid + linear,
+        _water_function(temperature, parameters),
+    )
 
 
 def _water_function(
