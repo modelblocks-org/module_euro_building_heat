@@ -35,9 +35,7 @@ def _pandas_reference_temperature(temperature):
 def _weather_data():
     time = pd.date_range("2017-12-25", "2019-01-05 23:00", freq="h")
     phase = np.arange(time.size, dtype=np.float32) / 240
-    temperature = np.stack([5 + np.sin(phase), 10 + np.cos(phase)]).astype(
-        np.float32
-    )
+    temperature = np.stack([5 + np.sin(phase), 10 + np.cos(phase)]).astype(np.float32)
     wind = np.stack(
         [np.full(time.size, 3, dtype=np.float32), np.full(time.size, 6)]
     ).astype(np.float32)
@@ -115,11 +113,7 @@ def test_profile_calculation_remains_lazy():
 
     reference = profiles.get_reference_temperature(temperature["temperature"])
     result = profiles._get_unscaled_heat_profile_for_weather_year(
-        temperature,
-        wind,
-        _daily_parameters(),
-        _hourly_parameters(),
-        2018,
+        temperature, wind, _daily_parameters(), _hourly_parameters(), 2018
     )
 
     assert dask.is_dask_collection(reference.data)
@@ -156,25 +150,17 @@ def test_space_heating_is_zero_at_and_above_bdew_temperature_bound():
         dims=("site", "time"),
         coords={"site": [0], "time": pd.date_range("2018-01-01", periods=2)},
     ).chunk({"site": 1})
-    wind = xr.DataArray([3.0], dims="site", coords={"site": [0]}).chunk(
-        {"site": 1}
-    )
+    wind = xr.DataArray([3.0], dims="site", coords={"site": [0]}).chunk({"site": 1})
     daily_parameters = _daily_parameters()
     hourly_parameters = _hourly_parameters()
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
         daily_total = profiles.when2heat_daily(
-            reference_temperature,
-            wind,
-            daily_parameters,
-            profiles._heat_function,
+            reference_temperature, wind, daily_parameters, profiles._heat_function
         )
         daily_hot_water = profiles.when2heat_daily(
-            reference_temperature,
-            wind,
-            daily_parameters,
-            profiles._water_function,
+            reference_temperature, wind, daily_parameters, profiles._water_function
         )
         hourly_total = profiles.get_hourly_heat_profiles(
             reference_temperature, daily_total, hourly_parameters
@@ -188,8 +174,7 @@ def test_space_heating_is_zero_at_and_above_bdew_temperature_bound():
 
     assert (hourly_space.sel(time=slice("2018-01-01", "2018-01-02")) == 0).all()
     missing_total = profiles._heat_function(
-        xr.DataArray([np.nan], dims="site"),
-        daily_parameters[("SFH", "normal")],
+        xr.DataArray([np.nan], dims="site"), daily_parameters[("SFH", "normal")]
     )
     assert missing_total.isnull().all()
 
@@ -200,9 +185,7 @@ def test_chunked_netcdf_inputs_write_equivalent_output(tmp_path, monkeypatch):
     wind_path = tmp_path / "wind.nc"
     output_path = tmp_path / "profiles.nc"
     input_encoding = {"chunksizes": (1, 168), "zlib": True}
-    temperature.to_netcdf(
-        temperature_path, encoding={"temperature": input_encoding}
-    )
+    temperature.to_netcdf(temperature_path, encoding={"temperature": input_encoding})
     wind.to_netcdf(wind_path, encoding={"wind10m": input_encoding})
 
     daily_parameters = _daily_parameters()
@@ -217,11 +200,7 @@ def test_chunked_netcdf_inputs_write_equivalent_output(tmp_path, monkeypatch):
         xr.open_dataset(wind_path, chunks={}) as chunked_wind,
     ):
         expected = profiles._get_unscaled_heat_profile_for_weather_year(
-            chunked_temperature,
-            chunked_wind,
-            daily_parameters,
-            hourly_parameters,
-            2018,
+            chunked_temperature, chunked_wind, daily_parameters, hourly_parameters, 2018
         ).compute()
 
     profiles.get_unscaled_heat_profiles(

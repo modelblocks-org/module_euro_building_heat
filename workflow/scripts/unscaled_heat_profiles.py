@@ -86,19 +86,14 @@ def get_unscaled_heat_profiles(
         grouped_hourly_heat = xr.concat(
             [
                 _get_unscaled_heat_profile_for_weather_year(
-                    temperature_ds,
-                    wind_ds,
-                    daily_params,
-                    hourly_params,
-                    weather_year,
+                    temperature_ds, wind_ds, daily_params, hourly_params, weather_year
                 )
                 for weather_year in weather_years
             ],
             dim="time",
         ).sortby("time")
         encoding = {
-            k: {"zlib": True, "complevel": 4}
-            for k in grouped_hourly_heat.data_vars
+            k: {"zlib": True, "complevel": 4} for k in grouped_hourly_heat.data_vars
         }
         # NetCDF writes are serialized internally, so a small worker pool provides
         # useful compute overlap without multiplying the per-chunk memory footprint.
@@ -270,8 +265,7 @@ def get_reference_temperature(
 
     # Weighted mean, method for which is given in [@Ruhnau:2019]
     return sum(
-        (0.5**i) * daily_average.shift({time_dim: i}).bfill(time_dim)
-        for i in range(4)
+        (0.5**i) * daily_average.shift({time_dim: i}).bfill(time_dim) for i in range(4)
     ) / sum(0.5**i for i in range(4))
 
 
@@ -299,8 +293,7 @@ def when2heat_daily(
                 wind <= AVE_WIND_SPEED_THRESHOLD,
                 func(temperature, all_parameters[(building, "normal")]),
                 func(temperature, all_parameters[(building, "windy")]),
-            )
-            .where(wind.notnull())
+            ).where(wind.notnull())
             for building in buildings
         ],
         dim=pd.Index(buildings, name="building"),
