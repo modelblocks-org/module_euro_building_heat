@@ -3,7 +3,7 @@
 
 rule process_gridded_weather_data:
     input:
-        era5_heat=lambda wc: get_era5_heat_files(wc.shapes),
+        era5=rules.download_era5_data.output.era5,
     output:
         grid="<resources>/automatic/shapes/{shapes}/gridded_weather/grid.nc",
         temperature="<resources>/automatic/shapes/{shapes}/gridded_weather/temperature.nc",
@@ -16,7 +16,7 @@ rule process_gridded_weather_data:
     params:
         weather_years=WEATHER_YEARS,
     message:
-        "Process monthly ERA5 weather data for '{wildcards.shapes}'."
+        "Process ERA5 weather data for '{wildcards.shapes}'."
     script:
         "../scripts/process_gridded_weather_data.py"
 

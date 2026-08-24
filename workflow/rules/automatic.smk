@@ -43,18 +43,17 @@ rule download_stable_dataset:
 
 rule download_era5_data:
     input:
-        shapes="<shapes>",
+        shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
     output:
-        era5_heat="<resources>/automatic/shapes/{shapes}/era5/heat_{year}_{month}.nc",
+        era5="<resources>/automatic/shapes/{shapes}/era5/heat.nc",
     log:
-        "<logs>/{shapes}/era5/download_era5_data_{year}_{month}.log",
-    wildcard_constraints:
-        month="0[1-9]|1[0-2]",
-        year="[0-9]{4}",
+        "<logs>/{shapes}/era5/download_era5_data.log",
     conda:
         "../envs/module.yaml"
+    params:
+        weather_years=WEATHER_YEARS,
     message:
-        "Download ERA5 weather data for '{wildcards.shapes}:{wildcards.year}:{wildcards.month}'."
+        "Download ERA5 weather data from Earth Data Hub for '{wildcards.shapes}'."
     script:
         "../scripts/download_era5_data.py"
 

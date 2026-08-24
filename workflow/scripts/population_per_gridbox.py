@@ -11,9 +11,8 @@ import xarray as xr
 from gregor.aggregate import aggregate_raster_to_polygon
 from shapely.geometry import box
 
-EPSG_3035 = "EPSG:3035"
 WGS84 = "EPSG:4326"
-DEFAULT_GRID_DEGREES = 0.5
+DEFAULT_GRID_DEGREES = 0.25
 
 
 def _normalise_shape_ids(locations: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -55,28 +54,28 @@ def population_on_weather_grid(
     # Locations are parquet shape files at the resolution of interest.
     locations = _normalise_shape_ids(gpd.read_parquet(path_to_locations))
 
-    gridbox = _weather_gridbox_polygons(coordinate_ds, lat_name, lon_name).to_crs(
-        EPSG_3035
+    population = rioxarray.open_rasterio(path_to_population, masked=True).squeeze(
+        drop=True
     )
-    locations_3035 = locations.to_crs(EPSG_3035)
-    minx, miny, maxx, maxy = locations_3035.total_bounds
+    population = population.fillna(0)
+    gridbox = _weather_gridbox_polygons(coordinate_ds, lat_name, lon_name).to_crs(
+        population.rio.crs
+    )
+    locations = locations.to_crs(population.rio.crs)
+    minx, miny, maxx, maxy = locations.total_bounds
     gridbox = gridbox.cx[minx:maxx, miny:maxy]
     if gridbox.empty:
         raise ValueError("No weather gridboxes overlap the provided shapes.")
 
     # Create new shapes that are either complete gridboxes or partial ones that
     # sit inside a specific location.
-    gridboxes_mapped_to_locations = gpd.overlay(gridbox, locations_3035)
+    gridboxes_mapped_to_locations = gpd.overlay(gridbox, locations)
     if gridboxes_mapped_to_locations.empty:
         raise ValueError("No weather gridbox polygons intersect the provided shapes.")
     gridboxes_mapped_to_locations = _assign_unmapped_locations_to_nearest_gridbox(
-        gridbox, locations_3035, gridboxes_mapped_to_locations
+        gridbox, locations, gridboxes_mapped_to_locations
     )
 
-    population = rioxarray.open_rasterio(path_to_population, masked=True).squeeze(
-        drop=True
-    )
-    population = population.fillna(0)
     gridboxes_mapped_to_locations = _aggregate_population_to_polygons(
         population, gridboxes_mapped_to_locations
     )

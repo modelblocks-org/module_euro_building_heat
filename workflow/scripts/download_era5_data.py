@@ -1,150 +1,92 @@
-"""Download monthly ERA5 weather files with cdsapi.
+"""Download one reusable ERA5 file from Earth Data Hub."""
 
-Downloads GRIB from CDS for efficient retrieval, then converts it locally to NetCDF.
-"""
-
-import calendar
-import logging
-import math
-import re
-import sys
-from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
 
-import cdsapi
-import cfgrib
 import geopandas as gpd
+import numpy as np
 import xarray as xr
 
-if TYPE_CHECKING:
-    snakemake: Any
-
-ERA5_CRS = "EPSG:4326"
-ERA5_START = 1940
-ERA5_DATASET = "reanalysis-era5-single-levels"
-
-ERA5_VARIABLES = [
-    "2m_temperature",
-    "10m_u_component_of_wind",
-    "10m_v_component_of_wind",
-    "soil_temperature_level_1",
-]
-
-HOURS = [f"{hour:02d}:00" for hour in range(24)]
-GRID_DEG = 0.5
-
-logger = logging.getLogger(__name__)
+EDH_URL = (
+    "https://data.earthdatahub.destine.eu/era5/era5-single-levels-atmosphere-v0.zarr"
+)
+EDH_VARIABLES = ["t2m", "u10", "v10", "stl1"]
+GRID_DEGREES = 0.25
+WGS84 = "EPSG:4326"
 
 
-def area_from_shapes(shapes: gpd.GeoDataFrame) -> tuple[float, ...]:
-    """Return padded, grid-aligned CDS area [north, west, south, east]."""
-    west, south, east, north = shapes.to_crs(ERA5_CRS).total_bounds
-
-    west = math.floor((west - GRID_DEG) / GRID_DEG) * GRID_DEG
-    south = math.floor((south - GRID_DEG) / GRID_DEG) * GRID_DEG
-    east = math.ceil((east + GRID_DEG) / GRID_DEG) * GRID_DEG
-    north = math.ceil((north + GRID_DEG) / GRID_DEG) * GRID_DEG
-
+def weather_time_range(weather_years: list[int]) -> tuple[datetime, datetime]:
+    """Return the timestamp range needed by the heat profile calculation."""
     return (
-        min(90.0, round(north, 8)),
-        max(-180.0, round(west, 8)),
-        max(-90.0, round(south, 8)),
-        min(180.0, round(east, 8)),
+        datetime(min(weather_years) - 1, 12, 25),
+        datetime(max(weather_years) + 1, 1, 5, 23),
     )
 
 
-def year_month_from_output(path: str | Path) -> tuple[int, int]:
-    """Parse year/month from an output filename like heat_2020_01.nc."""
-    match = re.search(r"heat_(\d{4})_(\d{2})\.nc$", Path(path).name)
-    if not match:
-        raise ValueError(f"Expected output filename like heat_2020_01.nc, got: {path}")
-
-    year = int(match.group(1))
-    month = int(match.group(2))
-
-    if year < ERA5_START:
-        raise ValueError(f"Invalid year in output filename: {path}")
-    if not 1 <= month <= 12:
-        raise ValueError(f"Invalid month in output filename: {path}")
-
-    return year, month
-
-
-def cds_request(area: Sequence[float], year: int, month: int) -> dict[str, Any]:
-    """Build one full-month ERA5 CDS request."""
-    days = calendar.monthrange(year, month)[1]
-
-    return {
-        "product_type": ["reanalysis"],
-        "variable": ERA5_VARIABLES,
-        "year": [f"{year:04d}"],
-        "month": [f"{month:02d}"],
-        "day": [f"{day:02d}" for day in range(1, days + 1)],
-        "time": HOURS,
-        "area": list(area),
-        "grid": f"{GRID_DEG}/{GRID_DEG}",
-        "data_format": "grib",
-        "download_format": "unarchived",
-    }
-
-
-def grib_to_netcdf(grib_path: Path, output_path: Path) -> None:
-    """Convert all compatible datasets in an ERA5 GRIB file to one NetCDF file."""
-    datasets = cfgrib.open_datasets(
-        grib_path, backend_kwargs={"indexpath": ""}, decode_timedelta=True
+def weather_bounds(shapes: gpd.GeoDataFrame) -> tuple[float, ...]:
+    """Return native-grid-aligned WGS84 bounds with one grid-cell buffer."""
+    west, south, east, north = shapes.to_crs(WGS84).total_bounds
+    return (
+        np.floor(west / GRID_DEGREES) * GRID_DEGREES - GRID_DEGREES,
+        np.floor(south / GRID_DEGREES) * GRID_DEGREES - GRID_DEGREES,
+        np.ceil(east / GRID_DEGREES) * GRID_DEGREES + GRID_DEGREES,
+        np.ceil(north / GRID_DEGREES) * GRID_DEGREES + GRID_DEGREES,
     )
-    xr.merge(datasets, compat="override").to_netcdf(output_path)
 
 
-def download_monthly_file(output_path: str | Path, area: Sequence[float]) -> Path:
-    """Download one monthly ERA5 file as GRIB, then save it as NetCDF."""
+def select_edh_weather(
+    dataset: xr.Dataset, bounds: tuple[float, ...], start: datetime, end: datetime
+) -> xr.Dataset:
+    """Select the requested EDH variables, area, and time range."""
+    west, south, east, north = bounds
+    dataset = dataset[EDH_VARIABLES].sel(
+        valid_time=slice(start, end), latitude=slice(north, south)
+    )
+    dataset = dataset.assign_coords(longitude=((dataset.longitude + 180) % 360) - 180)
+    return (
+        dataset.where(
+            (dataset.longitude >= west) & (dataset.longitude <= east), drop=True
+        )
+        .sortby("longitude")
+        .rename({"valid_time": "time", "latitude": "lat", "longitude": "lon"})
+        .sortby("lat")
+    )
+
+
+def download_era5_data(
+    path_to_shapes: str | Path, output_path: str | Path, weather_years: list[int]
+) -> None:
+    """Download the complete EDH subset to one NetCDF file."""
+    start, end = weather_time_range(weather_years)
+    bounds = weather_bounds(gpd.read_parquet(path_to_shapes))
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    year, month = year_month_from_output(output_path)
-    request = cds_request(area, year, month)
-
-    logger.info("Downloading ERA5 %04d-%02d to %s", year, month, output_path)
-    logger.info(
-        "CDS request: dataset=%s variables=%s area=%s grid=%s format=grib",
-        ERA5_DATASET,
-        ",".join(ERA5_VARIABLES),
-        area,
-        f"{GRID_DEG}/{GRID_DEG}",
-    )
-
-    grib_path = output_path.with_suffix(".grib")
-    if grib_path.exists():
-        logger.info("Reusing previously downloaded GRIB file %s", grib_path)
-    else:
-        partial_grib = grib_path.with_suffix(".grib.part")
-        client = cdsapi.Client(quiet=True, progress=False)
-        try:
-            client.retrieve(ERA5_DATASET, request, str(partial_grib))
-            partial_grib.replace(grib_path)
-        finally:
-            partial_grib.unlink(missing_ok=True)
-
-    logger.info("Converting downloaded GRIB to NetCDF")
-    grib_to_netcdf(grib_path, output_path)
-    grib_path.unlink()
-
-    logger.info("Saved ERA5 %04d-%02d to %s", year, month, output_path)
-    return output_path
-
-
-def main() -> None:
-    """Main Snakemake process."""
-    shapes = gpd.read_parquet(snakemake.input.shapes)
-    area = area_from_shapes(shapes)
-    download_monthly_file(snakemake.output.era5_heat, area)
+    with xr.open_dataset(
+        EDH_URL,
+        chunks={},
+        engine="zarr",
+        storage_options={"client_kwargs": {"trust_env": True}},
+    ) as era5:
+        dataset = select_edh_weather(era5, bounds, start, end)
+        dataset.attrs.update(
+            {
+                "dataset": "era5-edh",
+                "date_from": start.strftime("%Y-%m-%d"),
+                "date_to": end.strftime("%Y-%m-%d"),
+                "grid_degrees": GRID_DEGREES,
+            }
+        )
+        dataset.to_netcdf(
+            output_path,
+            encoding={
+                variable: {"zlib": True, "complevel": 1} for variable in EDH_VARIABLES
+            },
+        )
 
 
 if __name__ == "__main__":
-    sys.stderr = open(snakemake.log[0], "w", buffering=1)
-    sys.stdout = sys.stderr
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", force=True
+    download_era5_data(
+        path_to_shapes=snakemake.input.shapes,
+        output_path=snakemake.output.era5,
+        weather_years=[int(year) for year in snakemake.params.weather_years],
     )
-    main()

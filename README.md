@@ -62,9 +62,9 @@ The main configuration groups are:
 - `weather`: first weather year and exclusive end weather year used to shape
   hourly heat-demand profiles. The weather-year span must match the model-year
   span. Output time series keep weather-year timestamps while annual scaling
-  uses the paired model years. Weather data is downloaded from CDS/ERA5 for
-  the requested shapes only. Monthly ERA5 requests include all required weather
-  variables and are stored as reusable NetCDF files.
+  uses the paired model years. ERA5 data is downloaded from Earth Data Hub in
+  one reusable NetCDF file for the full time range, then processed locally on
+  its native 0.25° grid.
 - `threads.aggregation`: number of threads used when aggregating gridded heat
   profiles to shapes.
 - `population.resolution`: GHSL GHS-POP resolution in metres. The default is
@@ -82,9 +82,17 @@ The main configuration groups are:
 - `heat.sfh_mfh_shares`: shares of single-family and multi-family households
   used when combining household heat profiles.
 
-CDS downloads require a valid `$HOME/.cdsapirc` file and accepted Terms of Use
-for the ERA5 hourly single-levels dataset in the Copernicus Climate Data Store.
-The workflow does not store CDS credentials in the module configuration.
+Earth Data Hub access requires an account and a `.netrc` entry for
+`data.earthdatahub.destine.eu`; download the file from the
+[account settings](https://earthdatahub.destine.eu/account-settings#my-personal-access-tokens)
+and use owner-only permissions (`chmod 600 ~/.netrc`) on Linux and macOS. The
+workflow does not store credentials in the module configuration.
+
+To check credentialed access without downloading weather arrays, run:
+
+```shell
+pixi run -e module python -c "import xarray as xr; print(xr.open_dataset('https://data.earthdatahub.destine.eu/era5/era5-single-levels-atmosphere-v0.zarr', engine='zarr', chunks={}, storage_options={'client_kwargs': {'trust_env': True}}))"
+```
 
 The module is designed to be called from another Snakemake workflow. A minimal
 import looks like this:
@@ -182,9 +190,9 @@ This module is based on the following research and datasets:
 
 - When2Heat heat-demand profile methodology and parameters:
   <https://github.com/oruhnau/when2heat>
-- ERA5 hourly single-level weather data used for temperature, wind speed, soil
-  temperature, and grid definitions:
-  <https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels>
+- Earth Data Hub ERA5 hourly single-level weather data used for temperature,
+  wind speed, soil temperature, and grid definitions:
+  <https://earthdatahub.destine.eu/collections/era5/datasets/era5-single-levels-atmosphere>
 - When2Heat demand profile parameter archive:
   <https://zenodo.org/records/10965295>
 - JRC-IDEES 2023 energy demand data:
