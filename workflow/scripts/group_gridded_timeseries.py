@@ -1,25 +1,33 @@
 """Aggregate gridded heat demand profiles to user-provided shapes."""
 
 import warnings
-from functools import partial
-from multiprocessing import Pool
 
 import xarray as xr
+from dask import config as dask_config
 
 
-def group_gridcells(
-    gridded_data: xr.Dataset, grid_weight: xr.DataArray, threads: int
-) -> xr.DataArray:
+def group_gridcells(gridded_data: xr.Dataset, grid_weight: xr.DataArray) -> xr.Dataset:
     """Group gridded heat data into resolution-specific units.
 
     Args:
         gridded_data (xr.Dataset): Gridded timeseries space heat and hot water data.
         grid_weight (xr.DataArray): Weighted mapping from grid (a.k.a. "site") to units.
-        threads (int): Number of threads over which to undertake multiprocessing.
 
     Returns:
-        xr.DataArray: data in resolution-specific units.
+        xr.Dataset: Data grouped into resolution-specific units.
     """
+    required_dimensions = {"site", "id"}
+    if set(grid_weight.dims) != required_dimensions:
+        raise ValueError(
+            "Grid weights must have exactly the dimensions 'site' and 'id'."
+        )
+    if grid_weight.site.to_index().has_duplicates:
+        raise ValueError("Grid weights contain duplicate site coordinates.")
+    if grid_weight.id.to_index().has_duplicates:
+        raise ValueError("Grid weights contain duplicate shape IDs.")
+    if (grid_weight.fillna(0) < 0).any().item():
+        raise ValueError("Grid weights cannot contain negative values.")
+
     population_by_id = grid_weight.sum("site")
     weighted_ids = population_by_id.id.where(population_by_id > 0, drop=True).values
     unweighted_ids = sorted(
@@ -35,12 +43,11 @@ def group_gridcells(
     if len(weighted_ids) == 0:
         raise ValueError("No shapes have positive population weights.")
 
-    apply_weights = partial(
-        _site_weighted_ave, gridded_data=gridded_data, grid_weight=grid_weight
-    )
-    # This is a slow operation, so we parallelise it.
-    with Pool(threads) as pool:
-        per_id_averages = pool.map(apply_weights, weighted_ids)
+    # Construct every shape reduction in one Dask graph. Source chunks shared by
+    # multiple shapes are then loaded and calculated once instead of once per process.
+    per_id_averages = [
+        _site_weighted_ave(id, gridded_data, grid_weight) for id in weighted_ids
+    ]
     weighted_average_ds = xr.concat(
         per_id_averages, dim=xr.IndexVariable("id", weighted_ids)
     )
@@ -51,11 +58,8 @@ def group_gridcells(
 def _site_weighted_ave(
     id: str, gridded_data: xr.Dataset, grid_weight: xr.DataArray
 ) -> xr.Dataset:
-    """Get the weighted average of all gridcells for a given spatial unit (id).
-
-    This function exists to enable multi-processing across IDs.
-    """
-    id_grid_weight = grid_weight.sel(id=id).dropna("site")
+    """Get the weighted average of all gridcells for a given spatial unit (id)."""
+    id_grid_weight = grid_weight.sel(id=id).where(lambda weight: weight > 0, drop=True)
     if id_grid_weight.sum("site").item() <= 0:
         raise ValueError(f"No population weights found for shape ID {id!r}.")
     normalised_weight = id_grid_weight / id_grid_weight.sum("site")
@@ -70,14 +74,15 @@ def _site_weighted_ave(
 
 
 if __name__ == "__main__":
-    gridded_data = xr.open_dataset(
-        snakemake.input.gridded_timeseries_data, decode_timedelta=True
-    )
-    grid_weights = xr.open_dataarray(
-        snakemake.input.grid_weights, decode_timedelta=True
-    )
-
-    resolution_specific_data = group_gridcells(
-        gridded_data, grid_weights, snakemake.threads
-    )
-    resolution_specific_data.to_netcdf(snakemake.output[0])
+    with (
+        xr.open_dataset(
+            snakemake.input.gridded_timeseries_data, decode_timedelta=True, chunks={}
+        ) as gridded_data,
+        xr.open_dataarray(
+            snakemake.input.grid_weights, decode_timedelta=True
+        ) as grid_weights_file,
+    ):
+        grid_weights = grid_weights_file.load()
+        resolution_specific_data = group_gridcells(gridded_data, grid_weights)
+        with dask_config.set(scheduler="threads", num_workers=snakemake.threads):
+            resolution_specific_data.to_netcdf(snakemake.output[0])

@@ -25,20 +25,22 @@ rule unscaled_heat_profiles:
     input:
         wind_speed=rules.process_gridded_weather_data.output.wind10m,
         temperature=rules.process_gridded_weather_data.output.temperature,
+        grid_weights="<resources>/automatic/shapes/{shapes}/population.nc",
         when2heat_daily="<resources>/automatic/when2heat/daily_demand.csv",
         when2heat_hourly_com="<resources>/automatic/when2heat/hourly_factors_COM.csv",
         when2heat_hourly_mfh="<resources>/automatic/when2heat/hourly_factors_MFH.csv",
         when2heat_hourly_sfh="<resources>/automatic/when2heat/hourly_factors_SFH.csv",
     output:
-        "<resources>/automatic/shapes/{shapes}/gridded-hourly_unscaled_heat_demand.nc",
+        temp("<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"),
     log:
         "<logs>/{shapes}/timeseries/unscaled_heat_profiles.log",
     conda:
         "../envs/module.yaml"
     params:
         weather_years=WEATHER_YEARS,
+    threads: config["threads"]["aggregation"]
     message:
-        "Generate gridded heat demand profile shapes from weather data."
+        "Generate and aggregate heat demand profiles for '{wildcards.shapes}'."
     script:
         "../scripts/unscaled_heat_profiles.py"
 
@@ -63,26 +65,9 @@ rule population_per_weather_gridbox:
         "../scripts/population_per_gridbox.py"
 
 
-rule group_gridded_timeseries_heat_demand:
-    input:
-        gridded_timeseries_data=rules.unscaled_heat_profiles.output[0],
-        grid_weights=rules.population_per_weather_gridbox.output[0],
-    output:
-        temp("<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"),
-    log:
-        "<logs>/{shapes}/timeseries/group_gridded_timeseries_heat_demand.log",
-    conda:
-        "../envs/module.yaml"
-    threads: config["threads"]["aggregation"]
-    message:
-        "Aggregate gridded heat demand profiles to '{wildcards.shapes}' shapes."
-    script:
-        "../scripts/group_gridded_timeseries.py"
-
-
 rule heat_demand_final_timeseries:
     input:
-        timeseries_data=rules.group_gridded_timeseries_heat_demand.output[0],
+        timeseries_data=rules.unscaled_heat_profiles.output[0],
         annual_demand="<annual_heat_demand>",
     output:
         "<heat_demand>",

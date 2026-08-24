@@ -5,12 +5,15 @@ When2Heat can be found here: https://github.com/oruhnau/when2heat
 """
 
 from collections.abc import Callable
+from time import perf_counter
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 from dask import config as dask_config
+from group_gridded_timeseries import group_gridcells
+
 
 # ASSUME (from When2Heat):
 # 1. Below 15 °C, the water heating demand is not defined and assumed to stay constant
@@ -23,23 +26,24 @@ SPACE_HEATING_UPPER_BOUND_TEMP = 40
 # All locations are separated by the average wind speed with the threshold
 # 4.4 m/s separating windy and not-windy (normal) locations
 AVE_WIND_SPEED_THRESHOLD = 4.4
-# Keep each annual output chunk small enough for low-memory laptops while avoiding
+# Keep each annual calculation chunk small enough for low-memory laptops while avoiding
 # the large task graph created by the weather files' two-dimensional storage chunks.
 PROFILE_SITE_CHUNK_SIZE = 512
-PROFILE_WORKERS = 2
 
 
 def get_unscaled_heat_profiles(
     path_to_wind_speed: str,
     path_to_temperature: str,
+    path_to_grid_weights: str,
     path_to_when2heat_daily: str,
     path_to_when2heat_hourly_com: str,
     path_to_when2heat_hourly_mfh: str,
     path_to_when2heat_hourly_sfh: str,
     weather_years: list[str | int],
+    workers: int,
     out_path: str,
 ) -> None:
-    """Produces time series of heat demand profiles.
+    """Produce population-weighted heat-demand profiles for arbitrary shapes.
 
     Profiles have correct shape and are consistent within themselves, but lack units.
     They must be later scaled so their magnitude matches annual heat demand data!
@@ -47,13 +51,16 @@ def get_unscaled_heat_profiles(
     Args:
         path_to_wind_speed (str): Gridded wind speed data in m/s.
         path_to_temperature (str): Gridded air temperature data in degrees C.
+        path_to_grid_weights (str): Population weights from weather sites to shapes.
         path_to_when2heat_daily (str): When2Heat daily demand parameters.
         path_to_when2heat_hourly_com (str): Commercial hourly profile factors.
         path_to_when2heat_hourly_mfh (str): Multi-family home hourly profile factors.
         path_to_when2heat_hourly_sfh (str): Single-family home hourly profile factors.
         weather_years: Weather years used to shape profiles.
+        workers (int): Number of Dask worker threads used to calculate profiles.
         out_path (str): Path to which data will be saved.
     """
+    started = perf_counter()
     weather_years = [int(year) for year in weather_years]
 
     # Parameters and how to apply them is based on [@BDEW:2015]
@@ -73,7 +80,17 @@ def get_unscaled_heat_profiles(
         xr.open_dataset(
             path_to_wind_speed, decode_timedelta=True, chunks={}
         ) as wind_ds,
+        xr.open_dataarray(
+            path_to_grid_weights, decode_timedelta=True
+        ) as grid_weights_file,
     ):
+        grid_weights = grid_weights_file.load()
+        population_by_site = grid_weights.fillna(0).sum("id")
+        relevant_sites = population_by_site.site.where(
+            population_by_site > 0, drop=True
+        )
+        temperature_ds = temperature_ds.sel(site=relevant_sites)
+        wind_ds = wind_ds.sel(site=relevant_sites)
         temperature_ds = temperature_ds.chunk(
             {"site": PROFILE_SITE_CHUNK_SIZE, "time": -1}
         )
@@ -83,27 +100,31 @@ def get_unscaled_heat_profiles(
         assert temperature_ds.attrs["unit"].lower() == "degrees c"
         assert wind_ds.attrs["unit"].lower() == "m/s"
 
-        grouped_hourly_heat = xr.concat(
-            [
-                _get_unscaled_heat_profile_for_weather_year(
-                    temperature_ds,
-                    wind_ds,
-                    daily_params,
-                    hourly_params,
-                    weather_year,
-                )
-                for weather_year in weather_years
-            ],
-            dim="time",
-        ).sortby("time")
-        encoding = {
-            k: {"zlib": True, "complevel": 4}
-            for k in grouped_hourly_heat.data_vars
-        }
-        # NetCDF writes are serialized internally, so a small worker pool provides
-        # useful compute overlap without multiplying the per-chunk memory footprint.
-        with dask_config.set(scheduler="threads", num_workers=PROFILE_WORKERS):
-            grouped_hourly_heat.to_netcdf(out_path, encoding=encoding)
+        gridded_hourly_heat = _get_unscaled_heat_profiles_for_weather_years(
+            temperature_ds, wind_ds, daily_params, hourly_params, weather_years
+        )
+        grouped_hourly_heat = group_gridcells(gridded_hourly_heat, grid_weights)
+        with dask_config.set(scheduler="threads", num_workers=workers):
+            grouped_hourly_heat.to_netcdf(out_path)
+
+
+def _get_unscaled_heat_profiles_for_weather_years(
+    temperature_ds: xr.Dataset,
+    wind_ds: xr.Dataset,
+    daily_params: pd.DataFrame,
+    hourly_params: xr.DataArray,
+    weather_years: list[int],
+) -> xr.Dataset:
+    """Build a chronological lazy profile dataset for all weather years."""
+    return xr.concat(
+        [
+            _get_unscaled_heat_profile_for_weather_year(
+                temperature_ds, wind_ds, daily_params, hourly_params, weather_year
+            )
+            for weather_year in weather_years
+        ],
+        dim="time",
+    ).sortby("time")
 
 
 def _get_unscaled_heat_profile_for_weather_year(
@@ -176,7 +197,7 @@ def get_hourly_heat_profiles(
     Args:
         reference_temperature (xr.DataArray): Daily reference temperature in degrees C.
         daily_heat (xr.DataArray): Relative daily heat demand per site.
-       hourly_params: xr.DataArray: Parameters from When2Heat.
+        hourly_params (xr.DataArray): Parameters from When2Heat.
 
     Returns:
         xr.DataArray: Hourly heat demand profiles (must be re-scaled later).
@@ -270,8 +291,7 @@ def get_reference_temperature(
 
     # Weighted mean, method for which is given in [@Ruhnau:2019]
     return sum(
-        (0.5**i) * daily_average.shift({time_dim: i}).bfill(time_dim)
-        for i in range(4)
+        (0.5**i) * daily_average.shift({time_dim: i}).bfill(time_dim) for i in range(4)
     ) / sum(0.5**i for i in range(4))
 
 
@@ -299,8 +319,7 @@ def when2heat_daily(
                 wind <= AVE_WIND_SPEED_THRESHOLD,
                 func(temperature, all_parameters[(building, "normal")]),
                 func(temperature, all_parameters[(building, "windy")]),
-            )
-            .where(wind.notnull())
+            ).where(wind.notnull())
             for building in buildings
         ],
         dim=pd.Index(buildings, name="building"),
@@ -402,10 +421,12 @@ if __name__ == "__main__":
     get_unscaled_heat_profiles(
         path_to_wind_speed=snakemake.input.wind_speed,
         path_to_temperature=snakemake.input.temperature,
+        path_to_grid_weights=snakemake.input.grid_weights,
         path_to_when2heat_daily=snakemake.input.when2heat_daily,
         path_to_when2heat_hourly_com=snakemake.input.when2heat_hourly_com,
         path_to_when2heat_hourly_mfh=snakemake.input.when2heat_hourly_mfh,
         path_to_when2heat_hourly_sfh=snakemake.input.when2heat_hourly_sfh,
         weather_years=snakemake.params.weather_years,
+        workers=snakemake.threads,
         out_path=snakemake.output[0],
     )
