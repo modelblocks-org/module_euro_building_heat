@@ -23,6 +23,40 @@ rule download_when2heat_params:
         "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
+rule download_timezone_boundaries:
+    output:
+        archive=ensure(
+            "<resources>/automatic/timezone-boundary-builder/2026c/timezones.geojson.zip",
+            sha256=internal["resources"]["timezone_boundaries"]["sha256"],
+        ),
+    log:
+        "<logs>/automatic/download_timezone_boundaries.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        curl_args=CURL_ARGS,
+        url=internal["resources"]["timezone_boundaries"]["url"],
+    message:
+        "Download pinned IANA timezone boundaries."
+    shell:
+        "curl {params.curl_args} --output {output.archive:q} {params.url:q} 2> {log:q}"
+
+
+rule extract_timezone_boundaries:
+    input:
+        archive=rules.download_timezone_boundaries.output.archive,
+    output:
+        geojson="<resources>/automatic/timezone-boundary-builder/2026c/timezones.geojson",
+    log:
+        "<logs>/automatic/extract_timezone_boundaries.log",
+    conda:
+        "../envs/module.yaml"
+    message:
+        "Extract the pinned IANA timezone boundary GeoJSON."
+    script:
+        "../scripts/extract_timezone_boundaries.py"
+
+
 rule download_stable_dataset:
     output:
         "<resources>/automatic/stable/{dataset}",
@@ -44,6 +78,7 @@ rule download_stable_dataset:
 rule download_era5_data:
     input:
         shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
+        edh_api="<edh_api>",
     output:
         era5="<resources>/automatic/shapes/{shapes}/era5/heat.nc",
     log:

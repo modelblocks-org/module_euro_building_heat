@@ -46,6 +46,7 @@ rule heat_pump_electricity_demand_timeseries:
         timeseries_data=rules.group_gridded_timeseries_heat_pump_cop.output[0],
         annual_demand="<annual_heat_demand>",
         heat_demand="<heat_demand>",
+        shape_timezones=rules.prepare_shape_timezones.output[0],
     output:
         cop="<heat_pump_cop>",
         electricity_demand="<heat_pump_electricity_demand>",

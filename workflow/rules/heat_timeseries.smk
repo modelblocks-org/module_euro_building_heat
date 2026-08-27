@@ -26,6 +26,7 @@ rule unscaled_heat_profiles:
         wind_speed=rules.process_gridded_weather_data.output.wind10m,
         temperature=rules.process_gridded_weather_data.output.temperature,
         grid_weights="<resources>/automatic/shapes/{shapes}/population.nc",
+        shape_timezones=rules.prepare_shape_timezones.output[0],
         when2heat_daily="<resources>/automatic/when2heat/daily_demand.csv",
         when2heat_hourly_com="<resources>/automatic/when2heat/hourly_factors_COM.csv",
         when2heat_hourly_mfh="<resources>/automatic/when2heat/hourly_factors_MFH.csv",
@@ -36,9 +37,9 @@ rule unscaled_heat_profiles:
         "<logs>/{shapes}/timeseries/unscaled_heat_profiles.log",
     conda:
         "../envs/module.yaml"
+    threads: config["threads"]["aggregation"]
     params:
         weather_years=WEATHER_YEARS,
-    threads: config["threads"]["aggregation"]
     message:
         "Generate and aggregate heat demand profiles for '{wildcards.shapes}'."
     script:
@@ -69,8 +70,10 @@ rule heat_demand_final_timeseries:
     input:
         timeseries_data=rules.unscaled_heat_profiles.output[0],
         annual_demand="<annual_heat_demand>",
+        shape_timezones=rules.prepare_shape_timezones.output[0],
     output:
-        "<heat_demand>",
+        timeseries="<heat_demand>",
+        plot="<heat_demand_timeseries>",
     log:
         "<logs>/{shapes}/timeseries/heat_demand_final_timeseries.log",
     conda:
@@ -82,21 +85,3 @@ rule heat_demand_final_timeseries:
         "Scale heat demand time series for '{wildcards.shapes}' shapes."
     script:
         "../scripts/heat_demand_final_timeseries.py"
-
-
-rule heat_demand_visualization:
-    input:
-        heat_demand="<heat_demand>",
-        shapes=rules.prepare_shapes.output[0],
-    output:
-        "<heat_demand_visualization>",
-    log:
-        "<logs>/{shapes}/visualization/heat_demand_visualization.log",
-    conda:
-        "../envs/module.yaml"
-    params:
-        max_steps=1000,
-    message:
-        "Create interactive heat demand visualization for '{wildcards.shapes}' shapes."
-    script:
-        "../scripts/heat_demand_visualization.py"

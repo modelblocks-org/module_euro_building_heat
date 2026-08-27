@@ -5,15 +5,14 @@ When2Heat can be found here: https://github.com/oruhnau/when2heat
 """
 
 from collections.abc import Callable
-from time import perf_counter
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+from _timeseries import read_shape_timezones
 from dask import config as dask_config
 from group_gridded_timeseries import group_gridcells
-
 
 # ASSUME (from When2Heat):
 # 1. Below 15 °C, the water heating demand is not defined and assumed to stay constant
@@ -29,12 +28,14 @@ AVE_WIND_SPEED_THRESHOLD = 4.4
 # Keep each annual calculation chunk small enough for low-memory laptops while avoiding
 # the large task graph created by the weather files' two-dimensional storage chunks.
 PROFILE_SITE_CHUNK_SIZE = 512
+UTC = "UTC"
 
 
 def get_unscaled_heat_profiles(
     path_to_wind_speed: str,
     path_to_temperature: str,
     path_to_grid_weights: str,
+    path_to_shape_timezones: str,
     path_to_when2heat_daily: str,
     path_to_when2heat_hourly_com: str,
     path_to_when2heat_hourly_mfh: str,
@@ -52,6 +53,7 @@ def get_unscaled_heat_profiles(
         path_to_wind_speed (str): Gridded wind speed data in m/s.
         path_to_temperature (str): Gridded air temperature data in degrees C.
         path_to_grid_weights (str): Population weights from weather sites to shapes.
+        path_to_shape_timezones (str): Geometry-derived IANA timezone per shape.
         path_to_when2heat_daily (str): When2Heat daily demand parameters.
         path_to_when2heat_hourly_com (str): Commercial hourly profile factors.
         path_to_when2heat_hourly_mfh (str): Multi-family home hourly profile factors.
@@ -60,8 +62,8 @@ def get_unscaled_heat_profiles(
         workers (int): Number of Dask worker threads used to calculate profiles.
         out_path (str): Path to which data will be saved.
     """
-    started = perf_counter()
     weather_years = [int(year) for year in weather_years]
+    shape_timezones = read_shape_timezones(path_to_shape_timezones)
 
     # Parameters and how to apply them is based on [@BDEW:2015]
     daily_params = read_daily_parameters(path_to_when2heat_daily)
@@ -100,31 +102,52 @@ def get_unscaled_heat_profiles(
         assert temperature_ds.attrs["unit"].lower() == "degrees c"
         assert wind_ds.attrs["unit"].lower() == "m/s"
 
-        gridded_hourly_heat = _get_unscaled_heat_profiles_for_weather_years(
-            temperature_ds, wind_ds, daily_params, hourly_params, weather_years
+        grouped_hourly_heat = _get_grouped_heat_profiles_for_weather_years(
+            temperature_ds,
+            wind_ds,
+            daily_params,
+            hourly_params,
+            grid_weights,
+            shape_timezones,
+            weather_years,
         )
-        grouped_hourly_heat = group_gridcells(gridded_hourly_heat, grid_weights)
         with dask_config.set(scheduler="threads", num_workers=workers):
             grouped_hourly_heat.to_netcdf(out_path)
 
 
-def _get_unscaled_heat_profiles_for_weather_years(
+def _get_grouped_heat_profiles_for_weather_years(
     temperature_ds: xr.Dataset,
     wind_ds: xr.Dataset,
     daily_params: pd.DataFrame,
     hourly_params: xr.DataArray,
+    grid_weights: xr.DataArray,
+    shape_timezones: pd.Series,
     weather_years: list[int],
 ) -> xr.Dataset:
-    """Build a chronological lazy profile dataset for all weather years."""
-    return xr.concat(
-        [
-            _get_unscaled_heat_profile_for_weather_year(
-                temperature_ds, wind_ds, daily_params, hourly_params, weather_year
+    """Aggregate local-clock profiles and remap each year to canonical UTC."""
+    result = xr.concat(
+        (
+            align_local_profiles_to_utc(
+                group_gridcells(
+                    _get_unscaled_heat_profile_for_weather_year(
+                        temperature_ds,
+                        wind_ds,
+                        daily_params,
+                        hourly_params,
+                        weather_year,
+                    ),
+                    grid_weights,
+                ),
+                shape_timezones,
+                weather_year,
             )
             for weather_year in weather_years
-        ],
+        ),
         dim="time",
     ).sortby("time")
+    result.attrs["timezone"] = UTC
+    result.time.attrs["timezone"] = UTC
+    return result
 
 
 def _get_unscaled_heat_profile_for_weather_year(
@@ -134,7 +157,7 @@ def _get_unscaled_heat_profile_for_weather_year(
     hourly_params: xr.DataArray,
     weather_year: int,
 ) -> xr.Dataset:
-    """Generate unscaled hourly heat profiles for one weather year."""
+    """Generate local-clock profiles with one boundary day on either side."""
     # Only need site-wide mean wind speed for this analysis.
     average_wind_speed = wind_ds["wind10m"].sel(time=str(weather_year)).mean("time")
 
@@ -153,9 +176,14 @@ def _get_unscaled_heat_profile_for_weather_year(
         temperature_for_year["temperature"], time_dim="time"
     )
 
-    # Subset to get only the target weather year. Output timestamps intentionally
-    # remain in weather years; model years are only used later for annual scaling.
-    reference_temperature = reference_temperature.sel(time=str(weather_year))
+    # UTC conversion can require the previous or following local date at a year
+    # boundary. Keep one complete boundary day on either side of the target year.
+    reference_temperature = reference_temperature.sel(
+        time=slice(
+            f"{weather_year - 1}-12-31",
+            f"{weather_year + 1}-01-01",
+        )
+    )
 
     # Get daily demand
     daily_heat = when2heat_daily(
@@ -184,6 +212,72 @@ def _get_unscaled_heat_profile_for_weather_year(
     return grouped_hourly_heat
 
 
+def canonical_utc_index(weather_year: int) -> pd.DatetimeIndex:
+    """Return the complete UTC hourly index for a weather year."""
+    return pd.date_range(
+        f"{weather_year}-01-01",
+        f"{weather_year + 1}-01-01",
+        freq="h",
+        inclusive="left",
+        tz=UTC,
+        name="time",
+    )
+
+
+def utc_index_to_local_clock(
+    utc_index: pd.DatetimeIndex, timezone: str
+) -> pd.DatetimeIndex:
+    """Convert UTC instants to timezone-naive local civil-clock labels."""
+    if utc_index.tz is None:
+        raise ValueError("UTC index must be timezone-aware before local conversion.")
+    return utc_index.tz_convert(timezone).tz_localize(None).rename("time")
+
+
+def align_local_profiles_to_utc(
+    local_profiles: xr.Dataset,
+    shape_timezones: pd.Series,
+    weather_year: int,
+) -> xr.Dataset:
+    """Select local-clock values for every canonical UTC timestamp by timezone."""
+    profile_ids = pd.Index(local_profiles.id.values.astype(str), name="shape_id")
+    missing_timezones = sorted(profile_ids.difference(shape_timezones.index))
+    if missing_timezones:
+        raise ValueError(
+            f"No inferred timezone found for aggregated shape IDs: {missing_timezones}"
+        )
+
+    canonical_index = canonical_utc_index(weather_year)
+    canonical_naive = canonical_index.tz_localize(None)
+    available_local_labels = pd.DatetimeIndex(local_profiles.time.values)
+    aligned_groups = []
+
+    selected_timezones = shape_timezones.reindex(profile_ids)
+    for timezone, timezone_ids in selected_timezones.groupby(selected_timezones):
+        local_labels = utc_index_to_local_clock(canonical_index, timezone)
+        missing_labels = local_labels.difference(available_local_labels)
+        if not missing_labels.empty:
+            raise ValueError(
+                f"Local profile buffer does not cover timezone {timezone!r}; "
+                f"missing labels from {missing_labels.min()} to {missing_labels.max()}."
+            )
+
+        local_indexer = xr.DataArray(local_labels.values, dims="utc_time")
+        aligned = local_profiles.sel(
+            id=timezone_ids.index.to_list(), time=local_indexer
+        )
+        aligned = (
+            aligned.drop_vars("time")
+            .rename({"utc_time": "time"})
+            .assign_coords(time=canonical_naive.values)
+        )
+        aligned_groups.append(aligned)
+
+    result = xr.concat(aligned_groups, dim="id").sel(id=profile_ids)
+    result.attrs["timezone"] = UTC
+    result.time.attrs["timezone"] = UTC
+    return result
+
+
 def get_hourly_heat_profiles(
     reference_temperature: xr.DataArray,
     daily_heat: xr.DataArray,
@@ -206,8 +300,11 @@ def get_hourly_heat_profiles(
     temperature_increments = (
         np.ceil((reference_temperature / 5).astype("float64")) * 5
     ).clip(min=-15, max=30)
-    # Profiles are linked to the day's temperature increment, so we align the two
-    temperature_increments.coords["weekday"] = temperature_increments.time.dt.dayofweek
+    # When2Heat follows strftime('%w'): Sunday=0, ..., Saturday=6. Pandas/xarray
+    # uses Monday=0, so rotate the local weekday before selecting commercial factors.
+    temperature_increments.coords["weekday"] = when2heat_weekday(
+        temperature_increments.time
+    )
     hourly_params_at_all_locations = hourly_params.sel(
         temperature=temperature_increments, weekday=temperature_increments.weekday
     ).drop_vars(["temperature", "weekday"])
@@ -217,6 +314,11 @@ def get_hourly_heat_profiles(
     hourly_heat = _hour_and_day_to_datetime(hourly_heat)
 
     return hourly_heat
+
+
+def when2heat_weekday(time: xr.DataArray) -> xr.DataArray:
+    """Return When2Heat weekday numbers: Sunday=0 through Saturday=6."""
+    return (time.dt.dayofweek + 1) % 7
 
 
 def read_daily_parameters(file_path: str) -> pd.DataFrame:
@@ -422,6 +524,7 @@ if __name__ == "__main__":
         path_to_wind_speed=snakemake.input.wind_speed,
         path_to_temperature=snakemake.input.temperature,
         path_to_grid_weights=snakemake.input.grid_weights,
+        path_to_shape_timezones=snakemake.input.shape_timezones,
         path_to_when2heat_daily=snakemake.input.when2heat_daily,
         path_to_when2heat_hourly_com=snakemake.input.when2heat_hourly_com,
         path_to_when2heat_hourly_mfh=snakemake.input.when2heat_hourly_mfh,

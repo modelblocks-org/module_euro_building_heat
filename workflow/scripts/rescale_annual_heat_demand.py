@@ -1,5 +1,6 @@
 """Scale national annual heat demand to arbitrary Modelblocks shapes."""
 
+import _plots
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -145,7 +146,11 @@ if __name__ == "__main__":
     demand = read_national_demand(snakemake.input.annual_demand)
     mapping = country_map(snakemake.input.shapes)
     population = shape_population(snakemake.input.population)
+    shapes = gpd.read_parquet(snakemake.input.shapes)
 
     scaled = rescale_to_shapes(demand, mapping, population)
     report_country_total_discrepancies(demand, scaled, mapping)
-    scaled.to_parquet(snakemake.output[0])
+    scaled.to_parquet(snakemake.output.annual_demand)
+    _plots.plot_annual_heat_demand_choropleth(
+        shapes, scaled, snakemake.output.choropleth
+    )

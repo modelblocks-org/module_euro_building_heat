@@ -6,8 +6,8 @@ years:
 
 weather:
   # Weather years used to shape hourly heat demand profiles. End year is exclusive.
-  start: 2018
-  end: 2019
+  start: 2023
+  end: 2024
 
 threads:
   aggregation: 8

@@ -2,6 +2,7 @@
 
 import pandas as pd
 import xarray as xr
+from _timeseries import utc_aware_hourly_frame, write_hourly_parquet
 
 
 def _group_end_uses(
@@ -44,7 +45,18 @@ def electricity_demand_from_heat(
     heat_demand: pd.DataFrame, cop: pd.DataFrame
 ) -> pd.DataFrame:
     """Convert heat demand to electricity demand using the heat pump COP."""
-    cop = cop.reindex(index=heat_demand.index, columns=heat_demand.columns)
+    if not heat_demand.index.equals(cop.index):
+        raise ValueError(
+            "Heat-demand and COP UTC indices must be exactly equal before combining."
+        )
+    missing_columns = sorted(set(heat_demand.columns) - set(cop.columns))
+    extra_columns = sorted(set(cop.columns) - set(heat_demand.columns))
+    if missing_columns or extra_columns:
+        raise ValueError(
+            "Heat-demand and COP shape columns differ: "
+            f"missing COP columns={missing_columns}, extra COP columns={extra_columns}."
+        )
+    cop = cop.reindex(columns=heat_demand.columns)
     electricity_demand = heat_demand.div(cop.where(cop > 0))
     return electricity_demand.where(heat_demand != 0, 0)
 
@@ -88,10 +100,23 @@ if __name__ == "__main__":
         .unstack("id")
         .rename_axis(index="timesteps")
     )
-    final_df.to_parquet(snakemake.output.cop)
+    final_df = utc_aware_hourly_frame(final_df)
 
     heat_demand = pd.read_parquet(snakemake.input.heat_demand)
+    if not heat_demand.index.equals(final_df.index):
+        raise ValueError(
+            "Heat-demand and COP UTC indices must be exactly equal before combining."
+        )
     electricity_demand = electricity_demand_from_heat(heat_demand, final_df).astype(
         "float32"
     )
-    electricity_demand.to_parquet(snakemake.output.electricity_demand)
+    write_hourly_parquet(
+        final_df,
+        snakemake.output.cop,
+        snakemake.input.shape_timezones,
+    )
+    write_hourly_parquet(
+        electricity_demand,
+        snakemake.output.electricity_demand,
+        snakemake.input.shape_timezones,
+    )

@@ -75,6 +75,27 @@ rule prepare_shapes:
         "../scripts/prepare_shapes.py"
 
 
+rule prepare_shape_timezones:
+    input:
+        shapes=rules.prepare_shapes.output[0],
+        timezone_boundaries=rules.extract_timezone_boundaries.output.geojson,
+    output:
+        "<resources>/automatic/shapes/{shapes}/shape_timezones.parquet",
+    log:
+        "<logs>/{shapes}/prepare_shape_timezones.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        source=internal["resources"]["timezone_boundaries"]["source"],
+        release=internal["resources"]["timezone_boundaries"]["release"],
+        sha256=internal["resources"]["timezone_boundaries"]["sha256"],
+        attribution=internal["resources"]["timezone_boundaries"]["attribution"],
+    message:
+        "Assign geometry-derived IANA timezones to '{wildcards.shapes}' shapes."
+    script:
+        "../scripts/prepare_shape_timezones.py"
+
+
 rule clip_population:
     input:
         raster=get_configured_population_file(),

@@ -54,6 +54,9 @@ def convert_era5_to_module_datasets(dataset: xr.Dataset) -> dict[str, xr.Dataset
         {name: outputs["temperature"][name] for name in ("site_id", "lat", "lon")},
         coords={"site": outputs["temperature"].site},
     )
+    for dataset in outputs.values():
+        if "time" in dataset.coords:
+            dataset.time.attrs["timezone"] = "UTC"
     return outputs
 
 

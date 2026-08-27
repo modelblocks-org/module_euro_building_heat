@@ -144,7 +144,8 @@ rule rescale_annual_heat_demand_to_shapes:
         shapes=rules.prepare_shapes.output[0],
         population="<resources>/automatic/shapes/{shapes}/population.nc",
     output:
-        "<annual_heat_demand>",
+        annual_demand="<annual_heat_demand>",
+        choropleth="<annual_heat_demand_choropleth>",
     log:
         "<logs>/{shapes}/annual/rescale_annual_heat_demand_to_shapes.log",
     conda:

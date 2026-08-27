@@ -1,8 +1,10 @@
 """Scale shape-level heat demand profiles to annual demand totals."""
 
+import _plots
 import numpy as np
 import pandas as pd
 import xarray as xr
+from _timeseries import write_hourly_parquet
 
 TWH_TO_MWH = 1e6
 
@@ -118,4 +120,9 @@ if __name__ == "__main__":
         .unstack("id")
         .rename_axis(index="timesteps")
     )
-    final_df.to_parquet(snakemake.output[0])
+    final_df = write_hourly_parquet(
+        final_df,
+        snakemake.output.timeseries,
+        snakemake.input.shape_timezones,
+    )
+    _plots.plot_heat_demand_timeseries(final_df, snakemake.output.plot)

@@ -101,6 +101,8 @@ def cop(
     combined_cop = combined_cop.fillna(cop_ashp)
 
     cop_ds = combined_cop.to_dataset(dim="end_use")
+    cop_ds.attrs["timezone"] = "UTC"
+    cop_ds.time.attrs["timezone"] = "UTC"
     encoding = {k: {"zlib": True, "complevel": 4} for k in cop_ds.data_vars}
     cop_ds.to_netcdf(path_to_output, encoding=encoding)
 

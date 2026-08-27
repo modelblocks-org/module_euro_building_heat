@@ -32,7 +32,8 @@ Data processing steps:
    which countries are needed for the requested `{shapes}` case.
 2. Download automatic input datasets, including gridded weather data,
    gridded population data, When2Heat profile parameters, Eurostat energy
-   statistics, Swiss energy statistics, and JRC-IDEES tertiary-sector data.
+   statistics, Swiss energy statistics, JRC-IDEES tertiary-sector data, and a
+   pinned IANA timezone-boundary map.
 3. Process national annual heat demand. Household demand is derived from
    Eurostat and Swiss end-use statistics; commercial demand is estimated using
    energy balances and JRC-IDEES tertiary-sector end-use data.
@@ -41,14 +42,18 @@ Data processing steps:
    hot water, and cooking.
 5. Allocate national annual useful heat demand to the requested shapes using
    population shares calculated on the weather grid.
-6. Generate unscaled hourly heat-demand profiles from gridded temperature and
-   wind-speed data using the When2Heat method.
-7. Aggregate the gridded profiles to the requested shapes with the same
+6. Infer one IANA timezone per shape from its geometric centroid, without using
+   `country_id`.
+7. Generate unscaled hourly heat-demand profiles from gridded temperature and
+   wind-speed data using the When2Heat method and local civil-clock factors.
+8. Aggregate the gridded profiles to the requested shapes with the same
    population weights.
-8. Scale the hourly profiles to the annual useful heat demand and write the
-   final shape-level heat-demand time series.
-9. Optionally create an interactive HTML choropleth map for visual inspection
-   of the heat-demand output.
+9. Convert each shape's local behavioral profile onto one canonical UTC hourly
+   timeline, scale it to annual useful heat demand, and write the final
+   shape-level time series.
+10. Create a static annual-demand choropleth and a stacked hourly time-series
+   plot alongside their respective datasets, both split by the user-provided
+   shapes.
 
 ## Configuration
 <!-- Please describe how to configure this module below -->
@@ -82,17 +87,11 @@ The main configuration groups are:
 - `heat.sfh_mfh_shares`: shares of single-family and multi-family households
   used when combining household heat profiles.
 
-Earth Data Hub access requires an account and a `.netrc` entry for
-`data.earthdatahub.destine.eu`; download the file from the
-[account settings](https://earthdatahub.destine.eu/account-settings#my-personal-access-tokens)
-and use owner-only permissions (`chmod 600 ~/.netrc`) on Linux and macOS. The
-workflow does not store credentials in the module configuration.
-
-To check credentialed access without downloading weather arrays, run:
-
-```shell
-pixi run -e module python -c "import xarray as xr; print(xr.open_dataset('https://data.earthdatahub.destine.eu/era5/era5-single-levels-atmosphere-v0.zarr', engine='zarr', chunks={}, storage_options={'client_kwargs': {'trust_env': True}}))"
-```
+Earth Data Hub access requires an account and an API key from the
+[account settings](https://earthdatahub.destine.eu/account-settings#my-personal-access-tokens).
+Save the key by itself in `resources/user/edh_api.txt`. Surrounding spaces and
+line breaks are ignored when the workflow reads the file. This credential file
+is ignored by Git and is not stored in the module configuration.
 
 The module is designed to be called from another Snakemake workflow. A minimal
 import looks like this:
@@ -101,6 +100,7 @@ import looks like this:
 module module_euro_building_heat:
     pathvars:
         shapes="resources/user/my_shapes/shapes.parquet",
+        edh_api="resources/user/edh_api.txt",
         heat_demand="results/my_shapes/heat_demand.parquet",
         logs="resources/module/logs",
         resources="resources/module/resources",
@@ -124,6 +124,28 @@ columns:
 - `geometry`: polygon geometry in a coordinate reference system readable by
   GeoPandas.
 
+### Timezone handling
+
+Timezone assignment is geometry-based and independent of `country_id`, which
+remains necessary only for annual-demand statistics. The workflow transforms
+each shape to EPSG:4326 and queries the land-only comprehensive
+`timezones.geojson.zip` from timezone-boundary-builder release `2026c` using
+the shape's Shapely centroid. The archive is pinned by SHA-256 checksum
+`7d3f0c5a33b6acd891335c0ad5ba767736b6914cb1a1d68c71921c17ce358948`.
+
+Exactly one unique IANA `tzid` must intersect every centroid. Assignment fails
+with the affected shape IDs and centroid coordinates if no polygon or multiple
+timezone polygons match. There is deliberately no country-code,
+representative-point, ocean-zone, or nearest-zone fallback. Consequently,
+concave or multipart land shapes can fail when their geometric centroid falls
+outside the land timezone polygons.
+
+When2Heat hourly factors are interpreted as local civil-clock profiles and are
+converted to UTC with the inferred IANA timezone. The spring DST gap is skipped
+and the repeated autumn hour is selected twice. ERA5 analysis timestamps remain
+unchanged UTC validity times, and the existing UTC-day reference-temperature
+method is preserved.
+
 ## Input / output structure
 <!-- Please describe input / output file placement below -->
 
@@ -137,10 +159,19 @@ path variables:
 | `shapes` | `<resources>/user/{shapes}/shapes.parquet` | User-provided polygons to process. |
 | `annual_heat_demand` | `<results>/{shapes}/annual/heat_demand_twh.parquet` | Annual useful heat demand in TWh by shape. |
 | `heat_demand` | `<results>/{shapes}/aggregated/heat_demand.parquet` | Final hourly heat-demand time series by shape. |
-| `heat_demand_visualization` | `<results>/{shapes}/visualization/heat_demand.html` | Interactive map for checking the output. |
+| `heat_pump_cop` | `<results>/{shapes}/aggregated/heat_pump_cop.parquet` | Final hourly heat-pump COP time series by shape. |
+| `heat_pump_electricity_demand` | `<results>/{shapes}/aggregated/heat_pump_electricity_demand.parquet` | Final hourly electricity demand for heat pumps by shape. |
+| `annual_heat_demand_choropleth` | `<results>/{shapes}/visualization/annual_heat_demand.pdf` | Static annual useful heat-demand map by shape. |
+| `heat_demand_timeseries` | `<results>/{shapes}/visualization/heat_demand_timeseries.pdf` | Static hourly heat-demand plot with one panel per shape. |
 
-The final `heat_demand` file is a Parquet table with timesteps on the index and
-shape IDs as columns. Values are scaled using `scaling.power`.
+The final `heat_demand`, `heat_pump_cop`, and
+`heat_pump_electricity_demand` files are wide Parquet tables with shape IDs as
+columns and a timezone-aware `datetime64[ns, UTC]` index named `timesteps`.
+Every timestamp identifies the start of its UTC hourly period. Their Parquet
+schema metadata records `output_timezone: UTC`, the JSON shape-to-IANA-timezone
+mapping under `shape_timezones`, the timezone-boundary source and release, its checksum, and ODbL
+attribution. Existing hourly outputs must be regenerated from shape-timezone
+assignment and unscaled-profile generation onward after upgrading.
 
 ## Development
 <!-- Please do not modify this templated section -->
@@ -199,6 +230,10 @@ This module is based on the following research and datasets:
   <https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2023_v1>
 - GHSL GHS-POP R2023A gridded population data:
   <https://human-settlement.emergency.copernicus.eu/ghs_pop2023.php>
+- Timezone Boundary Builder release 2026c, whose comprehensive land-only
+  boundary data is derived from OpenStreetMap and distributed under the Open
+  Data Commons Open Database License (ODbL):
+  <https://github.com/evansiroky/timezone-boundary-builder/releases/tag/2026c>
 - Eurostat household end-use and energy-balance datasets, distributed here via
   the Euro-Calliope dataset mirror:
   <https://github.com/calliope-project/euro-calliope-datasets>

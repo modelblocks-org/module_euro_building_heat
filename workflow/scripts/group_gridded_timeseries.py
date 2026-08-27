@@ -84,5 +84,8 @@ if __name__ == "__main__":
     ):
         grid_weights = grid_weights_file.load()
         resolution_specific_data = group_gridcells(gridded_data, grid_weights)
+        if "time" in resolution_specific_data.coords:
+            resolution_specific_data.attrs["timezone"] = "UTC"
+            resolution_specific_data.time.attrs["timezone"] = "UTC"
         with dask_config.set(scheduler="threads", num_workers=snakemake.threads):
             resolution_specific_data.to_netcdf(snakemake.output[0])

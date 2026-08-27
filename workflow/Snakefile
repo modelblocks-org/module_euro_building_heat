@@ -11,12 +11,14 @@ min_version("9.19")
 pathvars:
     # User resources
     shapes="<resources>/user/{shapes}/shapes.parquet",
+    edh_api="<resources>/user/edh_api.txt",
     # Module results
     annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
     heat_demand="<results>/{shapes}/aggregated/heat_demand.parquet",
     heat_pump_cop="<results>/{shapes}/aggregated/heat_pump_cop.parquet",
     heat_pump_electricity_demand="<results>/{shapes}/aggregated/heat_pump_electricity_demand.parquet",
-    heat_demand_visualization="<results>/{shapes}/visualization/heat_demand.html",
+    annual_heat_demand_choropleth="<results>/{shapes}/visualization/annual_heat_demand.pdf",
+    heat_demand_timeseries="<results>/{shapes}/visualization/heat_demand_timeseries.pdf",
 
 
 # Load the example configuration. This will be overridden by users.
@@ -56,6 +58,7 @@ workflow.source_path("scripts/_jrc.py")
 workflow.source_path("scripts/_che.py")
 workflow.source_path("scripts/_ecuk.py")
 workflow.source_path("scripts/_plots.py")
+workflow.source_path("scripts/_timeseries.py")
 workflow.source_path("scripts/_utils.py")
 
 # Run additional check on configuration / settings

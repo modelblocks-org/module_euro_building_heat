@@ -36,6 +36,13 @@ resources:
   when2heat:
     url: https://zenodo.org/records/10965295/files/{dataset}.csv
     datasets: ["daily_demand", "hourly_factors_COM", "hourly_factors_MFH", "hourly_factors_SFH"]
+  timezone_boundaries:
+    release: "2026c"
+    dataset: timezones.geojson.zip
+    url: https://github.com/evansiroky/timezone-boundary-builder/releases/download/2026c/timezones.geojson.zip
+    sha256: 7d3f0c5a33b6acd891335c0ad5ba767736b6914cb1a1d68c71921c17ce358948
+    source: https://github.com/evansiroky/timezone-boundary-builder/releases/tag/2026c
+    attribution: Contains information from timezone-boundary-builder and OpenStreetMap contributors, made available under the Open Database License (ODbL) 1.0.
   stable:  # Helper Zenodo repository with stable versions of government/manufacturer data.
     url: https://zenodo.org/records/20926669/files/{dataset}
     datasets:
