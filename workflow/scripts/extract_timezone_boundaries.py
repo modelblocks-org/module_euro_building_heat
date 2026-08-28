@@ -34,7 +34,4 @@ def extract_timezone_geojson(archive_path: str | Path, output_path: str | Path) 
 
 if __name__ == "__main__":
     sys.stderr = open(snakemake.log[0], "w", buffering=1)
-    extract_timezone_geojson(
-        snakemake.input.archive,
-        snakemake.output.geojson,
-    )
+    extract_timezone_geojson(snakemake.input.archive, snakemake.output.geojson)

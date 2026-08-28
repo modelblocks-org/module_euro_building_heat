@@ -102,9 +102,7 @@ def get_unscaled_heat_profiles(
         assert wind_ds.attrs["unit"].lower() == "m/s"
 
         with dask_config.set(scheduler="threads", num_workers=workers):
-            for weather_year, out_path in zip(
-                weather_years, out_paths, strict=True
-            ):
+            for weather_year, out_path in zip(weather_years, out_paths, strict=True):
                 grouped_hourly_heat = group_gridcells(
                     _get_unscaled_heat_profile_for_weather_year(
                         temperature_ds,
@@ -151,10 +149,7 @@ def _get_unscaled_heat_profile_for_weather_year(
     # UTC conversion can require the previous or following local date at a year
     # boundary. Keep one complete boundary day on either side of the target year.
     reference_temperature = reference_temperature.sel(
-        time=slice(
-            f"{weather_year - 1}-12-31",
-            f"{weather_year + 1}-01-01",
-        )
+        time=slice(f"{weather_year - 1}-12-31", f"{weather_year + 1}-01-01")
     )
 
     # Get daily demand

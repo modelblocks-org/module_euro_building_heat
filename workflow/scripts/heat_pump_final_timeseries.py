@@ -111,9 +111,7 @@ if __name__ == "__main__":
         "float32"
     )
     write_hourly_parquet(
-        final_df,
-        snakemake.output.cop,
-        snakemake.input.shape_timezones,
+        final_df, snakemake.output.cop, snakemake.input.shape_timezones
     )
     write_hourly_parquet(
         electricity_demand,

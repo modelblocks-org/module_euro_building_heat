@@ -54,9 +54,7 @@ def group_ids_by_local_schedule(
 
 
 def align_local_profiles_to_utc(
-    local_profiles: xr.Dataset,
-    shape_timezones: pd.Series,
-    weather_year: int,
+    local_profiles: xr.Dataset, shape_timezones: pd.Series, weather_year: int
 ) -> xr.Dataset:
     """Select local-clock values for every canonical UTC timestamp by schedule."""
     profile_ids = pd.Index(local_profiles.id.values.astype(str), name="shape_id")
@@ -75,9 +73,7 @@ def align_local_profiles_to_utc(
     for schedule_group in group_ids_by_local_schedule(
         canonical_index, selected_timezones
     ):
-        missing_labels = schedule_group.local_labels.difference(
-            available_local_labels
-        )
+        missing_labels = schedule_group.local_labels.difference(available_local_labels)
         if not missing_labels.empty:
             raise ValueError(
                 "Local profile buffer does not cover timezones "
@@ -88,9 +84,7 @@ def align_local_profiles_to_utc(
         local_indexer = xr.DataArray(
             schedule_group.local_labels.values, dims="utc_time"
         )
-        aligned = local_profiles.sel(
-            id=schedule_group.ids, time=local_indexer
-        )
+        aligned = local_profiles.sel(id=schedule_group.ids, time=local_indexer)
         aligned = (
             aligned.drop_vars("time")
             .rename({"utc_time": "time"})
@@ -126,9 +120,7 @@ def align_local_profile_files_to_utc(
             weather_years, local_profile_paths, strict=True
         ):
             local_profiles = stack.enter_context(
-                xr.open_dataset(
-                    local_profile_path, decode_timedelta=True, chunks={}
-                )
+                xr.open_dataset(local_profile_path, decode_timedelta=True, chunks={})
             )
             if local_profiles.attrs.get("time_basis") != LOCAL_TIME_BASIS:
                 raise ValueError(

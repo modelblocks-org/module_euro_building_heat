@@ -21,13 +21,10 @@ def assign_shape_timezones(
     shapes: gpd.GeoDataFrame, timezone_boundaries: gpd.GeoDataFrame
 ) -> pd.DataFrame:
     """Assign the unique timezone polygon intersecting each shape centroid."""
-
     shapes_wgs84 = shapes.loc[:, ["shape_id", "geometry"]].to_crs(WGS84).copy()
     shapes_wgs84["shape_id"] = _normalise_shape_ids(shapes_wgs84["shape_id"])
 
-    timezone_boundaries = timezone_boundaries.loc[:, ["tzid", "geometry"]].to_crs(
-        WGS84
-    )
+    timezone_boundaries = timezone_boundaries.loc[:, ["tzid", "geometry"]].to_crs(WGS84)
     centroid_geometry = shapely.centroid(shapes_wgs84.geometry.array)
     centroids = gpd.GeoDataFrame(
         {
@@ -40,10 +37,7 @@ def assign_shape_timezones(
     )
 
     matches = gpd.sjoin(
-        centroids,
-        timezone_boundaries,
-        how="left",
-        predicate="intersects",
+        centroids, timezone_boundaries, how="left", predicate="intersects"
     )
     timezone_matches = {
         shape_id: sorted(set(group["tzid"].dropna().astype(str)))

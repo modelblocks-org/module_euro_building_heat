@@ -27,6 +27,7 @@ LOCAL_UNSCALED_HEAT_PROFILES = expand(
 JRC_SPATIAL_SCOPE = internal["resources"]["jrc"]["spatial_scope"]
 SECTOR_TO_JRC_DATASET = {"services": "Tertiary", "residential": "Residential"}
 
+
 # Helper functions
 def additional_config_validation() -> None:
     """Run additional validation that JSON schemas do not support."""
@@ -82,6 +83,7 @@ def get_supported_ecuk_releases() -> list[int]:
     # the internal range is inclusive, so extend by one
     return list(range(release_range[0], release_range[-1] + 1))
 
+
 def _read_checkpoint_lines(path):
     with open(path) as f:
         return [line.strip() for line in f if line.strip()]
@@ -115,6 +117,7 @@ def _annual_energy_balance_proxy_population_inputs(wildcards):
             shapes=wildcards.shapes,
         )
     return []
+
 
 def _get_jrc_baseline_files(sector: str) -> list[str]:
     """Get all the files needed to construct a JRC-IDEES baseline."""

@@ -1,5 +1,6 @@
 """Rules for annual heat demand by shape."""
 
+
 checkpoint prepare_shape_country_scope:
     input:
         shapes=rules.prepare_shapes.output[0],
