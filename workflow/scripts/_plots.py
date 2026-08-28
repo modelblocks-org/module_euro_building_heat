@@ -146,10 +146,7 @@ def plot_annual_heat_demand_choropleth(
                 zorder=2,
             )
             country_boundaries.plot(
-                ax=ax,
-                color=MAP_BASE_EDGE_COLOR,
-                linewidth=0.9,
-                zorder=3,
+                ax=ax, color=MAP_BASE_EDGE_COLOR, linewidth=0.9, zorder=3
             )
             ax.set_xlim(minimum_x - padding, maximum_x + padding)
             ax.set_ylim(minimum_y - padding, maximum_y + padding)
