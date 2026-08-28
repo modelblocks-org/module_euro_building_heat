@@ -10,8 +10,21 @@ import numpy as np
 import pandas as pd
 from cmap import Colormap
 from matplotlib.axes import Axes
-from matplotlib.colors import Normalize
+from matplotlib.colors import PowerNorm
 from matplotlib.figure import Figure
+
+PLOT_STYLE = {
+    "font.family": "serif",
+    "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+    "axes.labelcolor": "#29333d",
+    "text.color": "#29333d",
+    "xtick.color": "#4b5563",
+    "ytick.color": "#4b5563",
+}
+MAP_CMAP = "YlOrRd"
+MAP_BACKGROUND_COLOR = "#eef3f5"
+MAP_BASE_COLOR = "#e6e2d9"
+MAP_BASE_EDGE_COLOR = "#7a858d"
 
 
 def draw_empty(ax: Axes, title: str, message: str = "No data available") -> None:
@@ -79,62 +92,100 @@ def plot_annual_heat_demand_choropleth(
     common_ids = demand_by_year.columns.intersection(shapes["shape_id"])
 
     demand_by_year = demand_by_year.loc[:, common_ids]
-    shapes = shapes[shapes["shape_id"].isin(common_ids)].to_crs("EPSG:4326")
+    shapes = shapes[shapes["shape_id"].isin(common_ids)].to_crs("EPSG:3035")
     years = demand_by_year.index.tolist()
     n_columns = min(3, len(years))
     n_rows = math.ceil(len(years) / n_columns)
-    fig, axes = plt.subplots(
-        nrows=n_rows,
-        ncols=n_columns,
-        figsize=(6 * n_columns, 5 * n_rows),
-        squeeze=False,
-        layout="constrained",
-    )
-    axes_flat = axes.ravel()
 
     values = demand_by_year.to_numpy(dtype=float)
     finite_values = values[np.isfinite(values)]
     maximum = float(finite_values.max()) if finite_values.size else 0.0
-    norm = Normalize(vmin=0, vmax=maximum if maximum > 0 else 1)
-    cmap = "viridis"
+    norm = PowerNorm(gamma=0.6, vmin=0, vmax=maximum if maximum > 0 else 1)
 
-    visible_axes = []
-    for ax, year in zip(axes_flat, years):
-        demand_for_year = demand_by_year.loc[year].rename("heat_demand_twh")
-        plot_data = shapes.merge(
-            demand_for_year, left_on="shape_id", right_index=True, how="left"
+    minimum_x, minimum_y, maximum_x, maximum_y = shapes.total_bounds
+    width = maximum_x - minimum_x
+    height = maximum_y - minimum_y
+    padding = max(width, height) * 0.04
+    if "country_id" in shapes.columns:
+        country_boundaries = shapes.dissolve(by="country_id").boundary
+    else:
+        country_boundaries = shapes.dissolve().boundary
+
+    with plt.rc_context(PLOT_STYLE):
+        fig, axes = plt.subplots(
+            nrows=n_rows,
+            ncols=n_columns,
+            figsize=(5.2 * n_columns, 5.2 * n_rows),
+            squeeze=False,
+            layout="constrained",
         )
-        plot_data.plot(
-            column="heat_demand_twh",
-            ax=ax,
-            cmap=cmap,
-            norm=norm,
-            edgecolor="white",
-            linewidth=0.25,
-            missing_kwds={"color": "lightgrey"},
+        axes_flat = axes.ravel()
+        visible_axes = []
+
+        for ax, year in zip(axes_flat, years):
+            demand_for_year = demand_by_year.loc[year].rename("heat_demand_twh")
+            plot_data = shapes.merge(
+                demand_for_year, left_on="shape_id", right_index=True, how="left"
+            )
+            ax.set_facecolor(MAP_BACKGROUND_COLOR)
+            shapes.plot(
+                ax=ax,
+                color=MAP_BASE_COLOR,
+                edgecolor=MAP_BASE_EDGE_COLOR,
+                linewidth=0.5,
+                zorder=1,
+            )
+            plot_data.dropna(subset=["heat_demand_twh"]).plot(
+                column="heat_demand_twh",
+                ax=ax,
+                cmap=MAP_CMAP,
+                norm=norm,
+                edgecolor="white",
+                linewidth=0.35,
+                alpha=0.94,
+                zorder=2,
+            )
+            country_boundaries.plot(
+                ax=ax,
+                color=MAP_BASE_EDGE_COLOR,
+                linewidth=0.9,
+                zorder=3,
+            )
+            ax.set_xlim(minimum_x - padding, maximum_x + padding)
+            ax.set_ylim(minimum_y - padding, maximum_y + padding)
+            ax.text(
+                0.03,
+                0.97,
+                str(year),
+                transform=ax.transAxes,
+                ha="left",
+                va="top",
+                fontsize="large",
+                fontweight="bold",
+                bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.8},
+                zorder=4,
+            )
+            ax.set_axis_off()
+            visible_axes.append(ax)
+
+        for ax in axes_flat[len(years) :]:
+            ax.set_visible(False)
+
+        colorbar = fig.colorbar(
+            plt.cm.ScalarMappable(norm=norm, cmap=MAP_CMAP),
+            ax=visible_axes,
+            location="bottom",
+            shrink=0.72,
+            aspect=35,
+            pad=0.02,
         )
-        ax.set_title(str(year), fontsize="large", fontweight="bold")
-        ax.set_axis_off()
-        visible_axes.append(ax)
+        colorbar.outline.set_edgecolor("#a5adb3")
+        colorbar.set_label("Annual useful heat demand (TWh)")
 
-    for ax in axes_flat[len(years) :]:
-        ax.set_visible(False)
-
-    colorbar = fig.colorbar(
-        plt.cm.ScalarMappable(norm=norm, cmap=cmap),
-        ax=visible_axes,
-        location="bottom",
-        shrink=0.7,
-        aspect=35,
-        pad=0.02,
-    )
-    colorbar.set_label("Annual useful heat demand (TWh)")
-    fig.suptitle("Annual useful heat demand by shape", fontsize="x-large")
-
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, bbox_inches="tight", pad_inches="layout")
-    plt.close(fig)
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output, bbox_inches="tight", pad_inches=0.05)
+        plt.close(fig)
 
 
 def _histogram_legend(fig: Figure, axes_flat) -> None:

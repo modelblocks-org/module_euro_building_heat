@@ -50,7 +50,7 @@ data_proxies:
     NOR: [SWE, DNK]
     SMR: [ITA]
     SRB: [BGR, HRV, HUN, ROU, GRC]
-  # jrc_idees uses the JRC IDEES dataset from the proxy country to shape hourly profiles.
+  # jrc_idees uses JRC-IDEES commercial end-use shares from the proxy country.
   jrc_idees:
     ALB: [BGR, HRV, HUN, ROU, GRC]
     AND: [ESP]

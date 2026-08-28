@@ -2,9 +2,11 @@
 
 This module prepares time series of heat demand and heat supply technologies for buildings in European countries.
 
-<!-- Place an attractive image of module outputs here -->
+<!-- Example module output -->
 <p align="center">
-  <img src="./figures/module.png" width="75%">
+  <img src="./figures/yearly_heat_demand_profile.png" width="80%">
+  <br>
+  <em>Example 2023 daily heat-demand profile (seven-day rolling mean).</em>
 </p>
 
 
@@ -20,165 +22,125 @@ and the `snakemake` [documentation](https://snakemake.readthedocs.io/en/stable/s
 ## Overview
 <!-- Please describe the processing stages of this module here -->
 
-This module builds spatially aggregated building heat-demand time series for a
-user-provided set of European regions. It combines national annual heat-demand
-statistics with weather-driven hourly demand profiles, then scales the profiles
-to the requested shapes using population weights.
+This module combines national annual heat-demand statistics with weather-driven
+hourly profiles and scales them to user-provided European regions using
+population weights.
 
 Data processing steps:
 
+<p align="center">
+  <img src="./figures/rulegraph.png" width="100%">
+</p>
+
 1. Prepare the spatial scope from the user-provided shapes file. The module
-   reads the `shape_id`, `country_id`, and `geometry` columns and determines
-   which countries are needed for the requested `{shapes}` case.
-2. Download automatic input datasets, including gridded weather data,
-   gridded population data, When2Heat profile parameters, Eurostat energy
-   statistics, Swiss energy statistics, JRC-IDEES tertiary-sector data, and a
-   pinned IANA timezone-boundary map.
-3. Process national annual heat demand. Household demand is derived from
-   Eurostat and Swiss end-use statistics; commercial demand is estimated using
-   energy balances and JRC-IDEES tertiary-sector end-use data.
+   keeps land shapes, validates their identifiers and geometries, and determines
+   the native and proxy countries needed for the requested `{shapes}` case.
+2. Download the required automatic inputs, including ERA5 weather, GHSL
+   population, When2Heat parameters, Eurostat and Swiss statistics, ECUK,
+   JRC-IDEES, heat-pump characteristics, and the pinned IANA timezone
+   boundaries.
+3. Process national annual final heat demand. Household demand is derived from
+   Eurostat, Swiss, and ECUK end-use statistics; commercial demand is estimated
+   using energy balances and JRC-IDEES tertiary-sector end-use data.
 4. Use published JRC-IDEES useful heat demand where available, or convert final
    energy demand with the configured technology efficiencies for space heat,
    hot water, and cooking.
-5. Allocate national annual useful heat demand to the requested shapes using
-   population shares calculated on the weather grid.
-6. Infer one IANA timezone per shape from its geometric centroid, without using
-   `country_id`.
-7. Generate unscaled hourly heat-demand profiles from gridded temperature and
-   wind-speed data using the When2Heat method and local civil-clock factors.
-8. Aggregate the gridded profiles to the requested shapes with the same
-   population weights and cache one compact local-clock file per weather year
-   under the shape's automatic resources.
-9. Convert each shape's local behavioral profile onto one canonical UTC hourly
-   timeline, scale it to annual useful heat demand, and write the final
-   shape-level time series.
-10. Create a static annual-demand choropleth and a stacked hourly time-series
-   plot alongside their respective datasets, both split by the user-provided
-   shapes.
+5. Calculate population weights on the ERA5 weather grid, allocate national
+   annual useful heat demand to the requested shapes, and create the annual
+   demand choropleth.
 
-## Configuration
-<!-- Please describe how to configure this module below -->
+<p align="center">
+  <img src="./figures/annual_heat_demand.png" width="50%">
+</p>
 
-Please consult the configuration [README](./config/README.md) and the [configuration example](./config/config.yaml) for a general overview on the configuration options of this module.
-
-The main configuration groups are:
-
-- `years`: first model year and exclusive end year. For example, `start: 2018`
-  and `end: 2019` processes the 2018 calendar year.
-- `weather`: first weather year and exclusive end weather year used to shape
-  hourly heat-demand profiles. The weather-year span must match the model-year
-  span. Output time series keep weather-year timestamps while annual scaling
-  uses the paired model years. ERA5 data is downloaded from Earth Data Hub in
-  one reusable NetCDF file for the full time range, then processed locally on
-  its native 0.25° grid.
-- `threads.aggregation`: number of threads used when aggregating gridded heat
-  profiles to shapes.
-- `population.resolution`: GHSL GHS-POP resolution in metres. The default is
-  `100`, the most precise available Mollweide grid; `1000` uses the smaller
-  1 km product. The workflow selects the GHSL five-year population epoch
-  closest to `years.start`.
-- `scaling.power`: factor used to convert MWh to the power or energy unit
-  expected by the downstream model.
-- `heat.tech_efficiencies`: carrier-specific efficiencies used to convert final
-  energy demand into useful heat demand by end use.
-- `heat.useful_heat_demand`: `actual` (the default) prioritizes published
-  JRC-IDEES useful heat demand, except for the UK where useful heat is always
-  calculated from ECUK final demand; `calculate_all` applies the configured
-  efficiencies consistently to final energy demand for every country.
-
-Single- and multi-family household profiles are combined with country-specific
-shares calculated from Eurostat's 2021 census table
-[`cens_21dwbo_r2`](https://ec.europa.eu/eurostat/databrowser/view/cens_21dwbo_r2/default/table?lang=en).
-One-dwelling residential buildings are classified as SFH; dwellings in buildings
-with two or at least three dwellings are classified as MFH. Countries absent from
-the census table use the mean share of the reference countries configured under
-`data_proxies.sfh_mfh_shares`.
-
-Earth Data Hub access requires an account and an API key from the
-[account settings](https://earthdatahub.destine.eu/account-settings#my-personal-access-tokens).
-Save the key by itself in `resources/user/edh_api.txt`. Surrounding spaces and
-line breaks are ignored when the workflow reads the file. This credential file
-is ignored by Git and is not stored in the module configuration.
-
-The module is designed to be called from another Snakemake workflow. A minimal
-import looks like this:
-
-```python
-module module_euro_building_heat:
-    pathvars:
-        shapes="resources/user/my_shapes/shapes.parquet",
-        edh_api="resources/user/edh_api.txt",
-        heat_demand="results/my_shapes/hourly/hourly_heat_demand.parquet",
-        logs="resources/module/logs",
-        resources="resources/module/resources",
-        results="resources/module/results",
-    snakefile:
-        "path/to/module_euro_building_heat/workflow/Snakefile"
-    config:
-        config["module_euro_building_heat"]
-
-use rule * from module_euro_building_heat as module_euro_building_heat_*
-```
-
-The user-provided shapes file must be a GeoParquet file with at least these
-columns:
-
-- `shape_id`: unique identifier for each output region.
-- `country_id`: ISO alpha-3 country code used to match shapes to national heat
-  statistics.
-- `shape_class`: shape context. Only rows with the exact value `land` are
-  processed; all other rows are dropped.
-- `geometry`: polygon geometry in a coordinate reference system readable by
-  GeoPandas.
+6. Calculate country-specific single-family and multi-family dwelling shares
+   from the 2021 Eurostat census, using configured reference countries where
+   data are missing.
+7. Infer exactly one IANA timezone for every shape from its geometric centroid,
+   independently of the `country_id` used for annual statistics.
+8. Process ERA5 air temperature, wind speed, and soil temperature, then
+   generate commercial, single-family, and multi-family heat-demand profiles
+   with the When2Heat method and local civil-clock factors.
+9. Aggregate the gridded demand profiles to the requested shapes using the same
+   population weights and cache one compact local-clock file per weather year.
+10. Align each local profile to a continuous UTC timeline using its inferred
+    timezone, combine the building types, pair weather years with model years,
+    scale to annual useful demand, and write the hourly demand and its plot.
+11. Calculate air-source and ground-source heat-pump COP from ERA5 air and soil
+    temperatures, configured sink temperatures, and technology shares. Aggregate
+    the COP to shapes and weight space heat and hot water using annual demand.
+12. Divide hourly heat demand by COP to obtain heat-pump electricity demand,
+    then write both hourly datasets with the same UTC timeline and timezone
+    provenance metadata.
 
 ### Timezone handling
 
 Timezone assignment is geometry-based and independent of `country_id`, which
-remains necessary only for annual-demand statistics. The workflow transforms
-each shape to EPSG:4326 and queries the land-only comprehensive
-`timezones.geojson.zip` from timezone-boundary-builder release `2026c` using
-the shape's Shapely centroid. The archive is pinned by SHA-256 checksum
-`7d3f0c5a33b6acd891335c0ad5ba767736b6914cb1a1d68c71921c17ce358948`.
+is used only to match shapes to national heat statistics. The workflow
+transforms each shape to EPSG:4326 and intersects its geometric centroid with
+the pinned, land-only timezone-boundary dataset.
 
-Exactly one unique IANA `tzid` must intersect every centroid. Assignment fails
-with the affected shape IDs and centroid coordinates if no polygon or multiple
-timezone polygons match. There is deliberately no country-code,
-representative-point, ocean-zone, or nearest-zone fallback. Consequently,
-concave or multipart land shapes can fail when their geometric centroid falls
-outside the land timezone polygons.
+Each centroid must intersect exactly one valid IANA timezone. Assignment fails
+with the affected shape IDs and centroid coordinates if no timezone or multiple
+timezones match. There is no country-code, representative-point, ocean-zone,
+or nearest-zone fallback.
 
-When2Heat hourly factors are interpreted as local civil-clock profiles and are
-converted to UTC with the inferred IANA timezone. The spring DST gap is skipped
-and the repeated autumn hour is selected twice. ERA5 analysis timestamps remain
-unchanged UTC validity times, and the existing UTC-day reference-temperature
-method is preserved.
+When2Heat hourly factors are interpreted in local civil time and selected onto
+a canonical UTC hourly index. The spring daylight-saving gap is skipped and
+the repeated autumn hour is selected twice. ERA5 analysis timestamps remain UTC.
+
+## Configuration
+<!-- Please describe how to configure this module below -->
+
+Please consult the configuration [README](./config/README.md) and
+[example](./config/config.yaml) for all configuration options.
+
+Earth Data Hub access requires an account and an API key from the
+[account settings](https://earthdatahub.destine.eu/account-settings#my-personal-access-tokens).
+Save the key by itself in `resources/user/edh_api.txt`; the file is ignored by
+Git.
 
 ## Input / output structure
 <!-- Please describe input / output file placement below -->
 
-Please consult the [interface file](./INTERFACE.yaml) for more information.
+Please consult the [interface file](./INTERFACE.yaml) for the machine-readable
+module interface and the [integration example](./tests/integration/Snakefile)
+for a complete module import.
 
-By default, the module expects user inputs and writes outputs through Snakemake
-path variables:
+The module receives inputs and exposes results through Snakemake path variables:
 
 | Path variable | Default path | Description |
 | --- | --- | --- |
+| `edh_api` | `<resources>/user/edh_api.txt` | Earth Data Hub API key used to download ERA5 data. |
 | `shapes` | `<resources>/user/{shapes}/shapes.parquet` | User-provided polygons to process. |
-| `annual_heat_demand` | `<results>/{shapes}/annual/annual_heat_demand.parquet` | Annual useful heat demand in TWh by shape. |
-| `heat_demand` | `<results>/{shapes}/hourly/hourly_heat_demand.parquet` | Final hourly heat-demand time series by shape. |
-| `heat_pump_cop` | `<results>/{shapes}/aggregated/heat_pump_cop.parquet` | Final hourly heat-pump COP time series by shape. |
-| `heat_pump_electricity_demand` | `<results>/{shapes}/aggregated/heat_pump_electricity_demand.parquet` | Final hourly electricity demand for heat pumps by shape. |
+| `annual_heat_demand` | `<results>/{shapes}/annual/annual_heat_demand.parquet` | Annual useful heat demand in TWh by shape, end use, and building category. |
+| `heat_demand` | `<results>/{shapes}/hourly/hourly_heat_demand.parquet` | Final hourly useful heat demand by shape. |
+| `heat_pump_cop` | `<results>/{shapes}/hourly/heat_pump_cop.parquet` | Final hourly heat-pump COP by shape. |
+| `heat_pump_electricity_demand` | `<results>/{shapes}/hourly/heat_pump_electricity_demand.parquet` | Final hourly electricity demand for heat pumps by shape. |
 | `annual_heat_demand_choropleth` | `<results>/{shapes}/visualization/annual_heat_demand.pdf` | Static annual useful heat-demand map by shape. |
-| `heat_demand_timeseries` | `<results>/{shapes}/visualization/heat_demand_timeseries.pdf` | Static hourly heat-demand plot with one panel per shape. |
+| `heat_demand_timeseries` | `<results>/{shapes}/visualization/heat_demand_timeseries.pdf` | Static heat-demand profile with one subplot per shape. |
+
+The shapes input must be a GeoParquet file containing:
+
+- `shape_id`: unique identifier for each output region.
+- `country_id`: ISO 3166-1 alpha-3 country code used to match national heat
+  statistics and configured proxies.
+- `shape_class`: shape context. Only rows with the exact value `land` are
+  processed.
+- `geometry`: polygon geometry in a coordinate reference system readable by
+  GeoPandas.
+
+The annual-demand output is a wide Parquet table with a `year`, `end_use`, and
+`cat_name` index and shape IDs as columns. Values are annual useful heat demand
+in TWh.
 
 The final `heat_demand`, `heat_pump_cop`, and
-`heat_pump_electricity_demand` files are wide Parquet tables with shape IDs as
+`heat_pump_electricity_demand` outputs are wide Parquet tables with shape IDs as
 columns and a timezone-aware `datetime64[ns, UTC]` index named `timesteps`.
 Every timestamp identifies the start of its UTC hourly period. Their Parquet
 schema metadata records `output_timezone: UTC`, the JSON shape-to-IANA-timezone
-mapping under `shape_timezones`, the timezone-boundary source and release, its checksum, and ODbL
-attribution. Existing hourly outputs must be regenerated from shape-timezone
-assignment and unscaled-profile generation onward after upgrading.
+mapping under `shape_timezones`, and the timezone-boundary source, release,
+checksum, and attribution.
 
 ## Development
 <!-- Please do not modify this templated section -->
