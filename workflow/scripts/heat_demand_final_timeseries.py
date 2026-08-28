@@ -1,7 +1,6 @@
 """Scale shape-level heat demand profiles to annual demand totals."""
 
 import _plots
-import numpy as np
 import pandas as pd
 import xarray as xr
 from _timeseries import write_hourly_parquet
@@ -9,10 +8,43 @@ from _timeseries import write_hourly_parquet
 TWH_TO_MWH = 1e6
 
 
+def _normalise_shape_ids(values: pd.Series) -> pd.Series:
+    """Match the shape-ID normalisation used by the gridded workflow."""
+    return values.astype(str).str.replace(".", "-", regex=False)
+
+
+def read_building_shares_by_shape(
+    shares_path: str, shapes_path: str, shape_ids: pd.Index
+) -> xr.DataArray:
+    """Map national SFH/MFH shares to the shapes in an unscaled profile."""
+    shares = pd.read_csv(shares_path, index_col="country_id")
+
+    shapes = pd.read_parquet(shapes_path, columns=["shape_id", "country_id"])
+    shapes["shape_id"] = _normalise_shape_ids(shapes["shape_id"])
+    shape_to_country = shapes.set_index("shape_id")["country_id"]
+
+    shape_ids = pd.Index(shape_ids.astype(str), name="id")
+    shape_to_country = shape_to_country.reindex(shape_ids)
+
+    shares_by_shape = pd.DataFrame(
+        {
+            "COM": 1.0,
+            "SFH": shape_to_country.map(shares["SFH"]),
+            "MFH": shape_to_country.map(shares["MFH"]),
+        },
+        index=shape_ids,
+    )
+    return xr.DataArray(
+        shares_by_shape.T,
+        dims=("building", "id"),
+        coords={"building": shares_by_shape.columns, "id": shape_ids},
+    )
+
+
 def scale_heat_demand_profiles(
     annual_demand_twh: xr.Dataset,
     unscaled_demand_profiles: xr.Dataset,
-    sfh_mfh_shares: dict,
+    building_shares: xr.DataArray,
     weather_model_years: dict[int, int],
 ) -> xr.DataArray:
     """Create demand timeseries for space heat and hot water across all building types.
@@ -29,9 +61,9 @@ def scale_heat_demand_profiles(
             Hourly heat demand profiles per year by resolution ID, end-use, and building
             category. Profiles will be normalised before scaling with annual demand, so
             their absolute magnitudes will be ignored.
-        sfh_mfh_shares (dict):
-            Share of single- and multi-family households, used to combine respective
-            unscaled demand profiles into one "household" profile.
+        building_shares:
+            Single- and multi-family dwelling shares by shape, plus a commercial
+            multiplier of one, used to combine profiles into building categories.
         weather_model_years:
             Mapping from weather years in the profile timestamps to model years in
             annual demand totals.
@@ -39,23 +71,13 @@ def scale_heat_demand_profiles(
     Returns:
         xr.DataArray: merged and scaled heat demand profiles.
     """
-    assert np.isclose(sum(sfh_mfh_shares.values()), 1), (
-        "Household type (single- vs multi-family home) shares must add up to 1."
-    )
-
-    sfh_mfh_shares_da = (
-        pd.Series({"COM": 1, **sfh_mfh_shares})
-        .rename_axis(index="building")
-        .to_xarray()
-    )
-    household_building_renamer = {k: "household" for k in sfh_mfh_shares}
     building_to_category = xr.DataArray(
-        pd.Series({"COM": "commercial", **household_building_renamer}).rename_axis(
-            index="building"
-        )
+        pd.Series(
+            {"COM": "commercial", "SFH": "household", "MFH": "household"}
+        ).rename_axis(index="building")
     )
     grouped_unscaled_demand = (
-        (unscaled_demand_profiles * sfh_mfh_shares_da)
+        (unscaled_demand_profiles * building_shares)
         .assign_coords(cat_name=building_to_category)
         .groupby("cat_name")
         .sum("building")
@@ -102,10 +124,15 @@ if __name__ == "__main__":
     unscaled_profiles = xr.open_dataset(
         snakemake.input.timeseries_data, decode_timedelta=True
     )
+    building_shares = read_building_shares_by_shape(
+        snakemake.input.sfh_mfh_shares,
+        snakemake.input.shapes,
+        pd.Index(unscaled_profiles.id.values),
+    )
     scaled_profiles = scale_heat_demand_profiles(
         annual_demand_ds,
         unscaled_profiles,
-        snakemake.params.sfh_mfh_shares,
+        building_shares,
         snakemake.params.weather_model_years,
     )
 
@@ -117,8 +144,6 @@ if __name__ == "__main__":
         .rename_axis(index="timesteps")
     )
     final_df = write_hourly_parquet(
-        final_df,
-        snakemake.output.timeseries,
-        snakemake.input.shape_timezones,
+        final_df, snakemake.output.timeseries, snakemake.input.shape_timezones
     )
     _plots.plot_heat_demand_timeseries(final_df, snakemake.output.plot)

@@ -20,6 +20,17 @@ population:
 data_proxies:
 # Use proxies to fill missing data for countries with no or incomplete data.
 # Multiple proxy countries can be specified for a single country, in which case the data from the proxy countries will be averaged.
+  # sfh_mfh_shares uses the mean dwelling shares of the proxy countries.
+  sfh_mfh_shares:
+    ALB: [BGR, HRV, HUN, ROU, GRC]
+    AND: [ESP]
+    BIH: [BGR, HRV, HUN, ROU, GRC]
+    GBR: [IRL]
+    MKD: [BGR, HRV, HUN, ROU, GRC]
+    MCO: [FRA]
+    MNE: [BGR, HRV, HUN, ROU, GRC]
+    SMR: [ITA]
+    SRB: [BGR, HRV, HUN, ROU, GRC]
   # annual_energy_balance uses energy balance data from the proxy country and scales with population.
   annual_energy_balance:
     AND: [ESP]
@@ -80,9 +91,6 @@ heat:
       solid-fossil-eff: 0.15
       biowaste-eff: 0.1
       electricity-eff: 0.5
-  sfh_mfh_shares:
-    MFH: 0.45
-    SFH: 0.55
   heat_pump:
     sink_temperature:
       underfloor: 35

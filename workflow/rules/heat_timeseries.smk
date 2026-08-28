@@ -1,5 +1,6 @@
 """Rules for gridded and shape-aggregated heat-demand time series."""
 
+
 rule process_gridded_weather_data:
     input:
         era5=rules.download_era5_data.output.era5,
@@ -87,6 +88,8 @@ rule heat_demand_final_timeseries:
     input:
         timeseries_data=rules.unscaled_heat_profiles.output[0],
         annual_demand="<annual_heat_demand>",
+        sfh_mfh_shares=rules.prepare_sfh_mfh_shares.output[0],
+        shapes=rules.prepare_shapes.output[0],
         shape_timezones=rules.prepare_shape_timezones.output[0],
     output:
         timeseries="<heat_demand>",
@@ -96,7 +99,6 @@ rule heat_demand_final_timeseries:
     conda:
         "../envs/module.yaml"
     params:
-        sfh_mfh_shares=config["heat"]["sfh_mfh_shares"],
         weather_model_years=WEATHER_MODEL_YEARS,
     message:
         "Scale heat demand time series for '{wildcards.shapes}' shapes."

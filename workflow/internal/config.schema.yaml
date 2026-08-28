@@ -49,6 +49,8 @@ properties:
     type: object
     additionalProperties: false
     properties:
+      sfh_mfh_shares:
+        $ref: "#/$defs/country_proxy_map"
       annual_energy_balance:
         $ref: "#/$defs/country_proxy_map"
       household_end_use:
@@ -58,7 +60,7 @@ properties:
   heat:
     type: object
     additionalProperties: false
-    required: [tech_efficiencies, sfh_mfh_shares]
+    required: [tech_efficiencies]
     properties:
       useful_heat_demand:
         type: string
@@ -69,19 +71,6 @@ properties:
           type: object
           additionalProperties:
             type: number
-      sfh_mfh_shares:
-        type: object
-        additionalProperties: false
-        required: [MFH, SFH]
-        properties:
-          MFH:
-            type: number
-            minimum: 0
-            maximum: 1
-          SFH:
-            type: number
-            minimum: 0
-            maximum: 1
       heat_pump:
         type: object
         additionalProperties: false

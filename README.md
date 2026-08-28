@@ -85,8 +85,14 @@ The main configuration groups are:
   JRC-IDEES useful heat demand, except for the UK where useful heat is always
   calculated from ECUK final demand; `calculate_all` applies the configured
   efficiencies consistently to final energy demand for every country.
-- `heat.sfh_mfh_shares`: shares of single-family and multi-family households
-  used when combining household heat profiles.
+
+Single- and multi-family household profiles are combined with country-specific
+shares calculated from Eurostat's 2021 census table
+[`cens_21dwbo_r2`](https://ec.europa.eu/eurostat/databrowser/view/cens_21dwbo_r2/default/table?lang=en).
+One-dwelling residential buildings are classified as SFH; dwellings in buildings
+with two or at least three dwellings are classified as MFH. Countries absent from
+the census table use the mean share of the reference countries configured under
+`data_proxies.sfh_mfh_shares`.
 
 Earth Data Hub access requires an account and an API key from the
 [account settings](https://earthdatahub.destine.eu/account-settings#my-personal-access-tokens).

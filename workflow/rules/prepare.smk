@@ -1,6 +1,24 @@
 """Rules for cleaning and preparation of user/downloaded files."""
 
 
+rule prepare_sfh_mfh_shares:
+    input:
+        census="<resources>/automatic/stable/cens_21dwbo_r2.tsv.gz",
+        shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
+    output:
+        "<resources>/automatic/shapes/{shapes}/sfh_mfh_shares.csv",
+    log:
+        "<logs>/{shapes}/prepare_sfh_mfh_shares.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        proxies=config.get("data_proxies", {}).get("sfh_mfh_shares", {}),
+    message:
+        "Calculate national single- and multi-family dwelling shares for '{wildcards.shapes}'."
+    script:
+        "../scripts/prepare_sfh_mfh_shares.py"
+
+
 rule unzip_jrc_idees:
     input:
         rules.download_jrc_idees.output[0],

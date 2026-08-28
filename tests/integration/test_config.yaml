@@ -31,9 +31,6 @@ module_euro_building_heat:
         solid-fossil-eff: 0.15
         biowaste-eff: 0.1
         electricity-eff: 0.5
-    sfh_mfh_shares:
-      MFH: 0.45
-      SFH: 0.55
     heat_pump:
       sink_temperature:
         underfloor: 35
