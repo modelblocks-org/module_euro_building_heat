@@ -1,41 +1,5 @@
 """Rules for annual heat demand by shape."""
 
-
-def _read_checkpoint_lines(path):
-    with open(path) as f:
-        return [line.strip() for line in f if line.strip()]
-
-
-def _official_final_demand_inputs(wildcards, sector):
-    """Return country statistics that provide absolute final demand."""
-    country_data = checkpoints.prepare_shape_country_scope.get(
-        shapes=wildcards.shapes
-    ).output.source_country_ids
-    countries = set(_read_checkpoint_lines(country_data))
-    inputs = []
-    if "CHE" in countries:
-        inputs.append(f"<resources>/automatic/baseline/che/{sector}_final.csv")
-    if "GBR" in countries:
-        inputs.append(f"<resources>/automatic/baseline/ecuk/{sector}_final.csv")
-    return inputs
-
-
-def _annual_energy_balance_proxy_population_inputs(wildcards):
-    country_data = checkpoints.prepare_shape_country_scope.get(
-        shapes=wildcards.shapes
-    ).output.country_ids
-    countries = set(_read_checkpoint_lines(country_data))
-    proxy_countries = set(
-        config.get("data_proxies", {}).get("annual_energy_balance", {})
-    )
-    if countries & proxy_countries:
-        return expand(
-            "<resources>/automatic/shapes/{shapes}/population.nc",
-            shapes=wildcards.shapes,
-        )
-    return []
-
-
 checkpoint prepare_shape_country_scope:
     input:
         shapes=rules.prepare_shapes.output[0],

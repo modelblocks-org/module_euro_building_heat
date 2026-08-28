@@ -1,38 +1,3 @@
-JRC_SPATIAL_SCOPE = internal["resources"]["jrc"]["spatial_scope"]
-
-SECTOR_TO_JRC_DATASET = {"services": "Tertiary", "residential": "Residential"}
-
-
-def _get_jrc_baseline_files(sector: str) -> list[str]:
-    """Get all the files needed to construct a JRC-IDEES baseline."""
-    jrc_version = internal["resources"]["jrc"]["use_version"]
-    countries = JRC_SPATIAL_SCOPE
-    dataset = SECTOR_TO_JRC_DATASET[sector]
-    uk_missing = jrc_version > 2015
-
-    file = "<resources>/automatic/jrc-idees/{version}/{dataset}_{country}.xlsx"
-    requested_files = [
-        file.format(version=jrc_version, country=country, dataset=dataset)
-        for country in countries
-        if not (country == "UK" and uk_missing)
-    ]
-
-    if uk_missing:
-        requested_files.append(file.format(version=2015, country="UK", dataset=dataset))
-
-    return requested_files
-
-
-def _get_ecuk_baseline_file() -> str:
-    """Select the first ECUK release covering the configured model period."""
-    release = min(
-        year
-        for year in get_supported_ecuk_releases()
-        if year > config["years"]["end"] - 1
-    )
-    return f"<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"
-
-
 rule baseline_jrc_idees_sector:
     input:
         jrc_files=lambda wc: _get_jrc_baseline_files(wc.sector),

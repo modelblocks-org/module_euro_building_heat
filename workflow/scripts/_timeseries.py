@@ -9,6 +9,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 OUTPUT_TIMEZONE = "UTC"
+LOCAL_TIME_BASIS = "local_civil_clock"
 SHAPE_TIMEZONES_METADATA_KEY = "shape_timezones"
 BOUNDARY_METADATA_KEYS = (
     "timezone_boundary_source",

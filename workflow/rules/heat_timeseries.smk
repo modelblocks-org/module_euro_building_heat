@@ -1,6 +1,5 @@
 """Rules for gridded and shape-aggregated heat-demand time series."""
 
-
 rule process_gridded_weather_data:
     input:
         era5=rules.download_era5_data.output.era5,
@@ -21,16 +20,34 @@ rule process_gridded_weather_data:
         "../scripts/process_gridded_weather_data.py"
 
 
-rule unscaled_heat_profiles:
+rule local_unscaled_heat_profiles:
     input:
         wind_speed=rules.process_gridded_weather_data.output.wind10m,
         temperature=rules.process_gridded_weather_data.output.temperature,
         grid_weights="<resources>/automatic/shapes/{shapes}/population.nc",
-        shape_timezones=rules.prepare_shape_timezones.output[0],
         when2heat_daily="<resources>/automatic/when2heat/daily_demand.csv",
         when2heat_hourly_com="<resources>/automatic/when2heat/hourly_factors_COM.csv",
         when2heat_hourly_mfh="<resources>/automatic/when2heat/hourly_factors_MFH.csv",
         when2heat_hourly_sfh="<resources>/automatic/when2heat/hourly_factors_SFH.csv",
+    output:
+        local_profiles=LOCAL_UNSCALED_HEAT_PROFILES,
+    log:
+        "<logs>/{shapes}/timeseries/local_unscaled_heat_profiles.log",
+    conda:
+        "../envs/module.yaml"
+    threads: config["threads"]["aggregation"]
+    params:
+        weather_years=WEATHER_YEARS,
+    message:
+        "Generate and aggregate local-clock heat demand profiles for '{wildcards.shapes}'."
+    script:
+        "../scripts/unscaled_heat_profiles.py"
+
+
+rule unscaled_heat_profiles:
+    input:
+        local_profiles=rules.local_unscaled_heat_profiles.output.local_profiles,
+        shape_timezones=rules.prepare_shape_timezones.output[0],
     output:
         temp("<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"),
     log:
@@ -41,9 +58,9 @@ rule unscaled_heat_profiles:
     params:
         weather_years=WEATHER_YEARS,
     message:
-        "Generate and aggregate heat demand profiles for '{wildcards.shapes}'."
+        "Align heat demand profiles for '{wildcards.shapes}' to UTC."
     script:
-        "../scripts/unscaled_heat_profiles.py"
+        "../scripts/align_unscaled_heat_profiles.py"
 
 
 rule population_per_weather_gridbox:

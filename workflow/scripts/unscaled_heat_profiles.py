@@ -5,12 +5,13 @@ When2Heat can be found here: https://github.com/oruhnau/when2heat
 """
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-from _timeseries import read_shape_timezones
+from _timeseries import LOCAL_TIME_BASIS
 from dask import config as dask_config
 from group_gridded_timeseries import group_gridcells
 
@@ -28,23 +29,21 @@ AVE_WIND_SPEED_THRESHOLD = 4.4
 # Keep each annual calculation chunk small enough for low-memory laptops while avoiding
 # the large task graph created by the weather files' two-dimensional storage chunks.
 PROFILE_SITE_CHUNK_SIZE = 512
-UTC = "UTC"
 
 
 def get_unscaled_heat_profiles(
     path_to_wind_speed: str,
     path_to_temperature: str,
     path_to_grid_weights: str,
-    path_to_shape_timezones: str,
     path_to_when2heat_daily: str,
     path_to_when2heat_hourly_com: str,
     path_to_when2heat_hourly_mfh: str,
     path_to_when2heat_hourly_sfh: str,
     weather_years: list[str | int],
     workers: int,
-    out_path: str,
+    out_paths: list[str],
 ) -> None:
-    """Produce population-weighted heat-demand profiles for arbitrary shapes.
+    """Produce annual local-clock heat-demand profiles for arbitrary shapes.
 
     Profiles have correct shape and are consistent within themselves, but lack units.
     They must be later scaled so their magnitude matches annual heat demand data!
@@ -53,17 +52,17 @@ def get_unscaled_heat_profiles(
         path_to_wind_speed (str): Gridded wind speed data in m/s.
         path_to_temperature (str): Gridded air temperature data in degrees C.
         path_to_grid_weights (str): Population weights from weather sites to shapes.
-        path_to_shape_timezones (str): Geometry-derived IANA timezone per shape.
         path_to_when2heat_daily (str): When2Heat daily demand parameters.
         path_to_when2heat_hourly_com (str): Commercial hourly profile factors.
         path_to_when2heat_hourly_mfh (str): Multi-family home hourly profile factors.
         path_to_when2heat_hourly_sfh (str): Single-family home hourly profile factors.
         weather_years: Weather years used to shape profiles.
         workers (int): Number of Dask worker threads used to calculate profiles.
-        out_path (str): Path to which data will be saved.
+        out_paths: Annual checkpoint paths, in the same order as ``weather_years``.
     """
     weather_years = [int(year) for year in weather_years]
-    shape_timezones = read_shape_timezones(path_to_shape_timezones)
+    if len(weather_years) != len(out_paths):
+        raise ValueError("Each weather year must have one local-profile output path.")
 
     # Parameters and how to apply them is based on [@BDEW:2015]
     daily_params = read_daily_parameters(path_to_when2heat_daily)
@@ -102,33 +101,11 @@ def get_unscaled_heat_profiles(
         assert temperature_ds.attrs["unit"].lower() == "degrees c"
         assert wind_ds.attrs["unit"].lower() == "m/s"
 
-        grouped_hourly_heat = _get_grouped_heat_profiles_for_weather_years(
-            temperature_ds,
-            wind_ds,
-            daily_params,
-            hourly_params,
-            grid_weights,
-            shape_timezones,
-            weather_years,
-        )
         with dask_config.set(scheduler="threads", num_workers=workers):
-            grouped_hourly_heat.to_netcdf(out_path)
-
-
-def _get_grouped_heat_profiles_for_weather_years(
-    temperature_ds: xr.Dataset,
-    wind_ds: xr.Dataset,
-    daily_params: pd.DataFrame,
-    hourly_params: xr.DataArray,
-    grid_weights: xr.DataArray,
-    shape_timezones: pd.Series,
-    weather_years: list[int],
-) -> xr.Dataset:
-    """Aggregate local-clock profiles and remap each year to canonical UTC."""
-    result = xr.concat(
-        (
-            align_local_profiles_to_utc(
-                group_gridcells(
+            for weather_year, out_path in zip(
+                weather_years, out_paths, strict=True
+            ):
+                grouped_hourly_heat = group_gridcells(
                     _get_unscaled_heat_profile_for_weather_year(
                         temperature_ds,
                         wind_ds,
@@ -137,17 +114,12 @@ def _get_grouped_heat_profiles_for_weather_years(
                         weather_year,
                     ),
                     grid_weights,
-                ),
-                shape_timezones,
-                weather_year,
-            )
-            for weather_year in weather_years
-        ),
-        dim="time",
-    ).sortby("time")
-    result.attrs["timezone"] = UTC
-    result.time.attrs["timezone"] = UTC
-    return result
+                )
+                grouped_hourly_heat.attrs["time_basis"] = LOCAL_TIME_BASIS
+                grouped_hourly_heat.attrs["weather_year"] = weather_year
+                grouped_hourly_heat.time.attrs["time_basis"] = LOCAL_TIME_BASIS
+                Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+                grouped_hourly_heat.to_netcdf(out_path)
 
 
 def _get_unscaled_heat_profile_for_weather_year(
@@ -210,70 +182,6 @@ def _get_unscaled_heat_profile_for_weather_year(
         [hourly_space.rename("space_heat"), hourly_hot_water.rename("hot_water")]
     )
     return grouped_hourly_heat
-
-
-def canonical_utc_index(weather_year: int) -> pd.DatetimeIndex:
-    """Return the complete UTC hourly index for a weather year."""
-    return pd.date_range(
-        f"{weather_year}-01-01",
-        f"{weather_year + 1}-01-01",
-        freq="h",
-        inclusive="left",
-        tz=UTC,
-        name="time",
-    )
-
-
-def utc_index_to_local_clock(
-    utc_index: pd.DatetimeIndex, timezone: str
-) -> pd.DatetimeIndex:
-    """Convert UTC instants to timezone-naive local civil-clock labels."""
-    return utc_index.tz_convert(timezone).tz_localize(None).rename("time")
-
-
-def align_local_profiles_to_utc(
-    local_profiles: xr.Dataset,
-    shape_timezones: pd.Series,
-    weather_year: int,
-) -> xr.Dataset:
-    """Select local-clock values for every canonical UTC timestamp by timezone."""
-    profile_ids = pd.Index(local_profiles.id.values.astype(str), name="shape_id")
-    missing_timezones = sorted(profile_ids.difference(shape_timezones.index))
-    if missing_timezones:
-        raise ValueError(
-            f"No inferred timezone found for aggregated shape IDs: {missing_timezones}"
-        )
-
-    canonical_index = canonical_utc_index(weather_year)
-    canonical_naive = canonical_index.tz_localize(None)
-    available_local_labels = pd.DatetimeIndex(local_profiles.time.values)
-    aligned_groups = []
-
-    selected_timezones = shape_timezones.reindex(profile_ids)
-    for timezone, timezone_ids in selected_timezones.groupby(selected_timezones):
-        local_labels = utc_index_to_local_clock(canonical_index, timezone)
-        missing_labels = local_labels.difference(available_local_labels)
-        if not missing_labels.empty:
-            raise ValueError(
-                f"Local profile buffer does not cover timezone {timezone!r}; "
-                f"missing labels from {missing_labels.min()} to {missing_labels.max()}."
-            )
-
-        local_indexer = xr.DataArray(local_labels.values, dims="utc_time")
-        aligned = local_profiles.sel(
-            id=timezone_ids.index.to_list(), time=local_indexer
-        )
-        aligned = (
-            aligned.drop_vars("time")
-            .rename({"utc_time": "time"})
-            .assign_coords(time=canonical_naive.values)
-        )
-        aligned_groups.append(aligned)
-
-    result = xr.concat(aligned_groups, dim="id").sel(id=profile_ids)
-    result.attrs["timezone"] = UTC
-    result.time.attrs["timezone"] = UTC
-    return result
 
 
 def get_hourly_heat_profiles(
@@ -522,12 +430,11 @@ if __name__ == "__main__":
         path_to_wind_speed=snakemake.input.wind_speed,
         path_to_temperature=snakemake.input.temperature,
         path_to_grid_weights=snakemake.input.grid_weights,
-        path_to_shape_timezones=snakemake.input.shape_timezones,
         path_to_when2heat_daily=snakemake.input.when2heat_daily,
         path_to_when2heat_hourly_com=snakemake.input.when2heat_hourly_com,
         path_to_when2heat_hourly_mfh=snakemake.input.when2heat_hourly_mfh,
         path_to_when2heat_hourly_sfh=snakemake.input.when2heat_hourly_sfh,
         weather_years=snakemake.params.weather_years,
         workers=snakemake.threads,
-        out_path=snakemake.output[0],
+        out_paths=list(snakemake.output.local_profiles),
     )

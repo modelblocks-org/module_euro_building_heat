@@ -47,7 +47,8 @@ Data processing steps:
 7. Generate unscaled hourly heat-demand profiles from gridded temperature and
    wind-speed data using the When2Heat method and local civil-clock factors.
 8. Aggregate the gridded profiles to the requested shapes with the same
-   population weights.
+   population weights and cache one compact local-clock file per weather year
+   under the shape's automatic resources.
 9. Convert each shape's local behavioral profile onto one canonical UTC hourly
    timeline, scale it to annual useful heat demand, and write the final
    shape-level time series.
