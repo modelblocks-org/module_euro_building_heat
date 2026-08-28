@@ -47,25 +47,18 @@ def plot_heat_demand_timeseries(
         hspace=0.55,
     )
 
-    fig.suptitle(
-        f"Per-unit heat demand factors ({rolling_days}-day rolling mean)",
-        fontsize="x-large",
-    )
-    if len(smoothed_demand.columns) == 0:
-        draw_empty(axes[0], "No heat demand shapes")
-    else:
-        for ax, shape_id in zip(axes, smoothed_demand.columns):
-            series = smoothed_demand[shape_id].dropna()
-            if series.empty:
-                draw_empty(ax, str(shape_id))
-            else:
-                ax.plot(series.index, series)
-                ax.set_title(
-                    str(shape_id), loc="left", fontsize="medium", fontweight="bold"
-                )
-                ax.margins(x=0)
-                ax.set_ylabel("Per unit")
-            ax.set_xlabel("")
+    for ax, shape_id in zip(axes, smoothed_demand.columns):
+        series = smoothed_demand[shape_id].dropna()
+        if series.empty:
+            draw_empty(ax, str(shape_id))
+        else:
+            ax.plot(series.index, series)
+            ax.set_title(
+                str(shape_id), loc="left", fontsize="medium", fontweight="bold"
+            )
+            ax.margins(x=0)
+            ax.set_ylabel("Per unit")
+        ax.set_xlabel("")
 
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)

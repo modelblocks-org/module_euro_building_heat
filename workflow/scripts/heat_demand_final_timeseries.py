@@ -76,10 +76,6 @@ def _scale_demand(
 ) -> xr.Dataset:
     """Scale one weather year with the annual demand for its paired model year."""
     weather_year = int(one_year_profile.time.dt.year[0])
-    if weather_year not in weather_model_years:
-        raise ValueError(
-            f"No model year mapping found for weather year {weather_year}."
-        )
     model_year = weather_model_years[weather_year]
     normalised_profile = one_year_profile / one_year_profile.sum("time")
     demand = normalised_profile * annual_demand.sel(year=model_year).drop("year")

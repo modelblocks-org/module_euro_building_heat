@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pyarrow as pa
@@ -63,28 +63,12 @@ def write_parquet_with_metadata(
 def read_shape_timezones(path: str | Path) -> pd.Series:
     """Read and validate the internal shape-to-IANA-timezone mapping."""
     mapping = pd.read_parquet(path)
-    required = {"shape_id", "timezone"}
-    missing = required.difference(mapping.columns)
-    if missing:
-        raise ValueError(f"Shape timezone mapping is missing columns: {sorted(missing)}")
-
     mapping = mapping.loc[:, ["shape_id", "timezone"]].copy()
     mapping["shape_id"] = mapping["shape_id"].astype(str)
     mapping["timezone"] = mapping["timezone"].astype(str)
-    if mapping["shape_id"].duplicated().any():
-        duplicates = sorted(
-            mapping.loc[mapping["shape_id"].duplicated(keep=False), "shape_id"].unique()
-        )
-        raise ValueError(f"Shape timezone mapping contains duplicate IDs: {duplicates}")
 
-    invalid = []
     for timezone in sorted(mapping["timezone"].unique()):
-        try:
-            ZoneInfo(timezone)
-        except ZoneInfoNotFoundError:
-            invalid.append(timezone)
-    if invalid:
-        raise ValueError(f"Unknown IANA timezone identifiers: {invalid}")
+        ZoneInfo(timezone)
 
     return mapping.set_index("shape_id")["timezone"].rename("timezone")
 
@@ -92,12 +76,6 @@ def read_shape_timezones(path: str | Path) -> pd.Series:
 def timezone_boundary_metadata(path: str | Path) -> dict[str, str]:
     """Read required boundary provenance from the shape-timezone mapping."""
     metadata = parquet_metadata(path)
-    missing = [key for key in BOUNDARY_METADATA_KEYS if key not in metadata]
-    if missing:
-        raise ValueError(
-            "Shape timezone mapping is missing Parquet metadata keys: "
-            f"{missing}"
-        )
     return {key: metadata[key] for key in BOUNDARY_METADATA_KEYS}
 
 
@@ -110,11 +88,6 @@ def utc_aware_hourly_frame(data: pd.DataFrame) -> pd.DataFrame:
     else:
         index = index.tz_convert(OUTPUT_TIMEZONE)
     index = index.rename("timesteps")
-
-    if index.has_duplicates:
-        raise ValueError("Hourly output index contains duplicate UTC timestamps.")
-    if not index.is_monotonic_increasing:
-        raise ValueError("Hourly output index is not monotonically increasing.")
     if len(index) > 1:
         expected = pd.date_range(index[0], index[-1], freq="h", tz=OUTPUT_TIMEZONE)
         if not index.equals(expected.rename("timesteps")):
@@ -132,9 +105,6 @@ def write_hourly_parquet(
     shape_timezones = read_shape_timezones(shape_timezones_path)
 
     output_ids = pd.Index(result.columns.astype(str))
-    missing_ids = sorted(output_ids.difference(shape_timezones.index))
-    if missing_ids:
-        raise ValueError(f"No inferred timezone found for output shape IDs: {missing_ids}")
     selected_timezones = shape_timezones.reindex(output_ids)
 
     metadata = timezone_boundary_metadata(shape_timezones_path)

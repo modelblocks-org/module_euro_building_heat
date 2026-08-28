@@ -228,8 +228,6 @@ def utc_index_to_local_clock(
     utc_index: pd.DatetimeIndex, timezone: str
 ) -> pd.DatetimeIndex:
     """Convert UTC instants to timezone-naive local civil-clock labels."""
-    if utc_index.tz is None:
-        raise ValueError("UTC index must be timezone-aware before local conversion.")
     return utc_index.tz_convert(timezone).tz_localize(None).rename("time")
 
 
