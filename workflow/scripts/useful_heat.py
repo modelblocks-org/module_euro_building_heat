@@ -1,5 +1,7 @@
 """Calculate annual useful heat demand from prepared final energy demand."""
 
+import sys
+
 import pandas as pd
 from final_heat_demand import match_model_years
 
@@ -134,6 +136,7 @@ def _write_useful_heat(demand: pd.DataFrame, path: str) -> None:
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     calculate_useful_heat(
         path_to_final_demand=snakemake.input.final_demand,
         paths_to_residential_useful_baselines=[

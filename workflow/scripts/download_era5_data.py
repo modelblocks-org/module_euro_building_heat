@@ -1,5 +1,6 @@
 """Download one reusable ERA5 file from Earth Data Hub."""
 
+import sys
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -97,6 +98,7 @@ def download_era5_data(
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     download_era5_data(
         path_to_shapes=snakemake.input.shapes,
         path_to_edh_api_key=snakemake.input.edh_api,

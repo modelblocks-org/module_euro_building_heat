@@ -1,5 +1,6 @@
 """Prepare annual final heat demand from standardised baselines."""
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -429,6 +430,7 @@ def _as_optional_path(value: Any) -> str | None:
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     prepare_final_heat_demand(
         path_to_energy_balance=snakemake.input.energy_balance,
         paths_to_residential_baselines=_as_list(snakemake.input.residential_baselines),

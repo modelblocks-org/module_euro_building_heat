@@ -9,6 +9,13 @@ module_euro_building_heat:
     aggregation: 1
   population:
     resolution: 1000
+  data_proxies:
+    sfh_mfh_shares:
+      MNE: [BGR, HRV, HUN, ROU, GRC]
+    household_end_use:
+      MNE: [BGR, HRV, HUN, ROU, GRC]
+    jrc_idees:
+      MNE: [BGR, HRV, HUN, ROU, GRC]
   heat:
     tech_efficiencies:
       space_heat:

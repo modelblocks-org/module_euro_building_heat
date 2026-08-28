@@ -1,5 +1,6 @@
 """Prepare annual energy balance data for heat demand calculations."""
 
+import sys
 import warnings
 from enum import Enum
 from string import digits
@@ -417,6 +418,7 @@ def _get_ch_industry_energy_balance(path_to_excel):
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     generate_annual_energy_balance_nc(
         path_to_energy_balance=snakemake.input.energy_balance,
         path_to_ch_excel=snakemake.input.ch_energy_balance,

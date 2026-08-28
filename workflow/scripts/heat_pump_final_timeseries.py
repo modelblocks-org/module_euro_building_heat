@@ -1,5 +1,7 @@
 """Prepare heat-pump COP and electricity-demand timeseries."""
 
+import sys
+
 import pandas as pd
 import xarray as xr
 from _timeseries import utc_aware_hourly_frame, write_hourly_parquet
@@ -84,6 +86,7 @@ def _end_use_weighted_ave(
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     timeseries_data = xr.open_dataset(
         snakemake.input.timeseries_data, decode_timedelta=True
     )

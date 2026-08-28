@@ -1,5 +1,7 @@
 """Scale shape-level heat demand profiles to annual demand totals."""
 
+import sys
+
 import _plots
 import pandas as pd
 import xarray as xr
@@ -119,6 +121,7 @@ def prepare_annual_demand(annual_demand: pd.Series) -> xr.DataArray:
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     annual_demand = pd.read_parquet(snakemake.input.annual_demand)
     annual_demand_ds = prepare_annual_demand(annual_demand)
     unscaled_profiles = xr.open_dataset(

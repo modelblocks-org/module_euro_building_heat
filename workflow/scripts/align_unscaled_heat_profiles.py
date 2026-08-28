@@ -1,5 +1,6 @@
 """Align compact local-clock heat profiles to a canonical UTC timeline."""
 
+import sys
 from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
@@ -147,6 +148,7 @@ def align_local_profile_files_to_utc(
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     align_local_profile_files_to_utc(
         local_profile_paths=list(snakemake.input.local_profiles),
         shape_timezones_path=snakemake.input.shape_timezones,

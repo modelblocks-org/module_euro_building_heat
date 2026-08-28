@@ -4,6 +4,7 @@ Functions attributable to When2Heat are explicitly referenced as such in docstri
 When2Heat can be found here: https://github.com/oruhnau/when2heat
 """
 
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
@@ -421,6 +422,7 @@ def _water_function(
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     get_unscaled_heat_profiles(
         path_to_wind_speed=snakemake.input.wind_speed,
         path_to_temperature=snakemake.input.temperature,

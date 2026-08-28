@@ -19,6 +19,8 @@ jobs:
         uses: prefix-dev/setup-pixi@v0.9.6
       - name: Run integration tests
         id: tests
+        env:
+          EDH_API_KEY: ${{ secrets.EDH_API_KEY }}
         run: pixi run test-integration
         continue-on-error: true
       - name: Run snakemake linting

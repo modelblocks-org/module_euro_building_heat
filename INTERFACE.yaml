@@ -26,16 +26,16 @@ pathvars:
         columns. Only rows with `shape_class` set to `land` are processed.
   results:
     annual_heat_demand:
-      default: "<results>/{shapes}/annual/heat_demand_twh.parquet"
+      default: "<results>/{shapes}/annual/annual_heat_demand.parquet"
       description: Annual useful heat demand in TWh, scaled from countries to shapes.
     heat_demand:
-      default: "<results>/{shapes}/aggregated/heat_demand.parquet"
+      default: "<results>/{shapes}/hourly/hourly_heat_demand.parquet"
       description: Shape-aggregated heat demand with a UTC-aware hourly index; local When2Heat behavior is converted using geometry-derived IANA timezones.
     heat_pump_cop:
-      default: "<results>/{shapes}/aggregated/heat_pump_cop.parquet"
+      default: "<results>/{shapes}/hourly/heat_pump_cop.parquet"
       description: Shape-aggregated heat-pump coefficient of performance with a UTC-aware hourly index.
     heat_pump_electricity_demand:
-      default: "<results>/{shapes}/aggregated/heat_pump_electricity_demand.parquet"
+      default: "<results>/{shapes}/hourly/heat_pump_electricity_demand.parquet"
       description: Shape-aggregated electricity demand for heat pumps with the same UTC-aware hourly index as heat demand and COP.
     annual_heat_demand_choropleth:
       default: "<results>/{shapes}/visualization/annual_heat_demand.pdf"

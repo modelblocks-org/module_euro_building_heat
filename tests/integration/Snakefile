@@ -2,24 +2,32 @@
 configfile: workflow.source_path("./test_config.yaml")
 
 
+# Stage the EDH API key without committing it to the repository. Locally, use the
+# module's user resource; in CI, use the repository secret exposed as an
+# environment variable.
+rule stage_edh_api:
+    output:
+        "resources/user/edh_api.txt",
+    run:
+        import os
+        import shutil
+        from pathlib import Path
+
+        local_api = Path(workflow.basedir).parents[1] / "resources/user/edh_api.txt"
+        if local_api.is_file():
+            shutil.copyfile(local_api, output[0])
+        elif api_key := os.environ.get("EDH_API_KEY"):
+            Path(output[0]).write_text(api_key.strip(), encoding="utf-8")
+
+
 # Emulate how another workflow might create shape inputs for this module.
 rule create_external_shapes:
     output:
         "resources/user/test/shapes.parquet",
-    run:
-        import geopandas as gpd
-        from shapely.geometry import box
-
-        shapes = gpd.GeoDataFrame(
-            {
-                "shape_id": ["NLD"],
-                "country_id": ["NLD"],
-                "shape_class": ["land"],
-                "geometry": [box(3, 50, 8, 54)],
-            },
-            crs="EPSG:4326",
-        )
-        shapes.to_parquet(output[0])
+    params:
+        url="https://zenodo.org/records/20765043/files/EUROPE_S_C1_ADM1.parquet?download=1",
+    shell:
+        "curl --fail --silent --show-error --location --output {output:q} {params.url:q}"
 
 
 # Import the module and configure it.
@@ -27,8 +35,9 @@ module module_euro_building_heat:
     pathvars:
         # Redirect specific user resources (inputs)
         shapes=rules.create_external_shapes.output[0],
+        edh_api=rules.stage_edh_api.output[0],
         # Redirect specific module results (outputs)
-        heat_demand="results/output/{shapes}/heat_demand.parquet",
+        heat_demand="results/output/{shapes}/hourly/hourly_heat_demand.parquet",
         # Redirect intermediate files that are internal to the module
         logs="resources/module/logs",
         resources="resources/module/resources",
@@ -47,6 +56,6 @@ use rule * from module_euro_building_heat as module_euro_building_heat_*
 rule all:
     default_target: True
     input:
-        "results/output/test/heat_demand.parquet",
+        "results/output/test/hourly/hourly_heat_demand.parquet",
     message:
         "A generic dry-run test case for the heat demand module."

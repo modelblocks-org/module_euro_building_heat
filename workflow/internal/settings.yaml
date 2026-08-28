@@ -44,12 +44,12 @@ resources:
     source: https://github.com/evansiroky/timezone-boundary-builder/releases/tag/2026c
     attribution: Contains information from timezone-boundary-builder and OpenStreetMap contributors, made available under the Open Database License (ODbL) 1.0.
   stable:  # Helper Zenodo repository with stable versions of government/manufacturer data.
-    url: https://zenodo.org/records/20926669/files/{dataset}
+    url: https://zenodo.org/records/22144030/files/{dataset}
     datasets:
      - CHE_energy_balance.xlsx
      - CHE_energy_consumption_households.xlsx
      - CHE_energy_consumption_industry.xlsx
-     #- cens_21dwbo_r2.tsv.gz
+     - cens_21dwbo_r2.tsv.gz
      - estat_nrg_bal_c.tsv.gz
      - GBR_End_Use_tables.zip
      - heat_pump_characteristics.nc

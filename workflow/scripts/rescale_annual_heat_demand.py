@@ -1,5 +1,7 @@
 """Scale national annual heat demand to arbitrary Modelblocks shapes."""
 
+import sys
+
 import _plots
 import geopandas as gpd
 import numpy as np
@@ -133,16 +135,19 @@ def report_country_total_discrepancies(
 
     print(
         "Annual and disaggregated heat demand totals differ for these countries "
-        "(disaggregated - annual):"
+        "(disaggregated - annual):",
+        file=sys.stderr,
     )
     for country_code in disaggregated_country_totals.index[~matching]:
         print(
             f"  {country_code}: {discrepancies[country_code]:.6g} TWh "
-            f"({discrepancy_pct[country_code]:.6g}%)"
+            f"({discrepancy_pct[country_code]:.6g}%)",
+            file=sys.stderr,
         )
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     demand = read_national_demand(snakemake.input.annual_demand)
     mapping = country_map(snakemake.input.shapes)
     population = shape_population(snakemake.input.population)

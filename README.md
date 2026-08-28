@@ -108,7 +108,7 @@ module module_euro_building_heat:
     pathvars:
         shapes="resources/user/my_shapes/shapes.parquet",
         edh_api="resources/user/edh_api.txt",
-        heat_demand="results/my_shapes/heat_demand.parquet",
+        heat_demand="results/my_shapes/hourly/hourly_heat_demand.parquet",
         logs="resources/module/logs",
         resources="resources/module/resources",
         results="resources/module/results",
@@ -164,8 +164,8 @@ path variables:
 | Path variable | Default path | Description |
 | --- | --- | --- |
 | `shapes` | `<resources>/user/{shapes}/shapes.parquet` | User-provided polygons to process. |
-| `annual_heat_demand` | `<results>/{shapes}/annual/heat_demand_twh.parquet` | Annual useful heat demand in TWh by shape. |
-| `heat_demand` | `<results>/{shapes}/aggregated/heat_demand.parquet` | Final hourly heat-demand time series by shape. |
+| `annual_heat_demand` | `<results>/{shapes}/annual/annual_heat_demand.parquet` | Annual useful heat demand in TWh by shape. |
+| `heat_demand` | `<results>/{shapes}/hourly/hourly_heat_demand.parquet` | Final hourly heat-demand time series by shape. |
 | `heat_pump_cop` | `<results>/{shapes}/aggregated/heat_pump_cop.parquet` | Final hourly heat-pump COP time series by shape. |
 | `heat_pump_electricity_demand` | `<results>/{shapes}/aggregated/heat_pump_electricity_demand.parquet` | Final hourly electricity demand for heat pumps by shape. |
 | `annual_heat_demand_choropleth` | `<results>/{shapes}/visualization/annual_heat_demand.pdf` | Static annual useful heat-demand map by shape. |

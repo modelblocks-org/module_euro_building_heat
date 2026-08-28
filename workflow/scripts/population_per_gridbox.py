@@ -1,6 +1,7 @@
 """Calculate population weights per weather gridbox and shape."""
 
 import math
+import sys
 import warnings
 
 import geopandas as gpd
@@ -198,6 +199,7 @@ def _aggregate_population_to_polygons(
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     population_on_weather_grid(
         path_to_population=snakemake.input.population,
         path_to_locations=snakemake.input.locations,

@@ -1,6 +1,7 @@
 """Calculate heat-pump coefficient of performance from weather data."""
 
 import math
+import sys
 
 import pandas as pd
 import xarray as xr
@@ -160,6 +161,7 @@ def _load_temperature_data(
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     cop(
         path_to_temperature_air=snakemake.input.temperature_air,
         path_to_temperature_ground=snakemake.input.temperature_ground,

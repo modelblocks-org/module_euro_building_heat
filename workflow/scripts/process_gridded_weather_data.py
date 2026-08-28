@@ -1,5 +1,6 @@
 """Process a local ERA5 NetCDF file into module weather files."""
 
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -97,6 +98,7 @@ def process_gridded_weather_data(
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     process_gridded_weather_data(
         path_to_era5=snakemake.input.era5,
         output_paths={

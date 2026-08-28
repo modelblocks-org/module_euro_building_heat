@@ -1,5 +1,6 @@
 """Aggregate gridded heat demand profiles to user-provided shapes."""
 
+import sys
 import warnings
 
 import xarray as xr
@@ -74,6 +75,7 @@ def _site_weighted_ave(
 
 
 if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
     with (
         xr.open_dataset(
             snakemake.input.gridded_timeseries_data, decode_timedelta=True, chunks={}
