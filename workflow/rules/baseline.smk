@@ -2,8 +2,8 @@ rule baseline_jrc_idees_sector:
     input:
         jrc_files=lambda wc: _get_jrc_baseline_files(wc.sector),
     output:
-        final="<resources>/automatic/baseline/jrc_idees/{sector}_final.csv",
-        useful="<resources>/automatic/baseline/jrc_idees/{sector}_useful.csv",
+        final="<resources>/automatic/baseline/jrc_idees/{sector}_final.parquet",
+        useful="<resources>/automatic/baseline/jrc_idees/{sector}_useful.parquet",
         plot="<resources>/automatic/baseline/jrc_idees/{sector}.pdf",
     log:
         "<logs>/baseline/baseline_jrc_idees_{sector}.log",
@@ -22,8 +22,8 @@ rule baseline_che_final_demand:
         raw_stats="<resources>/automatic/stable/CHE_energy_consumption_households.xlsx",
         parser=workflow.source_path("../scripts/_che.py"),
     output:
-        residential="<resources>/automatic/baseline/che/residential_final.csv",
-        services="<resources>/automatic/baseline/che/services_final.csv",
+        residential="<resources>/automatic/baseline/che/residential_final.parquet",
+        services="<resources>/automatic/baseline/che/services_final.parquet",
         residential_plot="<resources>/automatic/baseline/che/residential.pdf",
         services_plot="<resources>/automatic/baseline/che/services.pdf",
     log:
@@ -41,8 +41,8 @@ rule baseline_ecuk_final_demand:
         raw_stats=_get_ecuk_baseline_file(),
         parser=workflow.source_path("../scripts/_ecuk.py"),
     output:
-        residential="<resources>/automatic/baseline/ecuk/residential_final.csv",
-        services="<resources>/automatic/baseline/ecuk/services_final.csv",
+        residential="<resources>/automatic/baseline/ecuk/residential_final.parquet",
+        services="<resources>/automatic/baseline/ecuk/services_final.parquet",
         residential_plot="<resources>/automatic/baseline/ecuk/residential.pdf",
         services_plot="<resources>/automatic/baseline/ecuk/services.pdf",
     log:

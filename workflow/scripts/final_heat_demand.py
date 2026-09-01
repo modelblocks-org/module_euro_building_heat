@@ -89,7 +89,7 @@ def _read_sector_baseline(paths: list[str]) -> pd.DataFrame:
     """Read baselines, giving later (country-specific) sources precedence."""
     baseline = pd.DataFrame()
     for path in paths:
-        source = pd.read_csv(path)
+        source = pd.read_parquet(path)
         if baseline.empty:
             baseline = source
             continue
@@ -146,7 +146,7 @@ def read_official_final_demand(paths: list[str], model_years: list[int]) -> pd.S
         )
         return pd.Series(dtype=float, index=empty_index, name="value")
 
-    baseline = pd.concat([pd.read_csv(path) for path in paths], ignore_index=True)
+    baseline = pd.concat([pd.read_parquet(path) for path in paths], ignore_index=True)
     values = baseline.set_index(index_names)["value"].sort_index()
     return match_model_years(
         values, model_years, ["carrier_name", "end_use", "country_code"]
@@ -342,10 +342,7 @@ def _mean_reference_end_use_shares(
 def _read_energy_balances(
     path_to_energy_balance: str, path_to_carrier_names: str
 ) -> dict[str, pd.DataFrame]:
-    energy_balance = pd.read_csv(
-        path_to_energy_balance,
-        index_col=["cat_code", "carrier_code", "unit", "country", "year"],
-    ).squeeze("columns")
+    energy_balance = pd.read_parquet(path_to_energy_balance).squeeze("columns")
     carrier_names = pd.read_csv(path_to_carrier_names, index_col=0)
     balance_codes = {
         "residential": ["FC_OTH_HH_E"],
@@ -415,7 +412,7 @@ def _write_final_demand(
     ]
     if result.isna().any():
         raise ValueError("Annual final demand contains missing values.")
-    result.rename("value").to_csv(path)
+    result.rename("value").to_frame().to_parquet(path)
 
 
 def _as_list(value: Any) -> list[str]:

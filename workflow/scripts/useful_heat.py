@@ -45,9 +45,7 @@ def calculate_useful_heat(
 
 
 def _read_final_demand(path: str) -> pd.DataFrame:
-    demand = pd.read_csv(
-        path, index_col=["end_use", "carrier_name", "country_code", "cat_name", "year"]
-    ).squeeze("columns")
+    demand = pd.read_parquet(path).squeeze("columns")
     return demand.unstack("year").sort_index()
 
 
@@ -102,7 +100,9 @@ def _read_published_useful_heat(
     """Read standardized published useful heat and match it to model years."""
     pieces = []
     for sector, paths in baseline_paths.items():
-        baseline = pd.concat([pd.read_csv(path) for path in paths], ignore_index=True)
+        baseline = pd.concat(
+            [pd.read_parquet(path) for path in paths], ignore_index=True
+        )
         baseline = baseline.loc[
             baseline["end_use"].isin(HEAT_END_USES)
             & (baseline["country_code"] != "GBR")
@@ -132,7 +132,7 @@ def _write_useful_heat(demand: pd.DataFrame, path: str) -> None:
     result = demand.stack(["end_use", "cat_name"], future_stack=True)
     if result.isna().any():
         raise ValueError("Annual useful heat demand contains missing values.")
-    result.rename("value").to_csv(path)
+    result.rename("value").to_frame().to_parquet(path)
 
 
 if __name__ == "__main__":

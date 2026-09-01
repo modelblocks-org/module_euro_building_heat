@@ -37,12 +37,12 @@ def main() -> None:
     sector: str = snakemake.wildcards.sector
 
     final_df = get_combined_sector_demand(jrc_files, sector, "final_energy", countries)
-    final_df.to_csv(snakemake.output.final, index=False)
+    final_df.to_parquet(snakemake.output.final, index=False)
 
     useful_df = get_combined_sector_demand(
         jrc_files, sector, "useful_energy", countries
     )
-    useful_df.to_csv(snakemake.output.useful, index=False)
+    useful_df.to_parquet(snakemake.output.useful, index=False)
 
     fig, axes = _plots.plot_bar_histogram(
         final_df,

@@ -3,12 +3,14 @@
 
 rule process_gridded_weather_data:
     input:
-        era5=rules.download_era5_data.output.era5,
+        era5=ancient(rules.download_era5_data.output.era5),
     output:
-        grid="<resources>/automatic/shapes/{shapes}/gridded_weather/grid.nc",
-        temperature="<resources>/automatic/shapes/{shapes}/gridded_weather/temperature.nc",
-        wind10m="<resources>/automatic/shapes/{shapes}/gridded_weather/wind10m.nc",
-        tsoil5="<resources>/automatic/shapes/{shapes}/gridded_weather/tsoil5.nc",
+        grid=temp("<resources>/automatic/shapes/{shapes}/gridded_weather/grid.nc"),
+        temperature=temp(
+            "<resources>/automatic/shapes/{shapes}/gridded_weather/temperature.nc"
+        ),
+        wind10m=temp("<resources>/automatic/shapes/{shapes}/gridded_weather/wind10m.nc"),
+        tsoil5=temp("<resources>/automatic/shapes/{shapes}/gridded_weather/tsoil5.nc"),
     log:
         "<logs>/{shapes}/timeseries/process_gridded_weather_data.log",
     conda:
@@ -31,7 +33,7 @@ rule local_unscaled_heat_profiles:
         when2heat_hourly_mfh="<resources>/automatic/when2heat/hourly_factors_MFH.csv",
         when2heat_hourly_sfh="<resources>/automatic/when2heat/hourly_factors_SFH.csv",
     output:
-        local_profiles=LOCAL_UNSCALED_HEAT_PROFILES,
+        local_profiles=temp(LOCAL_UNSCALED_HEAT_PROFILES),
     log:
         "<logs>/{shapes}/timeseries/local_unscaled_heat_profiles.log",
     conda:
@@ -70,7 +72,7 @@ rule population_per_weather_gridbox:
         population=rules.clip_population.output.path,
         locations=rules.prepare_shapes.output[0],
     output:
-        "<resources>/automatic/shapes/{shapes}/population.nc",
+        temp("<resources>/automatic/shapes/{shapes}/population.nc"),
     log:
         "<logs>/{shapes}/timeseries/population_per_weather_gridbox.log",
     conda:

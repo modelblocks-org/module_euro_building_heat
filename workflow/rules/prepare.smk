@@ -6,7 +6,7 @@ rule prepare_sfh_mfh_shares:
         census="<resources>/automatic/stable/cens_21dwbo_r2.tsv.gz",
         shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
     output:
-        "<resources>/automatic/shapes/{shapes}/sfh_mfh_shares.csv",
+        temp("<resources>/automatic/shapes/{shapes}/sfh_mfh_shares.parquet"),
     log:
         "<logs>/{shapes}/prepare_sfh_mfh_shares.log",
     conda:
@@ -23,7 +23,7 @@ rule unzip_jrc_idees:
     input:
         rules.download_jrc_idees.output[0],
     output:
-        "<resources>/automatic/jrc-idees/{version}/{dataset}_{country_code}.xlsx",
+        temp("<resources>/automatic/jrc-idees/{version}/{dataset}_{country_code}.xlsx"),
     log:
         "<logs>/automatic/unzip_jrc_idees_v{version}_{dataset}_{country_code}.log",
     wildcard_constraints:
@@ -43,7 +43,7 @@ rule unzip_ECUK_release:
     input:
         "<resources>/automatic/stable/GBR_End_Use_tables.zip",
     output:
-        "<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx",
+        temp("<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"),
     log:
         "<logs>/unzip_GBR_end_use_{release}.log",
     wildcard_constraints:
@@ -61,7 +61,7 @@ rule unzip_raw_population:
     input:
         rules.download_raw_population.output[0],
     output:
-        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.tif",
+        temp("<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.tif"),
     log:
         "<logs>/automatic/unzip_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
     params:
@@ -98,7 +98,7 @@ rule prepare_shape_timezones:
         shapes=rules.prepare_shapes.output[0],
         timezone_boundaries=rules.extract_timezone_boundaries.output.geojson,
     output:
-        "<resources>/automatic/shapes/{shapes}/shape_timezones.parquet",
+        temp("<resources>/automatic/shapes/{shapes}/shape_timezones.parquet"),
     log:
         "<logs>/{shapes}/prepare_shape_timezones.log",
     conda:
@@ -114,7 +114,7 @@ rule clip_population:
         raster=get_configured_population_file(),
         like_vector=rules.prepare_shapes.output[0],
     output:
-        path="<resources>/automatic/shapes/{shapes}/proxy.tif",
+        path=temp("<resources>/automatic/shapes/{shapes}/proxy.tif"),
     log:
         "<logs>/{shapes}/clip_population.log",
     params:

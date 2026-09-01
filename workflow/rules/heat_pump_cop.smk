@@ -7,7 +7,7 @@ rule heat_pump_cop:
         temperature_ground=rules.process_gridded_weather_data.output.tsoil5,
         heat_pump_characteristics="<resources>/automatic/stable/heat_pump_characteristics.nc",
     output:
-        "<resources>/automatic/shapes/{shapes}/gridded-heat-pump-cop.nc",
+        temp("<resources>/automatic/shapes/{shapes}/gridded-heat-pump-cop.nc"),
     log:
         "<logs>/{shapes}/heat-pump/heat_pump_cop.log",
     conda:

@@ -73,7 +73,7 @@ def main() -> None:
     )
     shares = prepare_country_shares(shares, country_ids, snakemake.params.proxies)
     Path(snakemake.output[0]).parent.mkdir(parents=True, exist_ok=True)
-    shares.to_csv(snakemake.output[0], float_format="%.10f")
+    shares.to_parquet(snakemake.output[0])
 
 
 if __name__ == "__main__":

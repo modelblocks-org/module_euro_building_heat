@@ -94,9 +94,9 @@ def _official_final_demand_inputs(wildcards, sector):
     countries = set(_read_checkpoint_lines(country_data))
     inputs = []
     if "CHE" in countries:
-        inputs.append(f"<resources>/automatic/baseline/che/{sector}_final.csv")
+        inputs.append(f"<resources>/automatic/baseline/che/{sector}_final.parquet")
     if "GBR" in countries:
-        inputs.append(f"<resources>/automatic/baseline/ecuk/{sector}_final.csv")
+        inputs.append(f"<resources>/automatic/baseline/ecuk/{sector}_final.parquet")
     return inputs
 
 

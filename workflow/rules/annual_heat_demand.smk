@@ -34,7 +34,7 @@ rule process_annual_energy_balances:
             "../internal/energy-balance-carrier-names.csv"
         ),
     output:
-        temp("<resources>/automatic/annual-energy-balances.csv"),
+        temp("<resources>/automatic/annual-energy-balances.parquet"),
     log:
         "<logs>/annual/process_annual_energy_balances.log",
     conda:
@@ -50,8 +50,8 @@ rule process_annual_energy_balances:
 rule process_final_heat_demand:
     input:
         energy_balance=rules.process_annual_energy_balances.output[0],
-        residential_baselines="<resources>/automatic/baseline/jrc_idees/residential_final.csv",
-        services_baselines="<resources>/automatic/baseline/jrc_idees/services_final.csv",
+        residential_baselines="<resources>/automatic/baseline/jrc_idees/residential_final.parquet",
+        services_baselines="<resources>/automatic/baseline/jrc_idees/services_final.parquet",
         official_residential_demand=lambda wc: _official_final_demand_inputs(
             wc, "residential"
         ),
@@ -66,7 +66,7 @@ rule process_final_heat_demand:
         ),
     output:
         final_demand=temp(
-            "<resources>/automatic/shapes/{shapes}/annual-final-heat-demand-twh.csv"
+            "<resources>/automatic/shapes/{shapes}/annual-final-heat-demand-twh.parquet"
         ),
     log:
         "<logs>/{shapes}/annual/process_final_heat_demand.log",
@@ -85,10 +85,12 @@ rule process_final_heat_demand:
 rule process_useful_heat:
     input:
         final_demand=rules.process_final_heat_demand.output.final_demand,
-        residential_useful_baseline="<resources>/automatic/baseline/jrc_idees/residential_useful.csv",
-        services_useful_baseline="<resources>/automatic/baseline/jrc_idees/services_useful.csv",
+        residential_useful_baseline="<resources>/automatic/baseline/jrc_idees/residential_useful.parquet",
+        services_useful_baseline="<resources>/automatic/baseline/jrc_idees/services_useful.parquet",
     output:
-        total_demand="<resources>/automatic/shapes/{shapes}/annual-heat-demand-twh.csv",
+        total_demand=temp(
+            "<resources>/automatic/shapes/{shapes}/annual-heat-demand-twh.parquet"
+        ),
     log:
         "<logs>/{shapes}/annual/process_useful_heat.log",
     conda:

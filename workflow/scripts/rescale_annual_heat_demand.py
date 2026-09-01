@@ -15,9 +15,9 @@ def normalise_shape_ids(values: pd.Index | pd.Series) -> pd.Index:
 
 
 def read_national_demand(path: str) -> pd.DataFrame:
-    """Read national annual heat demand from the legacy CSV structure."""
+    """Read national annual heat demand from Parquet."""
     return (
-        pd.read_csv(path, index_col=[0, 1, 2, 3])
+        pd.read_parquet(path)
         .squeeze("columns")
         .unstack("country_code")
         .rename(columns=str.upper)

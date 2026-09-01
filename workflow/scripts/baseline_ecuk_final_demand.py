@@ -18,7 +18,7 @@ def main() -> None:
     for sector in ["residential", "services"]:
         df = _ecuk.get_sector_demand(raw_file, sector)
         df = _schemas.BaselineSchema.validate_countries(df, ["GBR"])
-        df.to_csv(snakemake.output[sector], index=False)
+        df.to_parquet(snakemake.output[sector], index=False)
 
         fig, _ = _plots.plot_bar_histogram(
             df, "end_use", container_col="country_code", unit="TWh"

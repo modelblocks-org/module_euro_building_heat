@@ -50,7 +50,9 @@ rule extract_timezone_boundaries:
     input:
         archive=rules.download_timezone_boundaries.output.archive,
     output:
-        geojson="<resources>/automatic/timezone-boundary-builder/timezones.geojson",
+        geojson=temp(
+            "<resources>/automatic/timezone-boundary-builder/timezones.geojson"
+        ),
     log:
         "<logs>/automatic/extract_timezone_boundaries.log",
     threads: 1
@@ -102,7 +104,7 @@ rule download_era5_data:
 
 rule download_raw_population:
     output:
-        temp("<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip"),
+        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip",
     log:
         "<logs>/automatic/download_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
     localrule: True

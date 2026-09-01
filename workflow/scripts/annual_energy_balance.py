@@ -87,9 +87,9 @@ def generate_annual_energy_balance_nc(
 
     result = tdf.mul(TJ_TO_TWH).rename("value").reset_index()
     result["unit"] = "twh"
-    result.set_index(["cat_code", "carrier_code", "unit", "country", "year"])[
-        "value"
-    ].to_csv(path_to_result)
+    result.set_index(
+        ["cat_code", "carrier_code", "unit", "country", "year"]
+    ).to_parquet(path_to_result)
 
 
 def _overlay_gbr_energy_balance(
@@ -105,7 +105,7 @@ def _overlay_gbr_energy_balance(
     }
     additions = []
     for path in baseline_paths:
-        baseline = pd.read_csv(path)
+        baseline = pd.read_parquet(path)
         sector = baseline["sector"].iat[0]
         cat_code, carrier_column = sector_metadata[sector]
         carrier_codes = (

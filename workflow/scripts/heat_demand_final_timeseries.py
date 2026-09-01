@@ -19,7 +19,7 @@ def read_building_shares_by_shape(
     shares_path: str, shapes_path: str, shape_ids: pd.Index
 ) -> xr.DataArray:
     """Map national SFH/MFH shares to the shapes in an unscaled profile."""
-    shares = pd.read_csv(shares_path, index_col="country_id")
+    shares = pd.read_parquet(shares_path)
 
     shapes = pd.read_parquet(shapes_path, columns=["shape_id", "country_id"])
     shapes["shape_id"] = _normalise_shape_ids(shapes["shape_id"])
