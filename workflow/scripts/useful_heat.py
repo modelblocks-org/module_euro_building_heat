@@ -7,13 +7,13 @@ from final_heat_demand import match_model_years
 
 HEAT_END_USES = ("space_heat", "hot_water", "cooking")
 EFFICIENCY_PARAMETERS = {
-    "biomass_and_waste": "biowaste-eff",
-    "gas": "gas-eff",
-    "oil": "oil-eff",
-    "renewable_heat": "solar-thermal-eff",
-    "solar_thermal": "solar-thermal-eff",
-    "solid_fossil": "solid-fossil-eff",
-    "electricity": "electricity-eff",
+    "biomass_and_waste": "biowaste",
+    "gas": "gas",
+    "oil": "oil",
+    "renewable_heat": "solar_thermal",
+    "solar_thermal": "solar_thermal",
+    "solid_fossil": "solid_fossil",
+    "electricity": "electricity",
 }
 UNIT_EFFICIENCY_CARRIERS = {"ambient_heat", "direct_electric", "heat", "heat_pump"}
 

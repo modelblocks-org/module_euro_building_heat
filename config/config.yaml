@@ -72,25 +72,25 @@ heat:
   useful_heat_demand: actual
   tech_efficiencies:
     space_heat:
-      gas-eff: 0.97
-      oil-eff: 0.9
-      solid-fossil-eff: 0.8
-      biowaste-eff: 0.8
-      solar-thermal-eff: 1
-      electricity-eff: 1
+      gas: 0.97
+      oil: 0.9
+      solid_fossil: 0.8
+      biowaste: 0.8
+      solar_thermal: 1
+      electricity: 1
     hot_water:
-      gas-eff: 0.97
-      oil-eff: 0.9
-      solid-fossil-eff: 0.8
-      biowaste-eff: 0.8
-      solar-thermal-eff: 1
-      electricity-eff: 1
+      gas: 0.97
+      oil: 0.9
+      solid_fossil: 0.8
+      biowaste: 0.8
+      solar_thermal: 1
+      electricity: 1
     cooking:
-      gas-eff: 0.28
-      oil-eff: 0.28
-      solid-fossil-eff: 0.15
-      biowaste-eff: 0.1
-      electricity-eff: 0.5
+      gas: 0.28
+      oil: 0.28
+      solid_fossil: 0.15
+      biowaste: 0.1
+      electricity: 0.5
   heat_pump:
     sink_temperature:
       underfloor: 35

@@ -6,6 +6,7 @@ required:
   - years
   - weather
   - threads
+  - population
   - heat
 properties:
   years:
@@ -58,8 +59,8 @@ properties:
     properties:
       resolution:
         description: >
-          GHSL GHS-POP raster resolution in metres. Use 100 for more spatial
-          detail or 1000 for a smaller, faster dataset.
+          GHSL GHS-POP raster resolution in metres.
+          Use 100 for more spatial detail or 1000 for a smaller, faster calculation.
         type: integer
         enum: [100, 1000]
   data_proxies:
@@ -72,7 +73,7 @@ properties:
       sfh_mfh_shares:
         description: >
           Maps countries missing dwelling-type data to countries whose
-          single-family and multi-family dwelling shares should be averaged.
+          single-family homes (sfh) and multi-family homes (mfh) shares should be averaged.
         $ref: "#/$defs/country_proxy_map"
       annual_energy_balance:
         description: >
@@ -103,21 +104,27 @@ properties:
         description: >
           Chooses whether to use published useful-heat data where available
           (`actual`) or calculate all useful heat from final energy and
-          `tech_efficiencies` (`calculate_all`). Defaults to `actual`.
+          `tech_efficiencies` (`calculate_all`).
         type: string
         enum: [actual, calculate_all]
+        default: actual
       tech_efficiencies:
         description: >
           Final-to-useful energy conversion factors grouped by end use and
           carrier; for example, 0.9 converts one unit of final energy to 0.9
           units of useful heat.
         type: object
-        additionalProperties:
-          description: Conversion factors for one end use, keyed by carrier.
-          type: object
-          additionalProperties:
-            description: Final-to-useful energy conversion factor.
-            type: number
+        additionalProperties: false
+        properties:
+          space_heat:
+            description: Conversion factors for space heating.
+            $ref: "#/$defs/technology_efficiencies"
+          hot_water:
+            description: Conversion factors for hot water.
+            $ref: "#/$defs/technology_efficiencies"
+          cooking:
+            description: Conversion factors for cooking.
+            $ref: "#/$defs/technology_efficiencies"
       heat_pump:
         description: >
           Settings used to calculate the combined air-source and ground-source
@@ -177,6 +184,34 @@ properties:
             type: number
             exclusiveMinimum: 0
 $defs:
+  technology_efficiencies:
+    type: object
+    additionalProperties: false
+    properties:
+      gas:
+        description: Final-to-useful energy conversion factor for gas.
+        type: number
+        minimum: 0
+      oil:
+        description: Final-to-useful energy conversion factor for oil.
+        type: number
+        minimum: 0
+      solid_fossil:
+        description: Final-to-useful energy conversion factor for solid fossil fuels.
+        type: number
+        minimum: 0
+      biowaste:
+        description: Final-to-useful energy conversion factor for biomass and waste.
+        type: number
+        minimum: 0
+      solar_thermal:
+        description: Final-to-useful energy conversion factor for solar thermal energy.
+        type: number
+        minimum: 0
+      electricity:
+        description: Final-to-useful energy conversion factor for electricity.
+        type: number
+        minimum: 0
   country_proxy_map:
     description: >
       Maps each target ISO 3166-1 alpha-3 country code to one or more reference

@@ -14,7 +14,7 @@ rule create_external_shapes:
     message:
         "Emulating shape inputs for integration testing."
     shell:
-        "curl --fail --silent --show-error --location --output {output:q} {params.url:q} 2> {log.stderr:q}"
+        "curl --fail --silent --show-error --location --output {output:q} {params.url:q} 2> {log:q}"
 
 
 # Import the module and configure it.
