@@ -7,7 +7,6 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import geopandas as gpd
 import pandas as pd
 import shapely
-from _timeseries import boundary_metadata, write_parquet_with_metadata
 
 WGS84 = "EPSG:4326"
 
@@ -89,13 +88,12 @@ def prepare_shape_timezones(
     shapes_path: str | Path,
     timezone_boundaries_path: str | Path,
     output_path: str | Path,
-    metadata: dict[str, str],
 ) -> None:
     """Read geometry inputs, assign timezones, and write the internal mapping."""
     shapes = gpd.read_parquet(shapes_path)
     timezone_boundaries = gpd.read_file(timezone_boundaries_path)
     mapping = assign_shape_timezones(shapes, timezone_boundaries)
-    write_parquet_with_metadata(mapping, output_path, metadata)
+    mapping.to_parquet(output_path, index=False)
 
 
 if __name__ == "__main__":
@@ -104,10 +102,4 @@ if __name__ == "__main__":
         shapes_path=snakemake.input.shapes,
         timezone_boundaries_path=snakemake.input.timezone_boundaries,
         output_path=snakemake.output[0],
-        metadata=boundary_metadata(
-            source=snakemake.params.source,
-            release=snakemake.params.release,
-            sha256=snakemake.params.sha256,
-            attribution=snakemake.params.attribution,
-        ),
     )

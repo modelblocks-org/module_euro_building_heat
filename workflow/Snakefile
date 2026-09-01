@@ -17,7 +17,7 @@ pathvars:
     heat_demand="<results>/{shapes}/hourly/hourly_heat_demand.parquet",
     heat_pump_cop="<results>/{shapes}/hourly/heat_pump_cop.parquet",
     heat_pump_electricity_demand="<results>/{shapes}/hourly/heat_pump_electricity_demand.parquet",
-    annual_heat_demand_choropleth="<results>/{shapes}/visualization/annual_heat_demand.pdf",
+    annual_heat_demand_choropleth="<results>/{shapes}/visualization/annual_heat_demand.png",
     heat_demand_timeseries="<results>/{shapes}/visualization/heat_demand_timeseries.pdf",
 
 

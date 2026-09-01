@@ -103,11 +103,6 @@ rule prepare_shape_timezones:
         "<logs>/{shapes}/prepare_shape_timezones.log",
     conda:
         "../envs/module.yaml"
-    params:
-        source=internal["resources"]["timezone_boundaries"]["source"],
-        release=internal["resources"]["timezone_boundaries"]["release"],
-        sha256=internal["resources"]["timezone_boundaries"]["sha256"],
-        attribution=internal["resources"]["timezone_boundaries"]["attribution"],
     message:
         "Assign geometry-derived IANA timezones to '{wildcards.shapes}' shapes."
     script:

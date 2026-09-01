@@ -1,7 +1,6 @@
 """Snakemake helper functions and utilities."""
 
 
-# Helpers
 def _get_year_range(group: str) -> list[int]:
     """Get ordered year range (lower->higher)."""
     if group not in ["years", "weather"]:
@@ -9,7 +8,6 @@ def _get_year_range(group: str) -> list[int]:
     return list(range(config[group]["start"], config[group]["end"]))
 
 
-# Globals
 MODEL_YEARS = _get_year_range("years")
 JRC_IDEES_VERSION = internal["resources"]["jrc"]["use_version"]
 JRC_IDEES_VERSIONS = [str(i) for i in internal["resources"]["jrc"]["versions"]]
@@ -28,7 +26,6 @@ JRC_SPATIAL_SCOPE = internal["resources"]["jrc"]["spatial_scope"]
 SECTOR_TO_JRC_DATASET = {"services": "Tertiary", "residential": "Residential"}
 
 
-# Helper functions
 def additional_config_validation() -> None:
     """Run additional validation that JSON schemas do not support."""
     if config["years"]["start"] >= config["years"]["end"]:

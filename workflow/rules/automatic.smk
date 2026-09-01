@@ -10,6 +10,7 @@ rule download_when2heat_params:
         "<logs>/automatic/download_when2heat_params_{dataset}.log",
     wildcard_constraints:
         dataset="|".join(internal["resources"]["when2heat"]["datasets"]),
+    localrule: True
     conda:
         "../envs/module.yaml"
     params:
@@ -26,16 +27,19 @@ rule download_when2heat_params:
 rule download_timezone_boundaries:
     output:
         archive=ensure(
-            "<resources>/automatic/timezone-boundary-builder/2026c/timezones.geojson.zip",
+            "<resources>/automatic/timezone-boundary-builder/timezones.zip",
             sha256=internal["resources"]["timezone_boundaries"]["sha256"],
         ),
     log:
         "<logs>/automatic/download_timezone_boundaries.log",
+    localrule: True
     conda:
         "../envs/module.yaml"
     params:
         curl_args=CURL_ARGS,
-        url=internal["resources"]["timezone_boundaries"]["url"],
+        url=internal["resources"]["timezone_boundaries"]["url"].format(
+            version=internal["resources"]["timezone_boundaries"]["use_version"]
+        ),
     message:
         "Download pinned IANA timezone boundaries."
     shell:
@@ -46,15 +50,16 @@ rule extract_timezone_boundaries:
     input:
         archive=rules.download_timezone_boundaries.output.archive,
     output:
-        geojson="<resources>/automatic/timezone-boundary-builder/2026c/timezones.geojson",
+        geojson="<resources>/automatic/timezone-boundary-builder/timezones.geojson",
     log:
         "<logs>/automatic/extract_timezone_boundaries.log",
-    conda:
-        "../envs/module.yaml"
+    threads: 1
+    params:
+        internal_paths=internal["resources"]["timezone_boundaries"]["file"],
     message:
         "Extract the pinned IANA timezone boundary GeoJSON."
-    script:
-        "../scripts/extract_timezone_boundaries.py"
+    wrapper:
+        "v9.8.0/utils/libarchive/extract"
 
 
 rule download_stable_dataset:
@@ -64,6 +69,7 @@ rule download_stable_dataset:
         "<logs>/automatic/download_stable_dataset_{dataset}.log",
     wildcard_constraints:
         dataset="|".join(internal["resources"]["stable"]["datasets"]),
+    localrule: True
     conda:
         "../envs/module.yaml"
     params:
@@ -83,6 +89,7 @@ rule download_era5_data:
         era5="<resources>/automatic/shapes/{shapes}/era5/heat.nc",
     log:
         "<logs>/{shapes}/era5/download_era5_data.log",
+    localrule: True
     conda:
         "../envs/module.yaml"
     params:
@@ -98,6 +105,7 @@ rule download_raw_population:
         temp("<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip"),
     log:
         "<logs>/automatic/download_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
+    localrule: True
     conda:
         "../envs/module.yaml"
     params:
@@ -121,6 +129,7 @@ rule download_jrc_idees:
     wildcard_constraints:
         country_code="|".join(internal["resources"]["jrc"]["spatial_scope"]),
         version="|".join(JRC_IDEES_VERSIONS),
+    localrule: True
     conda:
         "../envs/module.yaml"
     params:

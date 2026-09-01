@@ -181,7 +181,7 @@ def plot_annual_heat_demand_choropleth(
 
         output = Path(output_path)
         output.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(output, bbox_inches="tight", pad_inches=0.05)
+        fig.savefig(output, bbox_inches="tight", pad_inches=0.05, dpi=200)
         plt.close(fig)
 
 

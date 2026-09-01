@@ -87,7 +87,7 @@ rule population_per_weather_gridbox:
 rule heat_demand_final_timeseries:
     input:
         timeseries_data=rules.unscaled_heat_profiles.output[0],
-        annual_demand="<annual_heat_demand>",
+        annual_demand=rules.rescale_annual_heat_demand_to_shapes.output.annual_demand,
         sfh_mfh_shares=rules.prepare_sfh_mfh_shares.output[0],
         shapes=rules.prepare_shapes.output[0],
         shape_timezones=rules.prepare_shape_timezones.output[0],

@@ -138,9 +138,8 @@ The final `heat_demand`, `heat_pump_cop`, and
 `heat_pump_electricity_demand` outputs are wide Parquet tables with shape IDs as
 columns and a timezone-aware `datetime64[ns, UTC]` index named `timesteps`.
 Every timestamp identifies the start of its UTC hourly period. Their Parquet
-schema metadata records `output_timezone: UTC`, the JSON shape-to-IANA-timezone
-mapping under `shape_timezones`, and the timezone-boundary source, release,
-checksum, and attribution.
+schema metadata records `output_timezone: UTC` and the JSON
+shape-to-IANA-timezone mapping under `shape_timezones`.
 
 ## Development
 <!-- Please do not modify this templated section -->
@@ -202,7 +201,7 @@ This module is based on the following research and datasets:
 - Timezone Boundary Builder release 2026c, whose comprehensive land-only
   boundary data is derived from OpenStreetMap and distributed under the Open
   Data Commons Open Database License (ODbL):
-  <https://github.com/evansiroky/timezone-boundary-builder/releases/tag/2026c>
+  <https://github.com/evansiroky/timezone-boundary-builder/>
 - Eurostat household end-use and energy-balance datasets, distributed here via
   the Euro-Calliope dataset mirror:
   <https://github.com/calliope-project/euro-calliope-datasets>
