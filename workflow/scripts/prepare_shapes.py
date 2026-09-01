@@ -9,6 +9,8 @@ from _schemas import ShapesSchema
 if TYPE_CHECKING:
     snakemake: Any
 
+WGS84 = "EPSG:4326"
+
 
 def check_proxied_country_scope(
     shapes: gpd.GeoDataFrame, dataset_scopes: dict, data_proxies: dict
@@ -53,6 +55,9 @@ def check_proxied_country_scope(
 def main() -> None:
     """Main snakemake process."""
     shapes = gpd.read_parquet(snakemake.input.shapes)
+    if shapes.crs is None:
+        raise ValueError("The shapes GeoParquet file must define a CRS.")
+    shapes = shapes.to_crs(WGS84)
     shapes = shapes.loc[shapes["shape_class"] == "land"]
     shapes = ShapesSchema.validate(shapes)
     if shapes.empty:

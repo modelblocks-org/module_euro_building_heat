@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import geopandas as gpd
 import pandas as pd
 import shapely
+from pyproj import CRS
 
 if TYPE_CHECKING:
     snakemake: Any
@@ -22,23 +23,28 @@ def _normalise_shape_ids(values: pd.Series) -> pd.Series:
 
 
 def assign_shape_timezones(
-    shapes: gpd.GeoDataFrame, timezone_boundaries: gpd.GeoDataFrame
+    shapes: gpd.GeoDataFrame,
+    timezone_boundaries: gpd.GeoDataFrame,
+    projected_crs: str | int,
 ) -> pd.DataFrame:
     """Assign the unique timezone polygon intersecting each shape centroid."""
-    shapes_wgs84 = shapes.loc[:, ["shape_id", "geometry"]].to_crs(WGS84).copy()
-    shapes_wgs84["shape_id"] = _normalise_shape_ids(shapes_wgs84["shape_id"])
+    centroid_crs = CRS.from_user_input(projected_crs)
+    if not centroid_crs.is_projected:
+        raise ValueError(f"The provided crs must be projected: {centroid_crs}.")
+
+    shapes_projected = (
+        shapes.loc[:, ["shape_id", "geometry"]].to_crs(centroid_crs).copy()
+    )
+    shapes_projected["shape_id"] = _normalise_shape_ids(shapes_projected["shape_id"])
 
     timezone_boundaries = timezone_boundaries.loc[:, ["tzid", "geometry"]].to_crs(WGS84)
-    centroid_geometry = shapely.centroid(shapes_wgs84.geometry.array)
     centroids = gpd.GeoDataFrame(
-        {
-            "shape_id": shapes_wgs84["shape_id"].to_numpy(),
-            "centroid_lon": shapely.get_x(centroid_geometry),
-            "centroid_lat": shapely.get_y(centroid_geometry),
-        },
-        geometry=centroid_geometry,
-        crs=WGS84,
-    )
+        {"shape_id": shapes_projected["shape_id"].to_numpy()},
+        geometry=shapely.centroid(shapes_projected.geometry.array),
+        crs=centroid_crs,
+    ).to_crs(WGS84)
+    centroids["centroid_lon"] = shapely.get_x(centroids.geometry.array)
+    centroids["centroid_lat"] = shapely.get_y(centroids.geometry.array)
 
     matches = gpd.sjoin(
         centroids, timezone_boundaries, how="left", predicate="intersects"
@@ -92,12 +98,13 @@ def assign_shape_timezones(
 def prepare_shape_timezones(
     shapes_path: str | Path,
     timezone_boundaries_path: str | Path,
+    projected_crs: str | int,
     output_path: str | Path,
 ) -> None:
     """Read geometry inputs, assign timezones, and write the internal mapping."""
     shapes = gpd.read_parquet(shapes_path)
     timezone_boundaries = gpd.read_file(timezone_boundaries_path)
-    mapping = assign_shape_timezones(shapes, timezone_boundaries)
+    mapping = assign_shape_timezones(shapes, timezone_boundaries, projected_crs)
     mapping.to_parquet(output_path, index=False)
 
 
@@ -106,5 +113,6 @@ if __name__ == "__main__":
     prepare_shape_timezones(
         shapes_path=snakemake.input.shapes,
         timezone_boundaries_path=snakemake.input.timezone_boundaries,
+        projected_crs=snakemake.params.projected_crs,
         output_path=snakemake.output[0],
     )

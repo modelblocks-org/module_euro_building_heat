@@ -6,7 +6,7 @@ We recommend consulting the following before using this module:
 
 ## Configuration overview
 
-For the complete module output set, configure `years`, `weather`, `threads`, `population`, `heat.tech_efficiencies`, and `heat.heat_pump` as shown in the example.
+For the complete module output set, configure `years`, `weather`, `threads`, `population`, `crs`, `heat.tech_efficiencies`, and `heat.heat_pump` as shown in the example.
 Only `data_proxies` and `heat.useful_heat_demand` are optional.
 
 ## Model and weather years
@@ -57,6 +57,16 @@ The accepted values are:
 
 The workflow automatically chooses the available five-year GHSL population epoch closest to `years.start`.
 Population is used to allocate national annual demand and weather-grid profiles to the user-provided shapes.
+
+## Coordinate reference systems
+
+```yaml
+crs:
+  projected: EPSG:3035
+```
+
+`crs.projected` selects the projected CRS used for geometric calculations such
+as shape centroids.
 
 ## Missing-country proxies
 

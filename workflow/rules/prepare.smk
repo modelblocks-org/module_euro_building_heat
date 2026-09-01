@@ -103,6 +103,8 @@ rule prepare_shape_timezones:
         "<logs>/{shapes}/prepare_shape_timezones.log",
     conda:
         "../envs/module.yaml"
+    params:
+        projected_crs=config["crs"]["projected"],
     message:
         "Assign geometry-derived IANA timezones to '{wildcards.shapes}' shapes."
     script:

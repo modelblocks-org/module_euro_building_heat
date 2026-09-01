@@ -76,9 +76,9 @@ Data processing steps:
 ### Timezone handling
 
 Timezone assignment is geometry-based and independent of `country_id`, which
-is used only to match shapes to national heat statistics. The workflow
-transforms each shape to EPSG:4326 and intersects its geometric centroid with
-the pinned, land-only timezone-boundary dataset.
+is used only to match shapes to national heat statistics. The workflow computes
+each shape centroid in the configured projected CRS, transforms the centroid to
+EPSG:4326, and intersects it with the pinned, land-only timezone-boundary dataset.
 
 Each centroid must intersect exactly one valid IANA timezone. Assignment fails
 with the affected shape IDs and centroid coordinates if no timezone or multiple
@@ -127,8 +127,8 @@ The shapes input must be a GeoParquet file containing:
   statistics and configured proxies.
 - `shape_class`: shape context. Only rows with the exact value `land` are
   processed.
-- `geometry`: polygon geometry in a coordinate reference system readable by
-  GeoPandas.
+- `geometry`: polygon geometry with correct CRS metadata readable by GeoPandas.
+  The workflow normalises prepared shapes to EPSG:4326 internally.
 
 The annual-demand output is a wide Parquet table with a `year`, `end_use`, and
 `cat_name` index and shape IDs as columns. Values are annual useful heat demand

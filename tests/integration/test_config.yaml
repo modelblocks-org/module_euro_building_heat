@@ -1,4 +1,6 @@
 module_euro_building_heat:
+  crs:
+    projected: EPSG:3035
   years:
     start: 2023
     end: 2024

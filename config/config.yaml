@@ -17,6 +17,10 @@ population:
   # Mollweide grid; use 100 for a heavier, longer download.
   resolution: 1000
 
+crs:
+  # Projected CRS used for geometry calculations such as shape centroids.
+  projected: EPSG:3035
+
 data_proxies:
 # Use proxies to fill missing data for countries with no or incomplete data.
 # Multiple proxy countries can be specified for a single country, in which case the data from the proxy countries will be averaged.

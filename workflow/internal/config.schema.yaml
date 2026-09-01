@@ -7,6 +7,7 @@ required:
   - weather
   - threads
   - population
+  - crs
   - heat
 properties:
   years:
@@ -63,6 +64,19 @@ properties:
           Use 100 for more spatial detail or 1000 for a smaller, faster calculation.
         type: integer
         enum: [100, 1000]
+  crs:
+    description: Coordinate reference systems used for geometry calculations.
+    type: object
+    additionalProperties: false
+    required: [projected]
+    properties:
+      projected:
+        description: >
+          Projected CRS used for centroid calculations, supplied as a CRS string
+          such as EPSG:3035 or as an integer EPSG code such as 3035.
+        oneOf:
+          - type: string
+          - type: integer
   data_proxies:
     description: >
       Optional mappings from unsupported target countries to reference
