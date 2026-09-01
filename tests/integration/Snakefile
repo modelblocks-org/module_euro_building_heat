@@ -24,10 +24,10 @@ rule stage_edh_api:
 
 # Emulate how another workflow might create shape inputs for this module.
 rule create_external_shapes:
-    log:
-        "logs/create_external_shapes.log",
     output:
         "resources/user/test/shapes.parquet",
+    log:
+        "logs/create_external_shapes.log",
     params:
         url="https://zenodo.org/records/20765043/files/EUROPE_S_C1_ADM1.parquet?download=1",
     shell:
