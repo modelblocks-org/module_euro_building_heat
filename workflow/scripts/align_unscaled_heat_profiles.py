@@ -4,11 +4,15 @@ import sys
 from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 import xarray as xr
 from _timeseries import LOCAL_TIME_BASIS, OUTPUT_TIMEZONE, read_shape_timezones
 from dask import config as dask_config
+
+if TYPE_CHECKING:
+    snakemake: Any
 
 
 @dataclass
@@ -105,7 +109,7 @@ def align_local_profiles_to_utc(
 def align_local_profile_files_to_utc(
     local_profile_paths: list[str],
     shape_timezones_path: str,
-    weather_years: list[str | int],
+    weather_years: list[int],
     workers: int,
     out_path: str,
 ) -> None:

@@ -2,11 +2,16 @@
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import geopandas as gpd
 import pandas as pd
 import shapely
+
+if TYPE_CHECKING:
+    snakemake: Any
+
 
 WGS84 = "EPSG:4326"
 

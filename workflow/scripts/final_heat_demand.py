@@ -2,10 +2,13 @@
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 import xarray as xr
+
+if TYPE_CHECKING:
+    snakemake: Any
 
 
 def prepare_final_heat_demand(
@@ -15,7 +18,7 @@ def prepare_final_heat_demand(
     paths_to_official_residential_demand: list[str],
     paths_to_official_services_demand: list[str],
     path_to_shapes: str,
-    path_to_population: str | None,
+    paths_to_population: list[str],
     path_to_carrier_names: str,
     data_proxies: dict[str, dict[str, list[str]]],
     country_codes: list[str],
@@ -31,7 +34,12 @@ def prepare_final_heat_demand(
 
     balance_proxies = data_proxies.get("annual_energy_balance", {})
     if set(country_codes) & set(balance_proxies):
-        population = _read_country_population(path_to_shapes, path_to_population)
+        if len(paths_to_population) != 1:
+            raise ValueError(
+                "Exactly one population file is required when annual energy-balance "
+                "proxies are configured for the selected countries."
+            )
+        population = _read_country_population(path_to_shapes, paths_to_population[0])
         energy_balances = {
             sector: proxy_energy_balance(
                 balance, population, balance_proxies, country_codes
@@ -421,11 +429,6 @@ def _as_list(value: Any) -> list[str]:
     return [str(path) for path in value]
 
 
-def _as_optional_path(value: Any) -> str | None:
-    paths = _as_list(value)
-    return paths[0] if paths else None
-
-
 if __name__ == "__main__":
     sys.stderr = open(snakemake.log[0], "w", buffering=1)
     prepare_final_heat_demand(
@@ -439,7 +442,7 @@ if __name__ == "__main__":
             snakemake.input.official_services_demand
         ),
         path_to_shapes=snakemake.input.shapes,
-        path_to_population=_as_optional_path(snakemake.input.population),
+        paths_to_population=_as_list(snakemake.input.population),
         path_to_carrier_names=snakemake.input.carrier_names,
         country_codes=snakemake.params.countries,
         model_years=snakemake.params.model_years,

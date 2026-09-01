@@ -1,10 +1,14 @@
 """Prepare heat-pump COP and electricity-demand timeseries."""
 
 import sys
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 import xarray as xr
 from _timeseries import utc_aware_hourly_frame, write_hourly_parquet
+
+if TYPE_CHECKING:
+    snakemake: Any
 
 
 def _group_end_uses(
@@ -79,14 +83,14 @@ def _end_use_weighted_ave(
         )
     model_year = weather_model_years[weather_year]
 
-    demand = annual_demand.sel(year=model_year).drop("year")
+    demand = annual_demand.sel(year=model_year, drop=True)
     total_demand = demand.sum("end_use")
     normalised_demand = demand / total_demand.where(total_demand > 0)
     return (one_year_profile * normalised_demand).sum("end_use")
 
 
-if __name__ == "__main__":
-    sys.stderr = open(snakemake.log[0], "w", buffering=1)
+def main() -> None:
+    """Main Snakemake process."""
     timeseries_data = xr.open_dataset(
         snakemake.input.timeseries_data, decode_timedelta=True
     )
@@ -121,3 +125,7 @@ if __name__ == "__main__":
         snakemake.output.electricity_demand,
         snakemake.input.shape_timezones,
     )
+
+
+if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)

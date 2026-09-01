@@ -1,11 +1,15 @@
 """Scale shape-level heat demand profiles to annual demand totals."""
 
 import sys
+from typing import TYPE_CHECKING, Any
 
 import _plots
 import pandas as pd
 import xarray as xr
 from _timeseries import write_hourly_parquet
+
+if TYPE_CHECKING:
+    snakemake: Any
 
 TWH_TO_MWH = 1e6
 
@@ -102,11 +106,11 @@ def _scale_demand(
     weather_year = int(one_year_profile.time.dt.year[0])
     model_year = weather_model_years[weather_year]
     normalised_profile = one_year_profile / one_year_profile.sum("time")
-    demand = normalised_profile * annual_demand.sel(year=model_year).drop("year")
+    demand = normalised_profile * annual_demand.sel(year=model_year, drop=True)
     return demand.sum("cat_name")
 
 
-def prepare_annual_demand(annual_demand: pd.Series) -> xr.DataArray:
+def prepare_annual_demand(annual_demand: pd.Series) -> xr.Dataset:
     """Restructure annual demand MultiIndex series into a multi-dimensional array.
 
     Result sums over all building categories and only contains hot water and space
@@ -120,8 +124,8 @@ def prepare_annual_demand(annual_demand: pd.Series) -> xr.DataArray:
     )
 
 
-if __name__ == "__main__":
-    sys.stderr = open(snakemake.log[0], "w", buffering=1)
+def main() -> None:
+    """Main Snakemake process."""
     annual_demand = pd.read_parquet(snakemake.input.annual_demand)
     annual_demand_ds = prepare_annual_demand(annual_demand)
     unscaled_profiles = xr.open_dataset(
@@ -150,3 +154,8 @@ if __name__ == "__main__":
         final_df, snakemake.output.timeseries, snakemake.input.shape_timezones
     )
     _plots.plot_heat_demand_timeseries(final_df, snakemake.output.plot)
+
+
+if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
+    main()

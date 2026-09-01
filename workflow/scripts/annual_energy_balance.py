@@ -4,6 +4,11 @@ import sys
 import warnings
 from enum import Enum
 from string import digits
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    snakemake: Any
+
 
 import _utils
 import pandas as pd

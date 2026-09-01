@@ -2,9 +2,13 @@
 
 import sys
 import warnings
+from typing import TYPE_CHECKING, Any
 
 import xarray as xr
 from dask import config as dask_config
+
+if TYPE_CHECKING:
+    snakemake: Any
 
 
 def group_gridcells(gridded_data: xr.Dataset, grid_weight: xr.DataArray) -> xr.Dataset:
@@ -74,8 +78,8 @@ def _site_weighted_ave(
     )
 
 
-if __name__ == "__main__":
-    sys.stderr = open(snakemake.log[0], "w", buffering=1)
+def main() -> None:
+    """Main Snakemake process."""
     with (
         xr.open_dataset(
             snakemake.input.gridded_timeseries_data, decode_timedelta=True, chunks={}
@@ -91,3 +95,8 @@ if __name__ == "__main__":
             resolution_specific_data.time.attrs["timezone"] = "UTC"
         with dask_config.set(scheduler="threads", num_workers=snakemake.threads):
             resolution_specific_data.to_netcdf(snakemake.output[0])
+
+
+if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
+    main()

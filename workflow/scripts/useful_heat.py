@@ -1,9 +1,14 @@
 """Calculate annual useful heat demand from prepared final energy demand."""
 
 import sys
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 from final_heat_demand import match_model_years
+
+if TYPE_CHECKING:
+    snakemake: Any
+
 
 HEAT_END_USES = ("space_heat", "hot_water", "cooking")
 EFFICIENCY_PARAMETERS = {

@@ -7,7 +7,7 @@ When2Heat can be found here: https://github.com/oruhnau/when2heat
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -15,6 +15,9 @@ import xarray as xr
 from _timeseries import LOCAL_TIME_BASIS
 from dask import config as dask_config
 from group_gridded_timeseries import group_gridcells
+
+if TYPE_CHECKING:
+    snakemake: Any
 
 # ASSUME (from When2Heat):
 # 1. Below 15 °C, the water heating demand is not defined and assumed to stay constant
@@ -30,6 +33,7 @@ AVE_WIND_SPEED_THRESHOLD = 4.4
 # Keep each annual calculation chunk small enough for low-memory laptops while avoiding
 # the large task graph created by the weather files' two-dimensional storage chunks.
 PROFILE_SITE_CHUNK_SIZE = 512
+BUILDING_TYPES = frozenset({"SFH", "MFH", "COM"})
 
 
 def get_unscaled_heat_profiles(
@@ -40,7 +44,7 @@ def get_unscaled_heat_profiles(
     path_to_when2heat_hourly_com: str,
     path_to_when2heat_hourly_mfh: str,
     path_to_when2heat_hourly_sfh: str,
-    weather_years: list[str | int],
+    weather_years: list[int],
     workers: int,
     out_paths: list[str],
 ) -> None:
@@ -61,7 +65,6 @@ def get_unscaled_heat_profiles(
         workers (int): Number of Dask worker threads used to calculate profiles.
         out_paths: Annual checkpoint paths, in the same order as ``weather_years``.
     """
-    weather_years = [int(year) for year in weather_years]
     if len(weather_years) != len(out_paths):
         raise ValueError("Each weather year must have one local-profile output path.")
 
@@ -199,7 +202,7 @@ def get_hourly_heat_profiles(
         xr.DataArray: Hourly heat demand profiles (must be re-scaled later).
     """
     # get temperature in 5C increments between -15C and +30C
-    temperature_increments = (
+    temperature_increments: xr.DataArray = (  # type: ignore[assignment]
         np.ceil((reference_temperature / 5).astype("float64")) * 5
     ).clip(min=-15, max=30)
     # When2Heat follows strftime('%w'): Sunday=0, ..., Saturday=6. Pandas/xarray
@@ -289,7 +292,7 @@ def get_reference_temperature(
         temperature.coarsen(
             {time_dim: 24}, boundary="exact", coord_func={time_dim: "min"}
         )
-        .mean()
+        .mean()  # type: ignore[attr-defined]
         .transpose(time_dim, ...)
     )
 
@@ -342,9 +345,12 @@ def _hour_and_day_to_datetime(da: xr.DataArray) -> xr.DataArray:
     return da.rename({"new_time": "time"})
 
 
-def _csv_reader(
-    building_type: Literal["SFH", "MFH", "COM"], file_path: str
-) -> pd.DataFrame:
+def _csv_reader(building_type: str, file_path: str) -> pd.DataFrame:
+    if building_type not in BUILDING_TYPES:
+        raise ValueError(
+            f"Unknown building type {building_type!r}; expected one of "
+            f"{sorted(BUILDING_TYPES)}."
+        )
     # MultiIndex for commercial heat because of weekday dependency
     index_col = [0, 1] if building_type == "COM" else 0
     return pd.read_csv(file_path, sep=";", decimal=",", index_col=index_col).apply(

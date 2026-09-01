@@ -3,6 +3,7 @@
 import math
 import sys
 import warnings
+from typing import TYPE_CHECKING, Any
 
 import geopandas as gpd
 import numpy as np
@@ -11,6 +12,9 @@ import rioxarray
 import xarray as xr
 from gregor.aggregate import aggregate_raster_to_polygon
 from shapely.geometry import box
+
+if TYPE_CHECKING:
+    snakemake: Any
 
 WGS84 = "EPSG:4326"
 DEFAULT_GRID_DEGREES = 0.25
@@ -55,10 +59,10 @@ def population_on_weather_grid(
     # Locations are parquet shape files at the resolution of interest.
     locations = _normalise_shape_ids(gpd.read_parquet(path_to_locations))
 
-    population = rioxarray.open_rasterio(path_to_population, masked=True).squeeze(
-        drop=True
-    )
-    population = population.fillna(0)
+    population_raster = rioxarray.open_rasterio(path_to_population, masked=True)
+    if not isinstance(population_raster, xr.DataArray):
+        raise TypeError("Expected the population raster to contain one data array.")
+    population = population_raster.squeeze(drop=True).fillna(0)
     gridbox = _weather_gridbox_polygons(coordinate_ds, lat_name, lon_name).to_crs(
         population.rio.crs
     )

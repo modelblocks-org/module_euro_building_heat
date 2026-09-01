@@ -1,12 +1,19 @@
 """Scale national annual heat demand to arbitrary Modelblocks shapes."""
 
+import logging
 import sys
+from typing import TYPE_CHECKING, Any
 
 import _plots
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+if TYPE_CHECKING:
+    snakemake: Any
+
+logger = logging.getLogger(__name__)
 
 
 def normalise_shape_ids(values: pd.Index | pd.Series) -> pd.Index:
@@ -111,7 +118,7 @@ def report_country_total_discrepancies(
     rtol: float = 1e-6,
     atol: float = 1e-9,
 ) -> None:
-    """Print countries whose disaggregated total does not match annual demand."""
+    """Log countries whose disaggregated total does not match annual demand."""
     shape_to_country = shape_to_country.reindex(disaggregated_demand.columns)
     disaggregated_country_totals = (
         disaggregated_demand.T.groupby(shape_to_country).sum().T.sum(axis=0)
@@ -133,21 +140,23 @@ def report_country_total_discrepancies(
     if matching.all():
         return
 
-    print(
+    logger.warning(
         "Annual and disaggregated heat demand totals differ for these countries "
-        "(disaggregated - annual):",
-        file=sys.stderr,
+        "(disaggregated - annual):"
     )
     for country_code in disaggregated_country_totals.index[~matching]:
-        print(
-            f"  {country_code}: {discrepancies[country_code]:.6g} TWh "
-            f"({discrepancy_pct[country_code]:.6g}%)",
-            file=sys.stderr,
+        logger.warning(
+            "  %s: %.6g TWh (%.6g%%)",
+            country_code,
+            discrepancies[country_code],
+            discrepancy_pct[country_code],
         )
 
 
 if __name__ == "__main__":
     sys.stderr = open(snakemake.log[0], "w", buffering=1)
+    logging.basicConfig(level=logging.INFO)
+
     demand = read_national_demand(snakemake.input.annual_demand)
     mapping = country_map(snakemake.input.shapes)
     population = shape_population(snakemake.input.population)

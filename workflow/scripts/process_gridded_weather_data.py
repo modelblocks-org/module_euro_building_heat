@@ -3,9 +3,14 @@
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import xarray as xr
+
+if TYPE_CHECKING:
+    snakemake: Any
+
 
 GRID_DEGREES = 0.25
 KELVIN_TO_CELSIUS = 273.15

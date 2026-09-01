@@ -2,9 +2,13 @@
 
 import math
 import sys
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 import xarray as xr
+
+if TYPE_CHECKING:
+    snakemake: Any
 
 
 def cop(

@@ -3,11 +3,16 @@
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 import geopandas as gpd
 import numpy as np
 import xarray as xr
+
+if TYPE_CHECKING:
+    snakemake: Any
+
 
 EDH_VARIABLES = ["t2m", "u10", "v10", "stl1"]
 GRID_DEGREES = 0.25
