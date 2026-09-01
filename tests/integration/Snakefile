@@ -8,6 +8,8 @@ configfile: workflow.source_path("./test_config.yaml")
 rule stage_edh_api:
     output:
         "resources/user/edh_api.txt",
+    log:
+        "logs/stage_edh_api.log",
     run:
         import os
         import shutil
@@ -22,6 +24,8 @@ rule stage_edh_api:
 
 # Emulate how another workflow might create shape inputs for this module.
 rule create_external_shapes:
+    log:
+        "logs/create_external_shapes.log",
     output:
         "resources/user/test/shapes.parquet",
     params:
