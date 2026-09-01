@@ -35,7 +35,7 @@ data_proxies:
   annual_energy_balance:
     AND: [ESP]
     LIE: [CHE]
-    MCO: [GBR]
+    MCO: [FRA]
     SMR: [ITA]
   # household_end_use uses household end use data from the proxy country to scale annual energy balance data.
   household_end_use:
@@ -45,7 +45,7 @@ data_proxies:
     ISL: [SWE, DNK]
     LIE: [CHE]
     MKD: [BGR, HRV, HUN, ROU, GRC]
-    MCO: [GBR]
+    MCO: [FRA]
     MNE: [BGR, HRV, HUN, ROU, GRC]
     NOR: [SWE, DNK]
     SMR: [ITA]
@@ -58,7 +58,7 @@ data_proxies:
     ISL: [SWE, DNK]
     LIE: [CHE]
     MKD: [BGR, HRV, HUN, ROU, GRC]
-    MCO: [GBR]
+    MCO: [FRA]
     MNE: [BGR, HRV, HUN, ROU, GRC]
     NOR: [SWE, DNK]
     SMR: [ITA]

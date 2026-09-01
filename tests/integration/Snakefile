@@ -2,36 +2,19 @@
 configfile: workflow.source_path("./test_config.yaml")
 
 
-# Stage the EDH API key without committing it to the repository. Locally, use the
-# module's user resource; in CI, use the repository secret exposed as an
-# environment variable.
-rule stage_edh_api:
-    output:
-        "resources/user/edh_api.txt",
-    log:
-        "logs/stage_edh_api.log",
-    run:
-        import os
-        import shutil
-        from pathlib import Path
-
-        local_api = Path(workflow.basedir).parents[1] / "resources/user/edh_api.txt"
-        if local_api.is_file():
-            shutil.copyfile(local_api, output[0])
-        elif api_key := os.environ.get("EDH_API_KEY"):
-            Path(output[0]).write_text(api_key.strip(), encoding="utf-8")
-
-
-# Emulate how another workflow might create shape inputs for this module.
 rule create_external_shapes:
     output:
         "resources/user/test/shapes.parquet",
     log:
         "logs/create_external_shapes.log",
+    conda:
+        "../../workflow/envs/module.yaml"
     params:
         url="https://zenodo.org/records/20765043/files/EUROPE_S_C1_ADM1.parquet?download=1",
+    message:
+        "Emulating shape inputs for integration testing."
     shell:
-        "curl --fail --silent --show-error --location --output {output:q} {params.url:q}"
+        "curl --fail --silent --show-error --location --output {output:q} {params.url:q} 2> {log.stderr:q}"
 
 
 # Import the module and configure it.
@@ -39,7 +22,7 @@ module module_euro_building_heat:
     pathvars:
         # Redirect specific user resources (inputs)
         shapes=rules.create_external_shapes.output[0],
-        edh_api=rules.stage_edh_api.output[0],
+        edh_api="resources/user/edh_api.txt",
         # Redirect specific module results (outputs)
         heat_demand="results/output/{shapes}/hourly/hourly_heat_demand.parquet",
         # Redirect intermediate files that are internal to the module
