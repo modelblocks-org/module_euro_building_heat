@@ -107,7 +107,7 @@ def tidy_annual_heat_demand(disaggregated_demand: pd.DataFrame) -> pd.DataFrame:
     tidy = (
         disaggregated_demand.rename_axis(columns="shape_id")
         .stack(future_stack=True)
-        .rename("annual_heat_demand_twh")
+        .rename("heat_demand_twh")
         .rename_axis(index={"cat_name": "category"})
         .reset_index()
     )

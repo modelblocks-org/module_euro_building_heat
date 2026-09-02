@@ -112,7 +112,11 @@ rule rescale_annual_heat_demand_to_shapes:
         population="<resources>/automatic/shapes/{shapes}/population.nc",
     output:
         annual_demand="<annual_heat_demand>",
-        choropleth="<annual_heat_demand_choropleth>",
+        choropleth=report(
+            "<resources>/automatic/shapes/{shapes}/plots/annual_heat_demand.png",
+            category="European Building Heat",
+            subcategory="Heat demand",
+        ),
     log:
         "<logs>/{shapes}/annual/rescale_annual_heat_demand_to_shapes.log",
     conda:

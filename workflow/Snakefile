@@ -13,12 +13,10 @@ pathvars:
     shapes="<resources>/user/{shapes}/shapes.parquet",
     edh_api="<resources>/user/edh_api.txt",
     # Module results
-    annual_heat_demand="<results>/{shapes}/annual/annual_heat_demand_twh.parquet",
+    annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
     heat_demand="<results>/{shapes}/hourly/heat_demand_mwh.parquet",
     heat_pump_cop="<results>/{shapes}/hourly/heat_pump_cop_pu.parquet",
     heat_pump_electricity_demand="<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet",
-    annual_heat_demand_choropleth="<results>/{shapes}/visualization/annual_heat_demand.png",
-    heat_demand_timeseries="<results>/{shapes}/visualization/heat_demand_timeseries.pdf",
 
 
 # Load the example configuration. This will be overridden by users.

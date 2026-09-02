@@ -112,7 +112,7 @@ def prepare_annual_demand(annual_demand: pd.DataFrame) -> xr.Dataset:
     """
     return (
         annual_demand.set_index(["end_use", "category", "year", "shape_id"])[
-            "annual_heat_demand_twh"
+            "heat_demand_twh"
         ]
         .to_xarray()
         .rename(shape_id="id")

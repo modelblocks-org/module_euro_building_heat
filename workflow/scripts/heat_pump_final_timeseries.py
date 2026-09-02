@@ -3,6 +3,7 @@
 import sys
 from typing import TYPE_CHECKING, Any
 
+import _plots
 import pandas as pd
 import xarray as xr
 from _timeseries import utc_aware_hourly_frame, write_hourly_parquet
@@ -39,7 +40,7 @@ def prepare_annual_demand(annual_demand: pd.DataFrame) -> xr.DataArray:
     """
     return (
         annual_demand.set_index(["end_use", "category", "year", "shape_id"])[
-            "annual_heat_demand_twh"
+            "heat_demand_twh"
         ]
         .to_xarray()
         .rename(shape_id="id")
@@ -118,16 +119,21 @@ def main() -> None:
     electricity_demand = electricity_demand_from_heat(heat_demand, final_df).astype(
         "float32"
     )
-    write_hourly_parquet(
+    final_df = write_hourly_parquet(
         final_df, snakemake.output.cop, snakemake.input.shape_timezones, units="p.u."
     )
-    write_hourly_parquet(
+    electricity_demand = write_hourly_parquet(
         electricity_demand,
         snakemake.output.electricity_demand,
         snakemake.input.shape_timezones,
         units="MWh",
     )
+    _plots.plot_timeseries(final_df, snakemake.output.cop_plot, "COP")
+    _plots.plot_timeseries(
+        electricity_demand, snakemake.output.electricity_demand_plot, "MWh"
+    )
 
 
 if __name__ == "__main__":
     sys.stderr = open(snakemake.log[0], "w", buffering=1)
+    main()

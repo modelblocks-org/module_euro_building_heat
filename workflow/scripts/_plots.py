@@ -34,18 +34,25 @@ def draw_empty(ax: Axes, title: str, message: str = "No data available") -> None
     ax.set_axis_off()
 
 
-def plot_heat_demand_timeseries(
-    demand: pd.DataFrame, output_path: str | Path, rolling_days: int = 1
+def plot_timeseries(
+    timeseries: pd.DataFrame,
+    output_path: str | Path,
+    ylabel: str,
+    *,
+    normalise: bool = False,
+    average_hours: int = 24,
 ) -> None:
-    """Plot per-unit rolling mean demand profiles for every shape."""
-    daily_demand = demand.sort_index().resample("D").sum(min_count=1)
-    mean_daily_demand = daily_demand.mean().replace(0, np.nan)
-    per_unit_demand = daily_demand.div(mean_daily_demand)
-    smoothed_demand = per_unit_demand.rolling(
-        window=rolling_days, center=True, min_periods=1
+    """Plot complete hourly profiles and their rolling average for every shape."""
+    plotted_timeseries = timeseries.sort_index()
+    if normalise:
+        plotted_timeseries = plotted_timeseries.div(
+            plotted_timeseries.mean().replace(0, np.nan)
+        )
+    averaged_timeseries = plotted_timeseries.rolling(
+        window=average_hours, center=True, min_periods=1
     ).mean()
 
-    n_shapes = max(1, len(smoothed_demand.columns))
+    n_shapes = max(1, len(plotted_timeseries.columns))
     row_height = 1.6
     fig_height = max(3.0, 1.0 + n_shapes * row_height)
     fig, axes = plt.subplots(
@@ -60,17 +67,19 @@ def plot_heat_demand_timeseries(
         hspace=0.55,
     )
 
-    for ax, shape_id in zip(axes, smoothed_demand.columns):
-        series = smoothed_demand[shape_id].dropna()
+    for ax, shape_id in zip(axes, plotted_timeseries.columns):
+        series = plotted_timeseries[shape_id].dropna()
         if series.empty:
             draw_empty(ax, str(shape_id))
         else:
-            ax.plot(series.index, series)
+            average = averaged_timeseries[shape_id].dropna()
+            ax.plot(series.index, series, linewidth=0.6, alpha=0.25)
+            ax.plot(average.index, average, color="black", linewidth=1.0)
             ax.set_title(
                 str(shape_id), loc="left", fontsize="medium", fontweight="bold"
             )
             ax.margins(x=0)
-            ax.set_ylabel("Per unit")
+            ax.set_ylabel(ylabel)
         ax.set_xlabel("")
 
     output = Path(output_path)
@@ -79,12 +88,21 @@ def plot_heat_demand_timeseries(
     plt.close(fig)
 
 
+def plot_heat_demand_timeseries(
+    demand: pd.DataFrame, output_path: str | Path, rolling_days: int = 1
+) -> None:
+    """Plot per-unit hourly demand and its rolling average for every shape."""
+    plot_timeseries(
+        demand, output_path, "Per unit", normalise=True, average_hours=24 * rolling_days
+    )
+
+
 def plot_annual_heat_demand_choropleth(
     shapes: gpd.GeoDataFrame, annual_demand: pd.DataFrame, output_path: str | Path
 ) -> None:
     """Plot total annual useful heat demand in every user-provided shape."""
     demand_by_year = (
-        annual_demand.groupby(["year", "shape_id"])["annual_heat_demand_twh"]
+        annual_demand.groupby(["year", "shape_id"])["heat_demand_twh"]
         .sum()
         .unstack("shape_id")
         .sort_index()
@@ -124,7 +142,7 @@ def plot_annual_heat_demand_choropleth(
         visible_axes = []
 
         for ax, year in zip(axes_flat, years):
-            demand_for_year = demand_by_year.loc[year].rename("annual_heat_demand_twh")
+            demand_for_year = demand_by_year.loc[year].rename("heat_demand_twh")
             plot_data = shapes.merge(
                 demand_for_year, left_on="shape_id", right_index=True, how="left"
             )
@@ -136,8 +154,8 @@ def plot_annual_heat_demand_choropleth(
                 linewidth=0.5,
                 zorder=1,
             )
-            plot_data.dropna(subset=["annual_heat_demand_twh"]).plot(
-                column="annual_heat_demand_twh",
+            plot_data.dropna(subset=["heat_demand_twh"]).plot(
+                column="heat_demand_twh",
                 ax=ax,
                 cmap=MAP_CMAP,
                 norm=norm,

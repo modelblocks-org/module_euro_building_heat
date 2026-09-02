@@ -27,11 +27,11 @@ pathvars:
         Only rows with `shape_class` set to `land` are processed.
   results:
     annual_heat_demand:
-      default: "<results>/{shapes}/annual/annual_heat_demand_twh.parquet"
+      default: "<results>/{shapes}/annual/heat_demand_twh.parquet"
       description: |
         Annual useful heat demand in TWh, scaled from countries to shapes.
         This table contains `end_use`, `category`, `year`, `shape_id`,
-        and `annual_heat_demand_twh` columns.
+        and `heat_demand_twh` columns.
     heat_demand:
       default: "<results>/{shapes}/hourly/heat_demand_mwh.parquet"
       description: |
@@ -46,11 +46,5 @@ pathvars:
       description: >
         Shape-aggregated electricity demand for heat pumps in MWh with the same
         UTC hourly index as the COP file.
-    annual_heat_demand_choropleth:
-      default: "<results>/{shapes}/visualization/annual_heat_demand.pdf"
-      description: Static choropleth of annual useful heat demand by shape.
-    heat_demand_timeseries:
-      default: "<results>/{shapes}/visualization/heat_demand_timeseries.pdf"
-      description: Static hourly heat-demand time series with one subplot per shape.
 wildcards:
   shapes: name of the provided shapes case.

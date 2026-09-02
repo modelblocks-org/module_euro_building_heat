@@ -50,6 +50,16 @@ rule heat_pump_electricity_demand_timeseries:
     output:
         cop="<heat_pump_cop>",
         electricity_demand="<heat_pump_electricity_demand>",
+        cop_plot=report(
+            "<resources>/automatic/shapes/{shapes}/plots/heat_pump_cop_timeseries.pdf",
+            category="European Building Heat",
+            subcategory="Heat pumps",
+        ),
+        electricity_demand_plot=report(
+            "<resources>/automatic/shapes/{shapes}/plots/heat_pump_electricity_demand_timeseries.pdf",
+            category="European Building Heat",
+            subcategory="Heat pumps",
+        ),
     log:
         "<logs>/{shapes}/heat-pump/heat_pump_electricity_demand_timeseries.log",
     conda:

@@ -132,5 +132,5 @@ class AnnualHeatDemandSchema(pa.DataFrameModel):
     "Model year."
     shape_id: Series[str]
     "Shape identifier."
-    annual_heat_demand_twh: Series[float] = pa.Field(ge=0)
+    heat_demand_twh: Series[float] = pa.Field(ge=0)
     "Annual useful heat demand in TWh."

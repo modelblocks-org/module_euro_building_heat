@@ -95,7 +95,11 @@ rule heat_demand_final_timeseries:
         shape_timezones=rules.prepare_shape_timezones.output[0],
     output:
         timeseries="<heat_demand>",
-        plot="<heat_demand_timeseries>",
+        plot=report(
+            "<resources>/automatic/shapes/{shapes}/plots/heat_demand_timeseries.pdf",
+            category="European Building Heat",
+            subcategory="Heat demand",
+        ),
     log:
         "<logs>/{shapes}/timeseries/heat_demand_final_timeseries.log",
     conda:
