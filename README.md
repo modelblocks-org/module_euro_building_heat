@@ -32,46 +32,27 @@ Data processing steps:
   <img src="./figures/rulegraph.png" width="100%">
 </p>
 
-1. Prepare the spatial scope from the user-provided shapes file. The module
-   keeps land shapes, validates their identifiers and geometries, and determines
-   the native and proxy countries needed for the requested `{shapes}` case.
-2. Download the required automatic inputs, including ERA5 weather, GHSL
-   population, When2Heat parameters, Eurostat and Swiss statistics, ECUK,
-   JRC-IDEES, heat-pump characteristics, and the pinned IANA timezone
-   boundaries.
-3. Process national annual final heat demand. Household demand is derived from
-   Eurostat, Swiss, and ECUK end-use statistics; commercial demand is estimated
-   using energy balances and JRC-IDEES tertiary-sector end-use data.
-4. Use published JRC-IDEES useful heat demand where available, or convert final
-   energy demand with the configured technology efficiencies for space heat,
-   hot water, and cooking.
-5. Calculate population weights on the ERA5 weather grid, allocate national
-   annual useful heat demand to the requested shapes, and create the annual
-   demand choropleth.
+1. Read and validate the user-provided regions. Only land shapes are processed,
+   and configured proxy countries fill gaps in the available statistics.
+2. Retrieve the required weather, population, timezone, and building-energy
+   datasets from ERA5, GHSL, Eurostat, JRC-IDEES, ECUK, and Swiss sources.
+3. Combine these statistics into national annual heat demand for households and
+   services. Published useful-heat data take precedence where available;
+   otherwise, configured technology efficiencies convert final to useful demand.
+4. Allocate national demand to the requested shapes using population weights,
+   producing a disaggregated annual TWh dataset.
 
 <p align="center">
   <img src="./figures/annual_heat_demand.png" width="50%">
 </p>
 
-6. Calculate country-specific single-family and multi-family dwelling shares
-   from the 2021 Eurostat census, using configured reference countries where
-   data are missing.
-7. Infer exactly one IANA timezone for every shape from its geometric centroid,
-   independently of the `country_id` used for annual statistics.
-8. Process ERA5 air temperature, wind speed, and soil temperature, then
-   generate commercial, single-family, and multi-family heat-demand profiles
-   with the When2Heat method and local civil-clock factors.
-9. Aggregate the gridded demand profiles to the requested shapes using the same
-   population weights and cache one compact local-clock file per weather year.
-10. Align each local profile to a continuous UTC timeline using its inferred
-    timezone, combine the building types, pair weather years with model years,
-    scale to annual useful demand, and write the hourly demand and its plot.
-11. Calculate air-source and ground-source heat-pump COP from ERA5 air and soil
-    temperatures, configured sink temperatures, and technology shares. Aggregate
-    the COP to shapes and weight space heat and hot water using annual demand.
-12. Divide hourly heat demand by COP to obtain heat-pump electricity demand,
-    then write both hourly datasets with the same UTC timeline and timezone
-    provenance metadata.
+5. Derive local building-type shares and timezones, then combine ERA5 weather
+   with When2Heat profiles to represent space heat and hot water demand.
+6. Aggregate profiles to the requested shapes, align local behavior to a
+   continuous UTC timeline, and scale each profile to its annual demand total.
+7. Calculate air-source and ground-source heat-pump COP from weather and the
+   configured sink temperatures and technology shares.
+8. Write hourly heat demand, heat-pump electricity / COP timeseries.
 
 ### Timezone handling
 
