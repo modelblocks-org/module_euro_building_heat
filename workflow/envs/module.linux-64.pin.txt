@@ -45,7 +45,6 @@ https://conda.anaconda.org/conda-forge/linux-64/yaml-0.2.5-h280c20c_3.conda#a77f
 https://conda.anaconda.org/conda-forge/linux-64/pyyaml-6.0.3-py312h8a5da7c_1.conda#15878599a87992e44c059731771591cb
 https://conda.anaconda.org/conda-forge/noarch/donfig-0.8.1.post1-pyhd8ed1ab_1.conda#c56a7fa5597ad78b62e1f5d21f7f8b8f
 https://conda.anaconda.org/conda-forge/noarch/zarr-3.3.0-pyhc364b38_0.conda#9ea26dd8ab46e83b7b7faaa891037471
-https://conda.anaconda.org/conda-forge/noarch/xlrd-2.0.2-pyhd8ed1ab_0.conda#91f5637b706492b9e418da1872fd61ce
 https://conda.anaconda.org/conda-forge/noarch/setuptools-83.0.0-pyh332efcf_0.conda#6bf6acbab2499830180ec88c3aff2fa4
 https://conda.anaconda.org/conda-forge/noarch/pycountry-24.6.1-pyhd8ed1ab_0.conda#62ed8c560f1b5b8d74ed11e68e9ae223
 https://conda.anaconda.org/conda-forge/noarch/mypy_extensions-1.1.0-pyha770c72_0.conda#e9c622e0d00fa24a6292279af3ab6d06
@@ -329,7 +328,6 @@ https://conda.anaconda.org/conda-forge/noarch/distributed-2026.6.0-pyhc364b38_1.
 https://conda.anaconda.org/conda-forge/noarch/bokeh-3.9.1-pyhd8ed1ab_0.conda#123fcfe0df4b6fc21804538e59cdaafe
 https://conda.anaconda.org/conda-forge/noarch/dask-2026.6.0-pyhc364b38_0.conda#a2d2a05abf6076c3d041ec91b2235823
 https://conda.anaconda.org/conda-forge/noarch/gregor-0.1.0-pyhcf101f3_0.conda#36a2d7837350f7e8da83bcaad552d0b5
-https://conda.anaconda.org/conda-forge/linux-64/gdal-3.10.3-py312hf50df08_27.conda#26029a5e0b00760274215ba361042d34
 https://conda.anaconda.org/conda-forge/linux-64/curl-8.21.0-hcf29cc6_1.conda#58609be98a9725cd359a1c63ff329628
 https://conda.anaconda.org/conda-forge/noarch/cmap-0.7.2-pyhd8ed1ab_0.conda#992b4902eb5ff13646048cd7629a82bf
 https://conda.anaconda.org/conda-forge/linux-64/bottleneck-1.6.0-np2py312hfb8c2c5_3.conda#99981dfd6b851dba87c43b5f895e6d6a
