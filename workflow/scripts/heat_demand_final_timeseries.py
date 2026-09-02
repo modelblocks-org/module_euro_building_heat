@@ -147,7 +147,10 @@ def main() -> None:
         .rename_axis(index="timesteps")
     )
     final_df = write_hourly_parquet(
-        final_df, snakemake.output.timeseries, snakemake.input.shape_timezones
+        final_df,
+        snakemake.output.timeseries,
+        snakemake.input.shape_timezones,
+        units="MWh",
     )
     _plots.plot_heat_demand_timeseries(final_df, snakemake.output.plot)
 

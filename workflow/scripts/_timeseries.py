@@ -1,36 +1,25 @@
-"""UTC index and Parquet metadata helpers for hourly module outputs."""
+"""UTC index and Parquet attribute helpers for hourly module outputs."""
 
-import json
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 
 OUTPUT_TIMEZONE = "UTC"
 LOCAL_TIME_BASIS = "local_civil_clock"
 SHAPE_TIMEZONES_METADATA_KEY = "shape_timezones"
 
 
-def write_parquet_with_metadata(
-    data: pd.DataFrame, path: str | Path, metadata: dict[str, str]
+def write_parquet_with_attributes(
+    data: pd.DataFrame, path: str | Path, attributes: dict[str, object]
 ) -> None:
-    """Write a Pandas table and merge custom values into Arrow schema metadata."""
+    """Write a Pandas table after merging attributes atomically."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = path.with_suffix(path.suffix + ".tmp")
 
-    table = pa.Table.from_pandas(data, preserve_index=True)
-    schema_metadata = dict(table.schema.metadata or {})
-    schema_metadata.update(
-        {
-            str(key).encode("utf-8"): str(value).encode("utf-8")
-            for key, value in metadata.items()
-        }
-    )
-    table = table.replace_schema_metadata(schema_metadata)
-    pq.write_table(table, temporary_path)
+    data.attrs.update(attributes)
+    data.to_parquet(temporary_path, index=True)
     temporary_path.replace(path)
 
 
@@ -65,20 +54,23 @@ def utc_aware_hourly_frame(data: pd.DataFrame) -> pd.DataFrame:
 
 
 def write_hourly_parquet(
-    data: pd.DataFrame, path: str | Path, shape_timezones_path: str | Path
+    data: pd.DataFrame,
+    path: str | Path,
+    shape_timezones_path: str | Path,
+    *,
+    units: str,
 ) -> pd.DataFrame:
-    """Write a UTC-aware hourly table with timezone metadata."""
+    """Write a UTC-aware hourly table with timezone and unit metadata."""
     result = utc_aware_hourly_frame(data)
+    result.attrs["units"] = units
     shape_timezones = read_shape_timezones(shape_timezones_path)
 
     output_ids = pd.Index(result.columns)
     selected_timezones = shape_timezones.reindex(output_ids)
 
-    metadata = {
+    attributes = {
         "output_timezone": OUTPUT_TIMEZONE,
-        SHAPE_TIMEZONES_METADATA_KEY: json.dumps(
-            selected_timezones.to_dict(), sort_keys=True, separators=(",", ":")
-        ),
+        SHAPE_TIMEZONES_METADATA_KEY: selected_timezones.to_dict(),
     }
-    write_parquet_with_metadata(result, path, metadata)
+    write_parquet_with_attributes(result, path, attributes)
     return result

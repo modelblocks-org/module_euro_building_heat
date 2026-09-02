@@ -119,12 +119,13 @@ def main() -> None:
         "float32"
     )
     write_hourly_parquet(
-        final_df, snakemake.output.cop, snakemake.input.shape_timezones
+        final_df, snakemake.output.cop, snakemake.input.shape_timezones, units="p.u."
     )
     write_hourly_parquet(
         electricity_demand,
         snakemake.output.electricity_demand,
         snakemake.input.shape_timezones,
+        units="MWh",
     )
 
 

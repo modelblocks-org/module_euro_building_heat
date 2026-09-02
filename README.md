@@ -113,10 +113,10 @@ The module receives inputs and exposes results through Snakemake path variables:
 | --- | --- | --- |
 | `edh_api` | `<resources>/user/edh_api.txt` | Earth Data Hub API key used to download ERA5 data. |
 | `shapes` | `<resources>/user/{shapes}/shapes.parquet` | User-provided polygons to process. |
-| `annual_heat_demand` | `<results>/{shapes}/annual/annual_heat_demand.parquet` | Tidy annual useful heat demand in TWh with `end_use`, `category`, `year`, `shape_id`, and `annual_heat_demand_twh` columns. |
-| `heat_demand` | `<results>/{shapes}/hourly/hourly_heat_demand.parquet` | Final hourly useful heat demand by shape. |
-| `heat_pump_cop` | `<results>/{shapes}/hourly/heat_pump_cop.parquet` | Final hourly heat-pump COP by shape. |
-| `heat_pump_electricity_demand` | `<results>/{shapes}/hourly/heat_pump_electricity_demand.parquet` | Final hourly electricity demand for heat pumps by shape. |
+| `annual_heat_demand` | `<results>/{shapes}/annual/annual_heat_demand_twh.parquet` | Tidy annual useful heat demand in TWh with `end_use`, `category`, `year`, `shape_id`, and `annual_heat_demand_twh` columns. |
+| `heat_demand` | `<results>/{shapes}/hourly/heat_demand_mwh.parquet` | Final hourly useful heat demand in MWh by shape. |
+| `heat_pump_cop` | `<results>/{shapes}/hourly/heat_pump_cop_pu.parquet` | Final hourly heat-pump COP in p.u. by shape. |
+| `heat_pump_electricity_demand` | `<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet` | Final hourly electricity demand in MWh for heat pumps by shape. |
 | `annual_heat_demand_choropleth` | `<results>/{shapes}/visualization/annual_heat_demand.pdf` | Static annual useful heat-demand map by shape. |
 | `heat_demand_timeseries` | `<results>/{shapes}/visualization/heat_demand_timeseries.pdf` | Static heat-demand profile with one subplot per shape. |
 
@@ -130,16 +130,13 @@ The shapes input must be a GeoParquet file containing:
 - `geometry`: polygon geometry with correct CRS metadata readable by GeoPandas.
   The workflow normalises prepared shapes to EPSG:4326 internally.
 
-The annual-demand output is a wide Parquet table with a `year`, `end_use`, and
-`cat_name` index and shape IDs as columns. Values are annual useful heat demand
-in TWh.
+The annual-demand output is a tidy Parquet table with `end_use`, `category`,
+`year`, `shape_id`, and `annual_heat_demand_twh` columns.
 
 The final `heat_demand`, `heat_pump_cop`, and
 `heat_pump_electricity_demand` outputs are wide Parquet tables with shape IDs as
 columns and a timezone-aware `datetime64[ns, UTC]` index named `timesteps`.
-Every timestamp identifies the start of its UTC hourly period. Their Parquet
-schema metadata records `output_timezone: UTC` and the JSON
-shape-to-IANA-timezone mapping under `shape_timezones`.
+Every timestamp identifies the start of its UTC hourly period.
 
 ## Development
 <!-- Please do not modify this templated section -->

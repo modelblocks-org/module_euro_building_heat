@@ -167,6 +167,7 @@ def main() -> None:
     report_country_total_discrepancies(demand, scaled, mapping)
     tidy = tidy_annual_heat_demand(scaled)
     validated = _schemas.AnnualHeatDemandSchema.validate(tidy)
+    validated.attrs["units"] = "TWh"
     validated.to_parquet(snakemake.output.annual_demand, index=False)
     _plots.plot_annual_heat_demand_choropleth(
         shapes, validated, snakemake.output.choropleth

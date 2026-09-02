@@ -16,30 +16,36 @@ pathvars:
     edh_api:
       default: "<resources>/user/edh_api.txt"
       description: |
-        Earth Data Hub API key used to download ERA5 weather data. The file
-        must contain only the API key; surrounding whitespace is ignored.
+        Earth Data Hub API key used to download ERA5 weather data.
+        The file must contain only the API key.
     shapes:
       default: "<resources>/user/{shapes}/shapes.parquet"
       description: |
-        Region-specific polygons to process. The parquet file must include
-        `shape_id`, `country_id` (ISO alpha-3), `shape_class`, and `geometry`
-        columns. Only rows with `shape_class` set to `land` are processed.
+        Region-specific polygons to process.
+        The parquet file must include the following columns:
+        `shape_id`, `country_id` (ISO alpha-3), `shape_class`, and `geometry`.
+        Only rows with `shape_class` set to `land` are processed.
   results:
     annual_heat_demand:
-      default: "<results>/{shapes}/annual/annual_heat_demand.parquet"
+      default: "<results>/{shapes}/annual/annual_heat_demand_twh.parquet"
       description: |
-        Annual useful heat demand in TWh, scaled from countries to shapes. This
-        tidy Parquet table contains `end_use`, `category`, `year`, `shape_id`,
+        Annual useful heat demand in TWh, scaled from countries to shapes.
+        This table contains `end_use`, `category`, `year`, `shape_id`,
         and `annual_heat_demand_twh` columns.
     heat_demand:
-      default: "<results>/{shapes}/hourly/hourly_heat_demand.parquet"
-      description: Shape-aggregated heat demand with a UTC-aware hourly index; local When2Heat behavior is converted using geometry-derived IANA timezones.
+      default: "<results>/{shapes}/hourly/heat_demand_mwh.parquet"
+      description: |
+        Shape-aggregated heat demand in MWh with a UTC hourly index.
+        Localised When2Heat behavior is converted using geometry-derived IANA timezones.
     heat_pump_cop:
-      default: "<results>/{shapes}/hourly/heat_pump_cop.parquet"
-      description: Shape-aggregated heat-pump coefficient of performance with a UTC-aware hourly index.
+      default: "<results>/{shapes}/hourly/heat_pump_cop_pu.parquet"
+      description: >
+        Shape-aggregated heat-pump coefficient of performance in p.u. with a UTC hourly index.
     heat_pump_electricity_demand:
-      default: "<results>/{shapes}/hourly/heat_pump_electricity_demand.parquet"
-      description: Shape-aggregated electricity demand for heat pumps with the same UTC-aware hourly index as heat demand and COP.
+      default: "<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet"
+      description: >
+        Shape-aggregated electricity demand for heat pumps in MWh with the same
+        UTC hourly index as the COP file.
     annual_heat_demand_choropleth:
       default: "<results>/{shapes}/visualization/annual_heat_demand.pdf"
       description: Static choropleth of annual useful heat demand by shape.

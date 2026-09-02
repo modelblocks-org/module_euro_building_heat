@@ -24,7 +24,7 @@ module module_euro_building_heat:
         shapes=rules.create_external_shapes.output[0],
         edh_api="resources/user/edh_api.txt",
         # Redirect specific module results (outputs)
-        heat_demand="results/output/{shapes}/hourly/hourly_heat_demand.parquet",
+        heat_demand="results/output/{shapes}/hourly/heat_demand_mwh.parquet",
         # Redirect intermediate files that are internal to the module
         logs="resources/module/logs",
         resources="resources/module/resources",
@@ -43,6 +43,6 @@ use rule * from module_euro_building_heat as module_euro_building_heat_*
 rule all:
     default_target: True
     input:
-        "results/output/test/hourly/hourly_heat_demand.parquet",
+        "results/output/test/hourly/heat_demand_mwh.parquet",
     message:
         "A generic dry-run test case for the heat demand module."
