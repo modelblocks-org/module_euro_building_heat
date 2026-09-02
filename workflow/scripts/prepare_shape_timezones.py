@@ -22,27 +22,31 @@ def assign_shape_timezones(
     timezone_boundaries: gpd.GeoDataFrame,
     projected_crs: str | int,
 ) -> pd.DataFrame:
-    """Assign the unique timezone polygon intersecting each shape centroid."""
+    """Assign a timezone using a centroid or, if outside its shape, an interior point."""
     centroid_crs = CRS.from_user_input(projected_crs)
     if not centroid_crs.is_projected:
         raise ValueError(f"The provided crs must be projected: {centroid_crs}.")
 
     shapes_projected = (
         shapes.loc[:, ["shape_id", "geometry"]].to_crs(centroid_crs).copy()
-    )
+    ).reset_index(drop=True)
 
     timezone_boundaries = timezone_boundaries.loc[:, ["tzid", "geometry"]].to_crs(WGS84)
-    centroids = gpd.GeoDataFrame(
+    points = gpd.GeoDataFrame(
         {"shape_id": shapes_projected["shape_id"].to_numpy()},
         geometry=shapely.centroid(shapes_projected.geometry.array),
         crs=centroid_crs,
-    ).to_crs(WGS84)
-    centroids["centroid_lon"] = shapely.get_x(centroids.geometry.array)
-    centroids["centroid_lat"] = shapely.get_y(centroids.geometry.array)
-
-    matches = gpd.sjoin(
-        centroids, timezone_boundaries, how="left", predicate="intersects"
     )
+    points.geometry = points.geometry.where(
+        points.geometry.intersects(shapes_projected.geometry),
+        shapes_projected.geometry.representative_point(),
+    )
+    points = points.to_crs(WGS84)
+    points["point_lon"] = shapely.get_x(points.geometry.array)
+    points["point_lat"] = shapely.get_y(points.geometry.array)
+
+    matches = gpd.sjoin(points, timezone_boundaries, how="left", predicate="intersects")
+
     timezone_matches = {
         shape_id: sorted(set(group["tzid"].dropna().astype(str)))
         for shape_id, group in matches.groupby("shape_id", sort=False)
@@ -50,17 +54,17 @@ def assign_shape_timezones(
 
     failures = []
     selected = []
-    for row in centroids.itertuples(index=False):
+    for row in points.itertuples(index=False):
         tzids = timezone_matches.get(row.shape_id, [])
-        coordinate = f"({row.centroid_lon:.6f}, {row.centroid_lat:.6f})"
+        coordinate = f"({row.point_lon:.6f}, {row.point_lat:.6f})"
         if len(tzids) == 0:
             failures.append(
-                f"shape_id={row.shape_id!r}, centroid={coordinate}: no timezone match"
+                f"shape_id={row.shape_id!r}, point={coordinate}: no timezone match"
             )
             continue
         if len(tzids) > 1:
             failures.append(
-                f"shape_id={row.shape_id!r}, centroid={coordinate}: "
+                f"shape_id={row.shape_id!r}, point={coordinate}: "
                 f"multiple timezone matches {tzids}"
             )
             continue
@@ -68,7 +72,7 @@ def assign_shape_timezones(
             ZoneInfo(tzids[0])
         except ZoneInfoNotFoundError:
             failures.append(
-                f"shape_id={row.shape_id!r}, centroid={coordinate}: "
+                f"shape_id={row.shape_id!r}, point={coordinate}: "
                 f"unknown IANA timezone {tzids[0]!r}"
             )
             continue
@@ -76,14 +80,14 @@ def assign_shape_timezones(
             {
                 "shape_id": row.shape_id,
                 "timezone": tzids[0],
-                "centroid_lon": row.centroid_lon,
-                "centroid_lat": row.centroid_lat,
+                "point_lon": row.point_lon,
+                "point_lat": row.point_lat,
             }
         )
 
     if failures:
         raise ValueError(
-            "Each shape centroid must match exactly one valid IANA timezone:\n- "
+            "Each shape must match exactly one valid IANA timezone:\n- "
             + "\n- ".join(failures)
         )
     return pd.DataFrame(selected)
