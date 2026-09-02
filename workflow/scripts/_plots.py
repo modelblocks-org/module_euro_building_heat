@@ -83,12 +83,13 @@ def plot_annual_heat_demand_choropleth(
     shapes: gpd.GeoDataFrame, annual_demand: pd.DataFrame, output_path: str | Path
 ) -> None:
     """Plot total annual useful heat demand in every user-provided shape."""
-    demand_by_year = annual_demand.groupby(level="year").sum().sort_index()
-
-    shapes = shapes.copy()
-    shapes["shape_id"] = (
-        shapes["shape_id"].astype(str).str.replace(".", "-", regex=False)
+    demand_by_year = (
+        annual_demand.groupby(["year", "shape_id"])["annual_heat_demand_twh"]
+        .sum()
+        .unstack("shape_id")
+        .sort_index()
     )
+
     common_ids = demand_by_year.columns.intersection(shapes["shape_id"])
 
     demand_by_year = demand_by_year.loc[:, common_ids]
@@ -123,7 +124,7 @@ def plot_annual_heat_demand_choropleth(
         visible_axes = []
 
         for ax, year in zip(axes_flat, years):
-            demand_for_year = demand_by_year.loc[year].rename("heat_demand_twh")
+            demand_for_year = demand_by_year.loc[year].rename("annual_heat_demand_twh")
             plot_data = shapes.merge(
                 demand_for_year, left_on="shape_id", right_index=True, how="left"
             )
@@ -135,8 +136,8 @@ def plot_annual_heat_demand_choropleth(
                 linewidth=0.5,
                 zorder=1,
             )
-            plot_data.dropna(subset=["heat_demand_twh"]).plot(
-                column="heat_demand_twh",
+            plot_data.dropna(subset=["annual_heat_demand_twh"]).plot(
+                column="annual_heat_demand_twh",
                 ax=ax,
                 cmap=MAP_CMAP,
                 norm=norm,

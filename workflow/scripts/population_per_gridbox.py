@@ -20,7 +20,7 @@ WGS84 = "EPSG:4326"
 DEFAULT_GRID_DEGREES = 0.25
 
 
-def _normalise_shape_ids(locations: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+def _prepare_locations(locations: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     required = {"shape_id", "geometry"}
     missing = required.difference(locations.columns)
     if missing:
@@ -29,15 +29,11 @@ def _normalise_shape_ids(locations: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         raise ValueError("The shapes parquet file must define a CRS.")
 
     locations = locations.rename(columns={"shape_id": "id"}).copy()
-    locations["id"] = locations["id"].astype(str).str.replace(".", "-", regex=False)
     if locations["id"].duplicated().any():
         duplicate_ids = sorted(
             locations.loc[locations["id"].duplicated(keep=False), "id"].unique()
         )
-        raise ValueError(
-            "Shapes contain duplicate IDs after replacing '.' with '-': "
-            f"{duplicate_ids}"
-        )
+        raise ValueError(f"Shapes contain duplicate shape IDs: {duplicate_ids}")
     return locations
 
 
@@ -57,7 +53,7 @@ def population_on_weather_grid(
     coordinate_ds = xr.open_dataset(path_to_coordinates, decode_timedelta=True)
 
     # Locations are parquet shape files at the resolution of interest.
-    locations = _normalise_shape_ids(gpd.read_parquet(path_to_locations))
+    locations = _prepare_locations(gpd.read_parquet(path_to_locations))
 
     population_raster = rioxarray.open_rasterio(path_to_population, masked=True)
     if not isinstance(population_raster, xr.DataArray):

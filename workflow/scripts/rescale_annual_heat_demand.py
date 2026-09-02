@@ -5,6 +5,7 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import _plots
+import _schemas
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -14,11 +15,6 @@ if TYPE_CHECKING:
     snakemake: Any
 
 logger = logging.getLogger(__name__)
-
-
-def normalise_shape_ids(values: pd.Index | pd.Series) -> pd.Index:
-    """Match shape IDs to xarray-safe IDs used by population weights."""
-    return pd.Index(values.astype(str).str.replace(".", "-", regex=False))
 
 
 def read_national_demand(path: str) -> pd.DataFrame:
@@ -34,14 +30,12 @@ def read_national_demand(path: str) -> pd.DataFrame:
 def shape_population(path: str) -> pd.Series:
     """Read total population assigned to each shape."""
     population = xr.open_dataarray(path, decode_timedelta=True).sum("site").to_series()
-    population.index = normalise_shape_ids(population.index)
     if population.index.has_duplicates:
         duplicate_ids = sorted(
             population.index[population.index.duplicated(keep=False)].unique()
         )
         raise ValueError(
-            "Population weights contain duplicate normalised shape IDs: "
-            f"{duplicate_ids}"
+            f"Population weights contain duplicate shape IDs: {duplicate_ids}"
         )
     return population.rename("population")
 
@@ -57,15 +51,11 @@ def country_map(path: str) -> pd.Series:
     mapping = (
         shapes.set_index("shape_id")["country_id"].astype(str).str.strip().str.upper()
     )
-    mapping.index = normalise_shape_ids(mapping.index)
     if mapping.index.has_duplicates:
         duplicate_ids = sorted(
             mapping.index[mapping.index.duplicated(keep=False)].unique()
         )
-        raise ValueError(
-            "Shapes contain duplicate IDs after replacing '.' with '-': "
-            f"{duplicate_ids}"
-        )
+        raise ValueError(f"Shapes contain duplicate shape IDs: {duplicate_ids}")
     return mapping
 
 
@@ -111,6 +101,19 @@ def rescale_to_shapes(
     return demand
 
 
+def tidy_annual_heat_demand(disaggregated_demand: pd.DataFrame) -> pd.DataFrame:
+    """Convert shape columns and indexed dimensions to the public tidy format."""
+    columns = list(_schemas.AnnualHeatDemandSchema.to_schema().columns)
+    tidy = (
+        disaggregated_demand.rename_axis(columns="shape_id")
+        .stack(future_stack=True)
+        .rename("annual_heat_demand_twh")
+        .rename_axis(index={"cat_name": "category"})
+        .reset_index()
+    )
+    return tidy.loc[:, columns].sort_values(columns[:-1]).reset_index(drop=True)
+
+
 def report_country_total_discrepancies(
     national_demand: pd.DataFrame,
     disaggregated_demand: pd.DataFrame,
@@ -153,10 +156,8 @@ def report_country_total_discrepancies(
         )
 
 
-if __name__ == "__main__":
-    sys.stderr = open(snakemake.log[0], "w", buffering=1)
-    logging.basicConfig(level=logging.INFO)
-
+def main() -> None:
+    """Main Snakemake process."""
     demand = read_national_demand(snakemake.input.annual_demand)
     mapping = country_map(snakemake.input.shapes)
     population = shape_population(snakemake.input.population)
@@ -164,7 +165,15 @@ if __name__ == "__main__":
 
     scaled = rescale_to_shapes(demand, mapping, population)
     report_country_total_discrepancies(demand, scaled, mapping)
-    scaled.to_parquet(snakemake.output.annual_demand)
+    tidy = tidy_annual_heat_demand(scaled)
+    validated = _schemas.AnnualHeatDemandSchema.validate(tidy)
+    validated.to_parquet(snakemake.output.annual_demand, index=False)
     _plots.plot_annual_heat_demand_choropleth(
-        shapes, scaled, snakemake.output.choropleth
+        shapes, validated, snakemake.output.choropleth
     )
+
+
+if __name__ == "__main__":
+    sys.stderr = open(snakemake.log[0], "w", buffering=1)
+    logging.basicConfig(level=logging.INFO)
+    main()

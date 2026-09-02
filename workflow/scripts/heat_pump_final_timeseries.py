@@ -32,18 +32,19 @@ def _group_end_uses(
 
 
 def prepare_annual_demand(annual_demand: pd.DataFrame) -> xr.DataArray:
-    """Restructure annual demand MultiIndex series into a multi-dimensional array.
+    """Restructure tidy annual demand into a multi-dimensional array.
 
     Result sums over all building categories and only contains hot water and space
     heating demands (without cooking).
     """
     return (
-        annual_demand.rename_axis(columns="id")
-        .stack()
-        .unstack("end_use")
-        .to_xarray()[["space_heat", "hot_water"]]
-        .to_array("end_use")
-        .sum("cat_name")
+        annual_demand.set_index(["end_use", "category", "year", "shape_id"])[
+            "annual_heat_demand_twh"
+        ]
+        .to_xarray()
+        .rename(shape_id="id")
+        .sel(end_use=["space_heat", "hot_water"])
+        .sum("category")
     )
 
 

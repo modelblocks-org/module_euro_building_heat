@@ -38,7 +38,6 @@ def read_shape_timezones(path: str | Path) -> pd.Series:
     """Read and validate the internal shape-to-IANA-timezone mapping."""
     mapping = pd.read_parquet(path)
     mapping = mapping.loc[:, ["shape_id", "timezone"]].copy()
-    mapping["shape_id"] = mapping["shape_id"].astype(str)
     mapping["timezone"] = mapping["timezone"].astype(str)
 
     for timezone in sorted(mapping["timezone"].unique()):
@@ -72,7 +71,7 @@ def write_hourly_parquet(
     result = utc_aware_hourly_frame(data)
     shape_timezones = read_shape_timezones(shape_timezones_path)
 
-    output_ids = pd.Index(result.columns.astype(str))
+    output_ids = pd.Index(result.columns)
     selected_timezones = shape_timezones.reindex(output_ids)
 
     metadata = {

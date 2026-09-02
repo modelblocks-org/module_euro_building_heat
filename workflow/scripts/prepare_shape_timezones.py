@@ -17,11 +17,6 @@ if TYPE_CHECKING:
 WGS84 = "EPSG:4326"
 
 
-def _normalise_shape_ids(values: pd.Series) -> pd.Series:
-    """Match the xarray-safe shape IDs used elsewhere in the workflow."""
-    return values.astype(str).str.replace(".", "-", regex=False)
-
-
 def assign_shape_timezones(
     shapes: gpd.GeoDataFrame,
     timezone_boundaries: gpd.GeoDataFrame,
@@ -35,7 +30,6 @@ def assign_shape_timezones(
     shapes_projected = (
         shapes.loc[:, ["shape_id", "geometry"]].to_crs(centroid_crs).copy()
     )
-    shapes_projected["shape_id"] = _normalise_shape_ids(shapes_projected["shape_id"])
 
     timezone_boundaries = timezone_boundaries.loc[:, ["tzid", "geometry"]].to_crs(WGS84)
     centroids = gpd.GeoDataFrame(

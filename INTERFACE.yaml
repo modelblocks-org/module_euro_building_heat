@@ -27,7 +27,10 @@ pathvars:
   results:
     annual_heat_demand:
       default: "<results>/{shapes}/annual/annual_heat_demand.parquet"
-      description: Annual useful heat demand in TWh, scaled from countries to shapes.
+      description: |
+        Annual useful heat demand in TWh, scaled from countries to shapes. This
+        tidy Parquet table contains `end_use`, `category`, `year`, `shape_id`,
+        and `annual_heat_demand_twh` columns.
     heat_demand:
       default: "<results>/{shapes}/hourly/hourly_heat_demand.parquet"
       description: Shape-aggregated heat demand with a UTC-aware hourly index; local When2Heat behavior is converted using geometry-derived IANA timezones.

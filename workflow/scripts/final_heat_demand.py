@@ -400,14 +400,11 @@ def _slice_energy_balance_by_sector(
 def _read_country_population(path_to_shapes: str, path_to_population: str) -> pd.Series:
     shapes = pd.read_parquet(path_to_shapes)
     shape_to_country = shapes.set_index("shape_id")["country_id"]
-    # Shape parquet IDs use hyphens while xarray site coordinates use dots.
-    shape_to_country.index = shape_to_country.index.str.replace(".", "-", regex=False)
     population = (
         xr.open_dataarray(path_to_population, decode_timedelta=True)
         .sum("site")
         .to_series()
     )
-    population.index = population.index.str.replace(".", "-", regex=False)
     return population.groupby(shape_to_country).sum().rename("population")
 
 

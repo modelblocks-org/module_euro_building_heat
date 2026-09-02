@@ -113,7 +113,7 @@ The module receives inputs and exposes results through Snakemake path variables:
 | --- | --- | --- |
 | `edh_api` | `<resources>/user/edh_api.txt` | Earth Data Hub API key used to download ERA5 data. |
 | `shapes` | `<resources>/user/{shapes}/shapes.parquet` | User-provided polygons to process. |
-| `annual_heat_demand` | `<results>/{shapes}/annual/annual_heat_demand.parquet` | Annual useful heat demand in TWh by shape, end use, and building category. |
+| `annual_heat_demand` | `<results>/{shapes}/annual/annual_heat_demand.parquet` | Tidy annual useful heat demand in TWh with `end_use`, `category`, `year`, `shape_id`, and `annual_heat_demand_twh` columns. |
 | `heat_demand` | `<results>/{shapes}/hourly/hourly_heat_demand.parquet` | Final hourly useful heat demand by shape. |
 | `heat_pump_cop` | `<results>/{shapes}/hourly/heat_pump_cop.parquet` | Final hourly heat-pump COP by shape. |
 | `heat_pump_electricity_demand` | `<results>/{shapes}/hourly/heat_pump_electricity_demand.parquet` | Final hourly electricity demand for heat pumps by shape. |

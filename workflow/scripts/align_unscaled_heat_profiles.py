@@ -62,7 +62,7 @@ def align_local_profiles_to_utc(
     local_profiles: xr.Dataset, shape_timezones: pd.Series, weather_year: int
 ) -> xr.Dataset:
     """Select local-clock values for every canonical UTC timestamp by schedule."""
-    profile_ids = pd.Index(local_profiles.id.values.astype(str), name="shape_id")
+    profile_ids = pd.Index(local_profiles.id.values, name="shape_id")
     missing_timezones = sorted(profile_ids.difference(shape_timezones.index))
     if missing_timezones:
         raise ValueError(

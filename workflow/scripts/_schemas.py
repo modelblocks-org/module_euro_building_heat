@@ -29,13 +29,15 @@ END_USES: tuple[str, ...] = (
     "hot_water",
     "space_heat",
 )
+ANNUAL_HEAT_END_USES: tuple[str, ...] = ("cooking", "hot_water", "space_heat")
+BUILDING_CATEGORIES: tuple[str, ...] = ("commercial", "household")
 
 
 class ShapesSchema(pa.DataFrameModel):
     """Schema for geographic shapes."""
 
     class Config:
-        coerce = True
+        coerce = False
         strict = "filter"
 
     shape_id: Series[str] = pa.Field(unique=True)
@@ -111,3 +113,24 @@ class BaselineSchema(pa.DataFrameModel):
     def get_column_names(cls) -> list[str]:
         """Get the schema column names."""
         return list(cls.to_schema().columns.keys())
+
+
+class AnnualHeatDemandSchema(pa.DataFrameModel):
+    """Schema for annual useful heat demand allocated to shapes."""
+
+    class Config:
+        coerce = False
+        strict = True
+        ordered = True
+        unique = ["end_use", "category", "year", "shape_id"]
+
+    end_use: Series[str] = pa.Field(isin=ANNUAL_HEAT_END_USES)
+    "Annual heat-demand end use."
+    category: Series[str] = pa.Field(isin=BUILDING_CATEGORIES)
+    "Building category."
+    year: Series[int] = pa.Field(ge=2000)
+    "Model year."
+    shape_id: Series[str]
+    "Shape identifier."
+    annual_heat_demand_twh: Series[float] = pa.Field(ge=0)
+    "Annual useful heat demand in TWh."

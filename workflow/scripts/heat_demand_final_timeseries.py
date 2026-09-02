@@ -14,11 +14,6 @@ if TYPE_CHECKING:
 TWH_TO_MWH = 1e6
 
 
-def _normalise_shape_ids(values: pd.Series) -> pd.Series:
-    """Match the shape-ID normalisation used by the gridded workflow."""
-    return values.astype(str).str.replace(".", "-", regex=False)
-
-
 def read_building_shares_by_shape(
     shares_path: str, shapes_path: str, shape_ids: pd.Index
 ) -> xr.DataArray:
@@ -26,10 +21,9 @@ def read_building_shares_by_shape(
     shares = pd.read_parquet(shares_path)
 
     shapes = pd.read_parquet(shapes_path, columns=["shape_id", "country_id"])
-    shapes["shape_id"] = _normalise_shape_ids(shapes["shape_id"])
     shape_to_country = shapes.set_index("shape_id")["country_id"]
 
-    shape_ids = pd.Index(shape_ids.astype(str), name="id")
+    shape_ids = pd.Index(shape_ids, name="id")
     shape_to_country = shape_to_country.reindex(shape_ids)
 
     shares_by_shape = pd.DataFrame(
@@ -84,8 +78,8 @@ def scale_heat_demand_profiles(
     )
     grouped_unscaled_demand = (
         (unscaled_demand_profiles * building_shares)
-        .assign_coords(cat_name=building_to_category)
-        .groupby("cat_name")
+        .assign_coords(category=building_to_category)
+        .groupby("category")
         .sum("building")
     )
     scaled_demand_profiles = grouped_unscaled_demand.groupby("time.year").apply(
@@ -107,20 +101,22 @@ def _scale_demand(
     model_year = weather_model_years[weather_year]
     normalised_profile = one_year_profile / one_year_profile.sum("time")
     demand = normalised_profile * annual_demand.sel(year=model_year, drop=True)
-    return demand.sum("cat_name")
+    return demand.sum("category")
 
 
-def prepare_annual_demand(annual_demand: pd.Series) -> xr.Dataset:
-    """Restructure annual demand MultiIndex series into a multi-dimensional array.
+def prepare_annual_demand(annual_demand: pd.DataFrame) -> xr.Dataset:
+    """Restructure tidy annual demand into a multi-dimensional array.
 
     Result sums over all building categories and only contains hot water and space
     heating demands (not cooking).
     """
     return (
-        annual_demand.rename_axis(columns="id")
-        .stack()
-        .unstack("end_use")
-        .to_xarray()[["space_heat", "hot_water"]]
+        annual_demand.set_index(["end_use", "category", "year", "shape_id"])[
+            "annual_heat_demand_twh"
+        ]
+        .to_xarray()
+        .rename(shape_id="id")
+        .to_dataset(dim="end_use")[["space_heat", "hot_water"]]
     )
 
 
