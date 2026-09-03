@@ -1,8 +1,241 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
-description: "Schema for user-provided configuration files."
+description: "Schema for user-provided heat demand configuration."
 type: object
 additionalProperties: false
+required:
+  - demand_years
+  - weather_years
+  - threads
+  - population
+  - crs
+  - heat
 properties:
-  dummy_text:
-    description: A template example. Should be deleted in real applications.
-    type: string
+  demand_years:
+    description: >
+      Selects the annual heat-demand years. The range includes `start`
+      and excludes `end`.
+    type: object
+    additionalProperties: false
+    required: [start, end]
+    properties:
+      start:
+        type: integer
+        minimum: 2010
+        maximum: 2023
+      end:
+        type: integer
+        minimum: 2011
+        maximum: 2024
+  weather_years:
+    description: >
+      Selects the ERA5 years used to construct hourly profiles. The range
+      includes `start`, excludes `end`, and must span the same number of years
+      as `demand_years`; weather and demand years are paired in order.
+    type: object
+    additionalProperties: false
+    required: [start, end]
+    properties:
+      start:
+        type: integer
+      end:
+        type: integer
+  threads:
+    description: Settings controlling parallel execution of aggregation tasks.
+    type: object
+    additionalProperties: false
+    required: [aggregation]
+    properties:
+      aggregation:
+        description: >
+          Maximum number of worker threads used to calculate and aggregate
+          gridded heat-demand and heat-pump profiles.
+        type: integer
+        minimum: 1
+  population:
+    description: >
+      Controls the GHSL population data used to allocate national demand and
+      weather-grid profiles to the input shapes.
+    type: object
+    additionalProperties: false
+    properties:
+      resolution:
+        description: >
+          GHSL GHS-POP raster resolution in metres.
+          Use 100 for more spatial detail or 1000 for a smaller, faster calculation.
+        type: integer
+        enum: [100, 1000]
+  crs:
+    description: Coordinate reference systems used for geometry calculations.
+    type: object
+    additionalProperties: false
+    required: [projected]
+    properties:
+      projected:
+        description: >
+          Projected CRS used for centroid calculations, supplied as a CRS string
+          such as EPSG:3035 or as an integer EPSG code such as 3035.
+        oneOf:
+          - type: string
+          - type: integer
+  data_proxies:
+    description: >
+      Optional mappings from unsupported target countries to reference
+      countries. Values from multiple reference countries are averaged.
+    type: object
+    additionalProperties: false
+    properties:
+      sfh_mfh_shares:
+        description: >
+          Maps countries missing dwelling-type data to countries whose
+          single-family homes (sfh) and multi-family homes (mfh) shares should be averaged.
+        $ref: "#/$defs/country_proxy_map"
+      annual_energy_balance:
+        description: >
+          Maps countries missing energy-balance data to countries whose
+          per-capita energy intensities should be averaged and scaled to the
+          target population.
+        $ref: "#/$defs/country_proxy_map"
+      household_end_use:
+        description: >
+          Maps countries missing residential end-use data to countries whose
+          carrier-level household end-use shares should be averaged.
+        $ref: "#/$defs/country_proxy_map"
+      jrc_idees:
+        description: >
+          Maps countries missing commercial end-use data to JRC-IDEES
+          countries whose carrier-level services end-use shares should be
+          averaged.
+        $ref: "#/$defs/country_proxy_map"
+  heat:
+    description: >
+      Controls the conversion of final energy to useful heat and the
+      calculation of heat-pump coefficient-of-performance profiles.
+    type: object
+    additionalProperties: false
+    required: [tech_efficiencies]
+    properties:
+      useful_heat_demand:
+        description: >
+          Chooses whether to use published useful-heat data where available
+          (`actual`) or calculate all useful heat from final energy and
+          `tech_efficiencies` (`calculate_all`).
+        type: string
+        enum: [actual, calculate_all]
+        default: actual
+      tech_efficiencies:
+        description: >
+          Final-to-useful energy conversion factors grouped by end use and
+          carrier; for example, 0.9 converts one unit of final energy to 0.9
+          units of useful heat.
+        type: object
+        additionalProperties: false
+        properties:
+          space_heat:
+            description: Conversion factors for space heating.
+            $ref: "#/$defs/technology_efficiencies"
+          hot_water:
+            description: Conversion factors for hot water.
+            $ref: "#/$defs/technology_efficiencies"
+          cooking:
+            description: Conversion factors for cooking.
+            $ref: "#/$defs/technology_efficiencies"
+      heat_pump:
+        description: >
+          Settings used to calculate the combined air-source and ground-source
+          heat-pump coefficient-of-performance profile.
+        type: object
+        additionalProperties: false
+        required:
+          - sink_temperature
+          - space_heat_sink_shares
+          - heat_pump_shares
+          - correction_factor
+        properties:
+          sink_temperature:
+            description: >
+              Operating temperature in degrees Celsius for each heat-delivery
+              method. Exactly one method omitted from
+              `space_heat_sink_shares` is treated as the hot-water sink.
+            type: object
+            minProperties: 2
+            additionalProperties:
+              description: Sink operating temperature in degrees Celsius.
+              type: number
+          space_heat_sink_shares:
+            description: >
+              Share of space heat delivered by each configured sink method.
+              Keys must occur in `sink_temperature`, and values must sum to
+              one.
+            type: object
+            minProperties: 1
+            additionalProperties:
+              description: Fraction of space heat delivered by this sink method.
+              type: number
+              minimum: 0
+              maximum: 1
+          heat_pump_shares:
+            description: >
+              Shares of air-source and ground-source heat pumps used to form
+              the combined COP profile; the two values must sum to one.
+            type: object
+            additionalProperties: false
+            required: [ashp, gshp]
+            properties:
+              ashp:
+                description: Fraction of heat pumps that are air-source.
+                type: number
+                minimum: 0
+                maximum: 1
+              gshp:
+                description: Fraction of heat pumps that are ground-source.
+                type: number
+                minimum: 0
+                maximum: 1
+          correction_factor:
+            description: >
+              Positive multiplier applied to manufacturer COP curves to
+              represent expected operational performance.
+            type: number
+            exclusiveMinimum: 0
+$defs:
+  technology_efficiencies:
+    type: object
+    additionalProperties: false
+    properties:
+      gas:
+        description: Final-to-useful energy conversion factor for gas.
+        type: number
+        minimum: 0
+      oil:
+        description: Final-to-useful energy conversion factor for oil.
+        type: number
+        minimum: 0
+      solid_fossil:
+        description: Final-to-useful energy conversion factor for solid fossil fuels.
+        type: number
+        minimum: 0
+      biowaste:
+        description: Final-to-useful energy conversion factor for biomass and waste.
+        type: number
+        minimum: 0
+      solar_thermal:
+        description: Final-to-useful energy conversion factor for solar thermal energy.
+        type: number
+        minimum: 0
+      electricity:
+        description: Final-to-useful energy conversion factor for electricity.
+        type: number
+        minimum: 0
+  country_proxy_map:
+    description: >
+      Maps each target ISO 3166-1 alpha-3 country code to one or more reference
+      country codes whose relevant values will be averaged.
+    type: object
+    additionalProperties:
+      description: Reference countries to use for one target country.
+      type: array
+      minItems: 1
+      items:
+        description: Reference-country ISO 3166-1 alpha-3 code.
+        type: string
+        pattern: "^[A-Za-z]{3}$"

@@ -1,0 +1,31 @@
+name: module
+channels:
+- conda-forge
+- bioconda
+- nodefaults
+dependencies:
+- curl >=8.9.1
+- python >=3.12.9
+- aiohttp >=3.12
+- geopandas >=1.0.1
+- rioxarray >=0.18.2
+- shapely >=2.0.7
+- bottleneck >=1.6.0
+- dask >=2026.6.0
+- ipdb >=0.13.13
+- matplotlib >=3.10.0
+- netcdf4 >=1.7.2
+- numpy >=2.2.4
+- openpyxl >=3.1.5
+- pandas >=2.2.3
+- pyarrow >=19.0.1
+- pycountry >=24.6.1
+- pyproj >=3.7.2
+- xarray >=2025.10.1
+- pandera >=0.31.1
+- pandera-geopandas >=0.31.1
+- pandera-pandas >=0.31.1
+- zarr >3
+- gregor >=0.1.0
+- cmap >=0.7.2
+- inflection >=0.5.1

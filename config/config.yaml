@@ -1,2 +1,111 @@
-# A minimal example of how to configure this module
-dummy_text: This is a user input.
+# Minimal example configuration for the heat demand workflow.
+demand_years:
+  # End year is exclusive, matching the Modelblocks module convention.
+  start: 2023
+  end: 2024
+
+weather_years:
+  # Weather years used to shape hourly heat demand profiles. End year is exclusive.
+  start: 2023
+  end: 2024
+
+threads:
+  aggregation: 8
+
+population:
+  # GHSL GHS-POP resolution in metres. 100 m is the most precise available
+  # Mollweide grid; use 100 for a heavier, longer download.
+  resolution: 1000
+
+crs:
+  # Projected CRS used for geometry calculations such as shape centroids.
+  projected: EPSG:3035
+
+data_proxies:
+# Use proxies to fill missing data for countries with no or incomplete data.
+# Multiple proxy countries can be specified for a single country, in which case the data from the proxy countries will be averaged.
+  # sfh_mfh_shares uses the mean dwelling shares of the proxy countries.
+  sfh_mfh_shares:
+    ALB: [BGR, HRV, HUN, ROU, GRC]
+    AND: [ESP]
+    BIH: [BGR, HRV, HUN, ROU, GRC]
+    GBR: [IRL]
+    MKD: [BGR, HRV, HUN, ROU, GRC]
+    MCO: [FRA]
+    MNE: [BGR, HRV, HUN, ROU, GRC]
+    SMR: [ITA]
+    SRB: [BGR, HRV, HUN, ROU, GRC]
+  # annual_energy_balance uses energy balance data from the proxy country and scales with population.
+  annual_energy_balance:
+    AND: [ESP]
+    LIE: [CHE]
+    MCO: [FRA]
+    SMR: [ITA]
+  # household_end_use uses household end use data from the proxy country to scale annual energy balance data.
+  household_end_use:
+    ALB: [BGR, HRV, HUN, ROU, GRC]
+    AND: [ESP]
+    BIH: [BGR, HRV, HUN, ROU, GRC]
+    ISL: [SWE, DNK]
+    LIE: [CHE]
+    MKD: [BGR, HRV, HUN, ROU, GRC]
+    MCO: [FRA]
+    MNE: [BGR, HRV, HUN, ROU, GRC]
+    NOR: [SWE, DNK]
+    SMR: [ITA]
+    SRB: [BGR, HRV, HUN, ROU, GRC]
+  # jrc_idees uses JRC-IDEES commercial end-use shares from the proxy country.
+  jrc_idees:
+    ALB: [BGR, HRV, HUN, ROU, GRC]
+    AND: [ESP]
+    BIH: [BGR, HRV, HUN, ROU, GRC]
+    ISL: [SWE, DNK]
+    LIE: [CHE]
+    MKD: [BGR, HRV, HUN, ROU, GRC]
+    MCO: [FRA]
+    MNE: [BGR, HRV, HUN, ROU, GRC]
+    NOR: [SWE, DNK]
+    SMR: [ITA]
+    SRB: [BGR, HRV, HUN, ROU, GRC]
+
+
+heat:
+  # Use published JRC-IDEES useful heat where available (actual), except for the
+  # UK where ECUK final demand is always converted with the efficiencies below.
+  # Use calculate_all to convert final energy for every country.
+  useful_heat_demand: actual
+  tech_efficiencies:
+    space_heat:
+      gas: 0.97
+      oil: 0.9
+      solid_fossil: 0.8
+      biowaste: 0.8
+      solar_thermal: 1
+      electricity: 1
+    hot_water:
+      gas: 0.97
+      oil: 0.9
+      solid_fossil: 0.8
+      biowaste: 0.8
+      solar_thermal: 1
+      electricity: 1
+    cooking:
+      gas: 0.28
+      oil: 0.28
+      solid_fossil: 0.15
+      biowaste: 0.1
+      electricity: 0.5
+  heat_pump:
+    sink_temperature:
+      underfloor: 35
+      radiator_large: 50
+      radiator_conventional: 65
+      hot_water: 60
+    space_heat_sink_shares:
+      underfloor: 0.1
+      radiator_large: 0.15
+      radiator_conventional: 0.75
+    heat_pump_shares:
+      ashp: 0.9
+      gshp: 0.1
+    correction_factor: 0.85

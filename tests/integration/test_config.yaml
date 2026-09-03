@@ -1,4 +1,56 @@
 module_euro_building_heat:
-  dummy_text: >-
-    Configuration values (like this one) are also external to the module!
-    This gives users a lot of flexibility in how they apply your methodology to solve their particular needs.
+  crs:
+    projected: EPSG:3035
+  demand_years:
+    start: 2023
+    end: 2024
+  weather_years:
+    start: 2023
+    end: 2024
+  threads:
+    aggregation: 1
+  population:
+    resolution: 1000
+  data_proxies:
+    sfh_mfh_shares:
+      MNE: [BGR, HRV, HUN, ROU, GRC]
+    household_end_use:
+      MNE: [BGR, HRV, HUN, ROU, GRC]
+    jrc_idees:
+      MNE: [BGR, HRV, HUN, ROU, GRC]
+  heat:
+    tech_efficiencies:
+      space_heat:
+        gas: 0.97
+        oil: 0.9
+        solid_fossil: 0.8
+        biowaste: 0.8
+        solar_thermal: 1
+        electricity: 1
+      hot_water:
+        gas: 0.97
+        oil: 0.9
+        solid_fossil: 0.8
+        biowaste: 0.8
+        solar_thermal: 1
+        electricity: 1
+      cooking:
+        gas: 0.28
+        oil: 0.28
+        solid_fossil: 0.15
+        biowaste: 0.1
+        electricity: 0.5
+    heat_pump:
+      sink_temperature:
+        underfloor: 35
+        radiator_large: 50
+        radiator_conventional: 65
+        hot_water: 60
+      space_heat_sink_shares:
+        underfloor: 0.1
+        radiator_large: 0.15
+        radiator_conventional: 0.75
+      heat_pump_shares:
+        ashp: 0.9
+        gshp: 0.1
+      correction_factor: 0.85

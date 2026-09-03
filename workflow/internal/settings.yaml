@@ -1,5 +1,171 @@
 # Module settings that users cannot modify.
 resources:
-  automatic:
-    # Links for automatically downloaded files
-    dummy_readme: "https://raw.githubusercontent.com/modelblocks-org/docs/refs/heads/main/README.md"
+  jrc:
+    use_version: 2023
+    versions: [2015, 2021, 2023]
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/{folder}/{file}
+    spatial_scope:
+      - AT
+      - BE
+      - BG
+      - CY
+      - CZ
+      - DE
+      - DK
+      - EE
+      - EL
+      - ES
+      - FI
+      - FR
+      - HR
+      - HU
+      - IE
+      - IT
+      - LT
+      - LU
+      - LV
+      - MT
+      - NL
+      - PL
+      - PT
+      - RO
+      - SE
+      - SI
+      - SK
+      - UK  # Only 2015
+  when2heat:
+    url: https://zenodo.org/records/10965295/files/{dataset}.csv
+    datasets: ["daily_demand", "hourly_factors_COM", "hourly_factors_MFH", "hourly_factors_SFH"]
+  timezone_boundaries:
+    use_version: 2026c
+    file: combined.json
+    url: https://github.com/evansiroky/timezone-boundary-builder/releases/download/{version}/timezones.geojson.zip
+    sha256: 7d3f0c5a33b6acd891335c0ad5ba767736b6914cb1a1d68c71921c17ce358948
+  stable:  # Helper Zenodo repository with stable versions of government/manufacturer data.
+    url: https://zenodo.org/records/22144030/files/{dataset}
+    datasets:
+     - CHE_energy_balance.xlsx
+     - CHE_energy_consumption_households.xlsx
+     - CHE_energy_consumption_industry.xlsx
+     - cens_21dwbo_r2.tsv.gz
+     - estat_nrg_bal_c.tsv.gz
+     - GBR_End_Use_tables.zip
+     - heat_pump_characteristics.nc
+    ECUK_releases: [2021, 2025]
+  ghsl:
+    url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A/{stem}/V1-0/{stem}_V1_0.zip
+    stem: GHS_POP_E{epoch}_GLOBE_R2023A_54009_{resolution}
+    epochs: [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030]
+    resolutions: [100, 1000]
+scope:
+  datasets:
+    annual_energy_balance:
+      proxy_config: annual_energy_balance
+      proxy_requires_shape_population: true
+      countries:
+        - ALB
+        - AUT
+        - BEL
+        - BGR
+        - BIH
+        - CHE
+        - CYP
+        - CZE
+        - DEU
+        - DNK
+        - EST
+        - FIN
+        - FRA
+        - GBR
+        - GEO
+        - GRC
+        - HRV
+        - HUN
+        - IRL
+        - ISL
+        - ITA
+        - LVA
+        - LTU
+        - LUX
+        - MDA
+        - MKD
+        - MLT
+        - MNE
+        - NLD
+        - NOR
+        - POL
+        - PRT
+        - ROU
+        - SRB
+        - SVK
+        - SVN
+        - ESP
+        - SWE
+        - TUR
+        - UKR
+    household_end_use:
+      proxy_config: household_end_use
+      proxy_requires_shape_population: false
+      countries:
+        - AUT
+        - BEL
+        - BGR
+        - CHE
+        - CYP
+        - CZE
+        - DEU
+        - DNK
+        - EST
+        - FIN
+        - FRA
+        - GBR
+        - GRC
+        - HRV
+        - HUN
+        - IRL
+        - ITA
+        - LVA
+        - LTU
+        - LUX
+        - MLT
+        - NLD
+        - POL
+        - PRT
+        - ROU
+        - SVK
+        - SVN
+        - ESP
+        - SWE
+    commercial_end_use:
+      proxy_config: jrc_idees
+      proxy_requires_shape_population: false
+      countries:
+        - AUT
+        - BEL
+        - BGR
+        - HRV
+        - CYP
+        - CZE
+        - DNK
+        - EST
+        - FIN
+        - FRA
+        - DEU
+        - GRC
+        - HUN
+        - IRL
+        - ITA
+        - LVA
+        - LTU
+        - LUX
+        - NLD
+        - MLT
+        - POL
+        - PRT
+        - ROU
+        - SVK
+        - SVN
+        - ESP
+        - SWE
+        - GBR
+        - CHE

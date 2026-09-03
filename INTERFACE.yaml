@@ -1,4 +1,6 @@
 # Module Input-Output structure for automated docs generation
+convention_version: v1.0.0
+
 pathvars:
   snakemake_defaults:
     logs:
@@ -11,38 +13,43 @@ pathvars:
       default: "<results>"
       description: "location of module result (output) files."
   user_resources:
-    user_message:
-      default: "<resources>/user/user_message.md"
-      description: Example file emulating external files requested from a user.
-  results:
-    combined_text:
-      default: "<results>/combined_text.md"
-      description: Example file emulating module results.
+    edh_api:
+      default: "<resources>/user/edh_api.txt"
+      description: |
+        Earth Data Hub API key used to download ERA5 weather data.
+        The file must contain only the API key.
+    shapes:
+      default: "<resources>/user/{shapes}/shapes.parquet"
+      description: |
+        Region-specific polygons to process.
+        The parquet file must include the following columns:
 
-# Wildcard example:
-#
-# pathvars:
-#   snakemake_defaults:
-#     logs:
-#       default: "<logs>"
-#       description: location of rule log files.
-#     resources:
-#       default: "<resources>"
-#       description: "location of module resource files."
-#     results:
-#       default: "<results>"
-#       description: "location of module results."
-#   user_resources:
-#     shapes:
-#       default: "<resources>/user/{shapes}/shapes.parquet"
-#       description: region-specific polygons to process.
-#     proxy:
-#       default: "<resources>/user/proxy.tiff"
-#       description: global proxy raster file.
-#   results:
-#     capacity:
-#       default: "<results>/{shapes}/{scenario}/capacity.parquet"
-#       description: Module results
-# wildcards:
-#   shapes: resolution case
-#   scenario: configured scenario case
+        - `shape_id`: unique identifier for each output region.
+        - `country_id`: ISO 3166-1 alpha-3 country code.
+        - `shape_class`: shape context. Only rows with `land` are processed.
+        - `geometry`: polygon geometry.
+  results:
+    annual_heat_demand:
+      default: "<results>/{shapes}/annual/heat_demand_twh.parquet"
+      description: |
+        Annual useful heat demand in TWh, scaled from countries to shapes.
+        This table contains the following columns:
+        - `end_use`: cooking, hot_water or space_heat.
+        - `category`: commercial or households
+        - `year`: year the demand applies to.
+        - `shape_id`: exact shape ID as seen in the input `shapes.parquet` case.
+        - `heat_demand_twh`: annual demand in TWh.
+    heat_demand:
+      default: "<results>/{shapes}/hourly/heat_demand_mwh.parquet"
+      description: |
+        Shape-aggregated heat demand in MWh with a harmonised UTC hourly index.
+    heat_pump_cop:
+      default: "<results>/{shapes}/hourly/heat_pump_cop_pu.parquet"
+      description: >
+        Shape-aggregated heat-pump coefficient of performance in p.u. with a harmonised UTC hourly index.
+    heat_pump_electricity_demand:
+      default: "<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet"
+      description: >
+        Shape-aggregated electricity demand for heat pumps in MWh with a harmonised UTC hourly index.
+wildcards:
+  shapes: name of the provided shapes case.
