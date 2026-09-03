@@ -22,11 +22,11 @@ def prepare_final_heat_demand(
     path_to_carrier_names: str,
     data_proxies: dict[str, dict[str, list[str]]],
     country_codes: list[str],
-    model_years: list[int],
+    demand_years: list[int],
     path_to_final_demand: str,
 ) -> None:
     """Match years, scale end-use shares, and proxy missing annual demand."""
-    model_years = [int(year) for year in model_years]
+    demand_years = [int(year) for year in demand_years]
     data_proxies = data_proxies or {}
     energy_balances = _read_energy_balances(
         path_to_energy_balance, path_to_carrier_names
@@ -48,7 +48,7 @@ def prepare_final_heat_demand(
         }
 
     energy_balances = {
-        sector: balance.loc[:, model_years]
+        sector: balance.loc[:, demand_years]
         for sector, balance in energy_balances.items()
     }
     sector_balances = {
@@ -71,14 +71,14 @@ def prepare_final_heat_demand(
     for sector in ("residential", "services"):
         baseline = _read_sector_baseline(baseline_paths[sector])
         shares = calculate_end_use_shares(baseline)
-        shares = match_model_years(
-            shares, model_years, ["carrier_name", "country_code"]
+        shares = match_demand_years(
+            shares, demand_years, ["carrier_name", "country_code"]
         )
         demand = scale_to_energy_balance(shares, sector_balances[sector])
         demand = _allocate_ambient_heat(demand, sector_balances[sector])
-        official = read_official_final_demand(official_paths[sector], model_years)
+        official = read_official_final_demand(official_paths[sector], demand_years)
         demand = overlay_official_final_demand(demand, official)
-        demand = _to_sector_wide(demand, sector, model_years)
+        demand = _to_sector_wide(demand, sector, demand_years)
         demand = proxy_end_use_demand(
             demand,
             sector_balances[sector],
@@ -124,15 +124,15 @@ def calculate_end_use_shares(baseline: pd.DataFrame) -> pd.Series:
     return values.div(totals).dropna().rename("value")
 
 
-def match_model_years(
-    values: pd.Series, model_years: list[int], group_levels: list[str]
+def match_demand_years(
+    values: pd.Series, demand_years: list[int], group_levels: list[str]
 ) -> pd.Series:
     """Repeat the nearest observed year; ties use the earlier source year."""
     pieces = []
     index_names = list(values.index.names)
     for _, group in values.groupby(level=group_levels):
         available_years = group.index.get_level_values("year").unique()
-        for target_year in model_years:
+        for target_year in demand_years:
             source_year = min(
                 available_years, key=lambda year: (abs(year - target_year), year)
             )
@@ -145,8 +145,8 @@ def match_model_years(
     return pd.concat(pieces).sort_index()
 
 
-def read_official_final_demand(paths: list[str], model_years: list[int]) -> pd.Series:
-    """Read absolute country statistics and match them to the model years."""
+def read_official_final_demand(paths: list[str], demand_years: list[int]) -> pd.Series:
+    """Read absolute country statistics and match them to the demand years."""
     index_names = ["carrier_name", "end_use", "country_code", "year"]
     if not paths:
         empty_index = pd.MultiIndex.from_arrays(
@@ -156,8 +156,8 @@ def read_official_final_demand(paths: list[str], model_years: list[int]) -> pd.S
 
     baseline = pd.concat([pd.read_parquet(path) for path in paths], ignore_index=True)
     values = baseline.set_index(index_names)["value"].sort_index()
-    return match_model_years(
-        values, model_years, ["carrier_name", "end_use", "country_code"]
+    return match_demand_years(
+        values, demand_years, ["carrier_name", "end_use", "country_code"]
     )
 
 
@@ -188,7 +188,7 @@ def overlay_official_final_demand(
 def scale_to_energy_balance(
     end_use_shares: pd.Series, energy_balance: pd.DataFrame
 ) -> pd.Series:
-    """Scale end-use shares by carrier totals from the model-year balance."""
+    """Scale end-use shares by carrier totals from the demand-year balance."""
     balance = energy_balance.stack()
     balance.index = balance.index.set_names(["carrier_name", "country_code", "year"])
     lookup = pd.MultiIndex.from_arrays(
@@ -219,14 +219,14 @@ def _allocate_ambient_heat(
 
 
 def _to_sector_wide(
-    demand: pd.Series, sector: str, model_years: list[int]
+    demand: pd.Series, sector: str, demand_years: list[int]
 ) -> pd.DataFrame:
     category = {"residential": "household", "services": "commercial"}[sector]
     return (
         demand.where(demand > 0)
         .dropna()
         .unstack("year")
-        .reindex(columns=model_years)
+        .reindex(columns=demand_years)
         .assign(cat_name=category)
         .set_index("cat_name", append=True)
         .reorder_levels(["end_use", "carrier_name", "country_code", "cat_name"])
@@ -442,7 +442,7 @@ if __name__ == "__main__":
         paths_to_population=_as_list(snakemake.input.population),
         path_to_carrier_names=snakemake.input.carrier_names,
         country_codes=snakemake.params.countries,
-        model_years=snakemake.params.model_years,
+        demand_years=snakemake.params.demand_years,
         data_proxies=snakemake.params.data_proxies,
         path_to_final_demand=snakemake.output.final_demand,
     )

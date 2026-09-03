@@ -65,7 +65,7 @@ rule heat_pump_electricity_demand_timeseries:
     conda:
         "../envs/module.yaml"
     params:
-        weather_model_years=WEATHER_MODEL_YEARS,
+        weather_demand_years=WEATHER_DEMAND_YEARS,
     message:
         "Calculate heat-pump COP and electricity demand time series for '{wildcards.shapes}' shapes."
     script:

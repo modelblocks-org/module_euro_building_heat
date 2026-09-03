@@ -1,10 +1,10 @@
 module_euro_building_heat:
   crs:
     projected: EPSG:3035
-  years:
+  demand_years:
     start: 2023
     end: 2024
-  weather:
+  weather_years:
     start: 2023
     end: 2024
   threads:

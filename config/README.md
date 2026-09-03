@@ -6,29 +6,29 @@ We recommend consulting the following before using this module:
 
 ## Configuration overview
 
-For the complete module output set, configure `years`, `weather`, `threads`, `population`, `crs`, `heat.tech_efficiencies`, and `heat.heat_pump` as shown in the example.
+For the complete module output set, configure `demand_years`, `weather_years`, `threads`, `population`, `crs`, `heat.tech_efficiencies`, and `heat.heat_pump` as shown in the example.
 Only `data_proxies` and `heat.useful_heat_demand` are optional.
 
-## Model and weather years
+## Demand and weather years
 
 Both year ranges include `start` and exclude `end`:
 
 ```yaml
-years:
+demand_years:
   start: 2023
   end: 2024
 
-weather:
+weather_years:
   start: 2023
   end: 2024
 ```
 
-`years` selects the annual heat-demand model years.
-The supported model period is 2010–2023, so `years.start` must be at least 2010 and `years.end` cannot exceed 2024.
+`demand_years` selects the annual heat-demand years.
+The supported demand period is 2010–2023, so `demand_years.start` must be at least 2010 and `demand_years.end` cannot exceed 2024.
 
-`weather` selects the ERA5 years used to construct the hourly profiles.
-It may differ from `years`, but it must contain the same number of years.
-Years are paired in order: for example, `years: 2022–2024` and `weather: 2018–2020` use 2018 weather for 2022 demand and 2019 weather for 2023 demand.
+`weather_years` selects the ERA5 years used to construct the hourly profiles.
+It may differ from `demand_years`, but it must contain the same number of years.
+Years are paired in order: for example, `demand_years: 2022–2024` and `weather_years: 2018–2020` use 2018 weather for 2022 demand and 2019 weather for 2023 demand.
 Hourly output timestamps retain the configured weather years.
 
 ## Threads
@@ -55,7 +55,7 @@ The accepted values are:
 - `100`: the more detailed 100 m dataset, with a larger download and higher
   processing cost.
 
-The workflow automatically chooses the available five-year GHSL population epoch closest to `years.start`.
+The workflow automatically chooses the available five-year GHSL population epoch closest to `demand_years.start`.
 Population is used to allocate national annual demand and weather-grid profiles to the user-provided shapes.
 
 ## Coordinate reference systems

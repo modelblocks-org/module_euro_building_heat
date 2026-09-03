@@ -4,7 +4,7 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-from final_heat_demand import match_model_years
+from final_heat_demand import match_demand_years
 
 if TYPE_CHECKING:
     snakemake: Any
@@ -29,7 +29,7 @@ def calculate_useful_heat(
     paths_to_services_useful_baselines: list[str],
     heat_tech_params: dict[str, dict[str, float]],
     useful_heat_demand_source: str,
-    model_years: list[int],
+    demand_years: list[int],
     path_to_output: str,
 ) -> None:
     """Convert final demand and optionally prioritize published useful heat."""
@@ -42,7 +42,7 @@ def calculate_useful_heat(
                 "residential": paths_to_residential_useful_baselines,
                 "services": paths_to_services_useful_baselines,
             },
-            model_years,
+            demand_years,
         )
         calculated = apply_published_precedence(calculated, published)
 
@@ -100,9 +100,9 @@ def _efficiencies(params: dict[str, float], carriers: pd.Index) -> pd.Series:
 
 
 def _read_published_useful_heat(
-    baseline_paths: dict[str, list[str]], model_years: list[int]
+    baseline_paths: dict[str, list[str]], demand_years: list[int]
 ) -> pd.DataFrame:
-    """Read standardized published useful heat and match it to model years."""
+    """Read standardized published useful heat and match it to demand years."""
     pieces = []
     for sector, paths in baseline_paths.items():
         baseline = pd.concat(
@@ -113,7 +113,7 @@ def _read_published_useful_heat(
             & (baseline["country_code"] != "GBR")
         ]
         values = baseline.groupby(["end_use", "country_code", "year"])["value"].sum()
-        matched = match_model_years(values, model_years, ["end_use", "country_code"])
+        matched = match_demand_years(values, demand_years, ["end_use", "country_code"])
         pieces.append(
             matched.unstack("end_use")
             .assign(
@@ -150,6 +150,6 @@ if __name__ == "__main__":
         paths_to_services_useful_baselines=[snakemake.input.services_useful_baseline],
         heat_tech_params=snakemake.params.heat_tech_params,
         useful_heat_demand_source=snakemake.params.useful_heat_demand,
-        model_years=snakemake.params.model_years,
+        demand_years=snakemake.params.demand_years,
         path_to_output=snakemake.output.total_demand,
     )

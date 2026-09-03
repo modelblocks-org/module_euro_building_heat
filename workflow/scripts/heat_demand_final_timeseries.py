@@ -45,7 +45,7 @@ def scale_heat_demand_profiles(
     annual_demand_twh: xr.Dataset,
     unscaled_demand_profiles: xr.Dataset,
     building_shares: xr.DataArray,
-    weather_model_years: dict[int, int],
+    weather_demand_years: dict[int, int],
 ) -> xr.DataArray:
     """Create demand timeseries for space heat and hot water across all building types.
 
@@ -64,8 +64,8 @@ def scale_heat_demand_profiles(
         building_shares:
             Single- and multi-family dwelling shares by shape, plus a commercial
             multiplier of one, used to combine profiles into building categories.
-        weather_model_years:
-            Mapping from weather years in the profile timestamps to model years in
+        weather_demand_years:
+            Mapping from weather years in the profile timestamps to demand years in
             annual demand totals.
 
     Returns:
@@ -85,7 +85,7 @@ def scale_heat_demand_profiles(
     scaled_demand_profiles = grouped_unscaled_demand.groupby("time.year").apply(
         _scale_demand,
         annual_demand=annual_demand_twh,
-        weather_model_years={int(k): int(v) for k, v in weather_model_years.items()},
+        weather_demand_years={int(k): int(v) for k, v in weather_demand_years.items()},
     )
 
     return scaled_demand_profiles.to_array("end_use") * TWH_TO_MWH
@@ -94,13 +94,13 @@ def scale_heat_demand_profiles(
 def _scale_demand(
     one_year_profile: xr.Dataset,
     annual_demand: xr.Dataset,
-    weather_model_years: dict[int, int],
+    weather_demand_years: dict[int, int],
 ) -> xr.Dataset:
-    """Scale one weather year with the annual demand for its paired model year."""
+    """Scale one weather year with the annual demand for its paired demand year."""
     weather_year = int(one_year_profile.time.dt.year[0])
-    model_year = weather_model_years[weather_year]
+    demand_year = weather_demand_years[weather_year]
     normalised_profile = one_year_profile / one_year_profile.sum("time")
-    demand = normalised_profile * annual_demand.sel(year=model_year, drop=True)
+    demand = normalised_profile * annual_demand.sel(year=demand_year, drop=True)
     return demand.sum("category")
 
 
@@ -136,7 +136,7 @@ def main() -> None:
         annual_demand_ds,
         unscaled_profiles,
         building_shares,
-        snakemake.params.weather_model_years,
+        snakemake.params.weather_demand_years,
     )
 
     final_df = (

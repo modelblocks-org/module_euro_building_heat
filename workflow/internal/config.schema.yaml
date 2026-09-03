@@ -3,16 +3,16 @@ description: "Schema for user-provided heat demand configuration."
 type: object
 additionalProperties: false
 required:
-  - years
-  - weather
+  - demand_years
+  - weather_years
   - threads
   - population
   - crs
   - heat
 properties:
-  years:
+  demand_years:
     description: >
-      Selects the annual heat-demand model years. The range includes `start`
+      Selects the annual heat-demand years. The range includes `start`
       and excludes `end`.
     type: object
     additionalProperties: false
@@ -26,11 +26,11 @@ properties:
         type: integer
         minimum: 2011
         maximum: 2024
-  weather:
+  weather_years:
     description: >
       Selects the ERA5 years used to construct hourly profiles. The range
       includes `start`, excludes `end`, and must span the same number of years
-      as `years`; weather and model years are paired in order.
+      as `demand_years`; weather and demand years are paired in order.
     type: object
     additionalProperties: false
     required: [start, end]

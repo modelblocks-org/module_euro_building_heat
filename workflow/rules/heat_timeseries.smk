@@ -105,7 +105,7 @@ rule heat_demand_final_timeseries:
     conda:
         "../envs/module.yaml"
     params:
-        weather_model_years=WEATHER_MODEL_YEARS,
+        weather_demand_years=WEATHER_DEMAND_YEARS,
     message:
         "Scale heat demand time series for '{wildcards.shapes}' shapes."
     script:

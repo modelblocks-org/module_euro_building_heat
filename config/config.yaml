@@ -1,10 +1,10 @@
 # Minimal example configuration for the heat demand workflow.
-years:
+demand_years:
   # End year is exclusive, matching the Modelblocks module convention.
   start: 2023
   end: 2024
 
-weather:
+weather_years:
   # Weather years used to shape hourly heat demand profiles. End year is exclusive.
   start: 2023
   end: 2024

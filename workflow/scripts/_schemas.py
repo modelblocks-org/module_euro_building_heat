@@ -129,7 +129,7 @@ class AnnualHeatDemandSchema(pa.DataFrameModel):
     category: Series[str] = pa.Field(isin=BUILDING_CATEGORIES)
     "Building category."
     year: Series[int] = pa.Field(ge=2000)
-    "Model year."
+    "Demand year."
     shape_id: Series[str]
     "Shape identifier."
     heat_demand_twh: Series[float] = pa.Field(ge=0)

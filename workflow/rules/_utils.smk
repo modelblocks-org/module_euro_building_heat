@@ -3,12 +3,12 @@
 
 def _get_year_range(group: str) -> list[int]:
     """Get ordered year range (lower->higher)."""
-    if group not in ["years", "weather"]:
+    if group not in ["demand_years", "weather_years"]:
         raise ValueError(f"Invalid year range requested: '{group}''.")
     return list(range(config[group]["start"], config[group]["end"]))
 
 
-MODEL_YEARS = _get_year_range("years")
+DEMAND_YEARS = _get_year_range("demand_years")
 JRC_IDEES_VERSION = internal["resources"]["jrc"]["use_version"]
 JRC_IDEES_VERSIONS = [str(i) for i in internal["resources"]["jrc"]["versions"]]
 JRC_IDEES_SPATIAL_SCOPE = [
@@ -16,8 +16,8 @@ JRC_IDEES_SPATIAL_SCOPE = [
     for country in internal["resources"]["jrc"]["spatial_scope"]
     if not (JRC_IDEES_VERSION > 2015 and country == "UK")
 ]
-WEATHER_YEARS = _get_year_range("weather")
-WEATHER_MODEL_YEARS = dict(zip(WEATHER_YEARS, MODEL_YEARS))
+WEATHER_YEARS = _get_year_range("weather_years")
+WEATHER_DEMAND_YEARS = dict(zip(WEATHER_YEARS, DEMAND_YEARS))
 LOCAL_UNSCALED_HEAT_PROFILES = expand(
     "<resources>/automatic/shapes/{{shapes}}/hourly_unscaled_heat_demand_local/{weather_year}.nc",
     weather_year=WEATHER_YEARS,
@@ -28,20 +28,22 @@ SECTOR_TO_JRC_DATASET = {"services": "Tertiary", "residential": "Residential"}
 
 def additional_config_validation() -> None:
     """Run additional validation that JSON schemas do not support."""
-    if config["years"]["start"] >= config["years"]["end"]:
+    if config["demand_years"]["start"] >= config["demand_years"]["end"]:
         raise ValueError(
-            "Configuration error: years.start must be less than years.end. "
+            "Configuration error: demand_years.start must be less than "
+            "demand_years.end. "
             "The end year is exclusive."
         )
-    if config["weather"]["start"] >= config["weather"]["end"]:
+    if config["weather_years"]["start"] >= config["weather_years"]["end"]:
         raise ValueError(
-            "Configuration error: weather.start must be less than weather.end. "
+            "Configuration error: weather_years.start must be less than "
+            "weather_years.end. "
             "The end year is exclusive."
         )
-    if len(MODEL_YEARS) != len(WEATHER_YEARS):
+    if len(DEMAND_YEARS) != len(WEATHER_YEARS):
         raise ValueError(
-            "Configuration error: weather year span must match model year span. "
-            f"Got model years {MODEL_YEARS} and weather years {WEATHER_YEARS}."
+            "Configuration error: weather year span must match demand year span. "
+            f"Got demand years {DEMAND_YEARS} and weather years {WEATHER_YEARS}."
         )
 
 
@@ -68,7 +70,7 @@ def get_configured_population_file() -> str:
     """Helper to obtain the GHSL population file from the configuration."""
     epoch = min(
         internal["resources"]["ghsl"]["epochs"],
-        key=lambda year: abs(year - config["years"]["start"]),
+        key=lambda year: abs(year - config["demand_years"]["start"]),
     )
     resolution = config["population"]["resolution"]
     return f"<resources>/automatic/ghsl/pop_{epoch}_{resolution}.tif"
@@ -141,6 +143,6 @@ def _get_ecuk_baseline_file() -> str:
     release = min(
         year
         for year in get_supported_ecuk_releases()
-        if year > config["years"]["end"] - 1
+        if year > config["demand_years"]["end"] - 1
     )
     return f"<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"

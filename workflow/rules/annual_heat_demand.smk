@@ -40,7 +40,7 @@ rule process_annual_energy_balances:
     conda:
         "../envs/module.yaml"
     params:
-        first_year=min(config["years"]["start"], 2000),
+        first_year=min(config["demand_years"]["start"], 2000),
     message:
         "Process annual energy balances from Eurostat, Swiss, and ECUK statistics."
     script:
@@ -73,7 +73,7 @@ rule process_final_heat_demand:
     conda:
         "../envs/module.yaml"
     params:
-        model_years=MODEL_YEARS,
+        demand_years=DEMAND_YEARS,
         countries=lambda wildcards, input: _read_checkpoint_lines(input.country_ids),
         data_proxies=config.get("data_proxies", {}),
     message:
@@ -96,7 +96,7 @@ rule process_useful_heat:
     conda:
         "../envs/module.yaml"
     params:
-        model_years=MODEL_YEARS,
+        demand_years=DEMAND_YEARS,
         heat_tech_params=config["heat"]["tech_efficiencies"],
         useful_heat_demand=config["heat"].get("useful_heat_demand", "actual"),
     message:
