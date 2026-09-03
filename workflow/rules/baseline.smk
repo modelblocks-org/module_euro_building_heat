@@ -1,3 +1,10 @@
+"""Baseline statistic files for heat demand data.
+
+These rules create the standardised annual statistic datasets that are used during proxying
+to fill in data for missing countries.
+"""
+
+
 rule baseline_jrc_idees_sector:
     input:
         jrc_files=lambda wc: _get_jrc_baseline_files(wc.sector),

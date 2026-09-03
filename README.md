@@ -84,30 +84,8 @@ Git.
 ## Input / output structure
 <!-- Please describe input / output file placement below -->
 
-Please consult the [interface file](./INTERFACE.yaml) for the machine-readable
-module interface and the [integration example](./tests/integration/Snakefile)
-for a complete module import.
+Please consult the [interface file](./INTERFACE.yaml) for more information.
 
-The module receives inputs and exposes results through Snakemake path variables:
-
-| Path variable | Default path | Description |
-| --- | --- | --- |
-| `edh_api` | `<resources>/user/edh_api.txt` | Earth Data Hub API key used to download ERA5 data. |
-| `shapes` | `<resources>/user/{shapes}/shapes.parquet` | User-provided polygons to process. |
-| `annual_heat_demand` | `<results>/{shapes}/annual/heat_demand_twh.parquet` | Tidy annual useful heat demand in TWh with `end_use`, `category`, `year`, `shape_id`, and `heat_demand_twh` columns. |
-| `heat_demand` | `<results>/{shapes}/hourly/heat_demand_mwh.parquet` | Final hourly useful heat demand in MWh by shape. |
-| `heat_pump_cop` | `<results>/{shapes}/hourly/heat_pump_cop_pu.parquet` | Final hourly heat-pump COP in p.u. by shape. |
-| `heat_pump_electricity_demand` | `<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet` | Final hourly electricity demand in MWh for heat pumps by shape. |
-
-The shapes input must be a GeoParquet file containing:
-
-- `shape_id`: unique identifier for each output region.
-- `country_id`: ISO 3166-1 alpha-3 country code used to match national heat
-  statistics and configured proxies.
-- `shape_class`: shape context. Only rows with the exact value `land` are
-  processed.
-- `geometry`: polygon geometry with correct CRS metadata readable by GeoPandas.
-  The workflow normalises prepared shapes to EPSG:4326 internally.
 
 ## Development
 <!-- Please do not modify this templated section -->

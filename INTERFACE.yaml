@@ -23,28 +23,33 @@ pathvars:
       description: |
         Region-specific polygons to process.
         The parquet file must include the following columns:
-        `shape_id`, `country_id` (ISO alpha-3), `shape_class`, and `geometry`.
-        Only rows with `shape_class` set to `land` are processed.
+
+        - `shape_id`: unique identifier for each output region.
+        - `country_id`: ISO 3166-1 alpha-3 country code.
+        - `shape_class`: shape context. Only rows with `land` are processed.
+        - `geometry`: polygon geometry.
   results:
     annual_heat_demand:
       default: "<results>/{shapes}/annual/heat_demand_twh.parquet"
       description: |
         Annual useful heat demand in TWh, scaled from countries to shapes.
-        This table contains `end_use`, `category`, `year`, `shape_id`,
-        and `heat_demand_twh` columns.
+        This table contains the following columns:
+        - `end_use`: cooking, hot_water or space_heat.
+        - `category`: commercial or households
+        - `year`: year the demand applies to.
+        - `shape_id`: exact shape ID as seen in the input `shapes.parquet` case.
+        - `heat_demand_twh`: annual demand in TWh.
     heat_demand:
       default: "<results>/{shapes}/hourly/heat_demand_mwh.parquet"
       description: |
-        Shape-aggregated heat demand in MWh with a UTC hourly index.
-        Localised When2Heat behavior is converted using geometry-derived IANA timezones.
+        Shape-aggregated heat demand in MWh with a harmonised UTC hourly index.
     heat_pump_cop:
       default: "<results>/{shapes}/hourly/heat_pump_cop_pu.parquet"
       description: >
-        Shape-aggregated heat-pump coefficient of performance in p.u. with a UTC hourly index.
+        Shape-aggregated heat-pump coefficient of performance in p.u. with a harmonised UTC hourly index.
     heat_pump_electricity_demand:
       default: "<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet"
       description: >
-        Shape-aggregated electricity demand for heat pumps in MWh with the same
-        UTC hourly index as the COP file.
+        Shape-aggregated electricity demand for heat pumps in MWh with a harmonised UTC hourly index.
 wildcards:
   shapes: name of the provided shapes case.

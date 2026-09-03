@@ -29,9 +29,9 @@ rule process_annual_energy_balances:
         ch_industry_energy_balance="<resources>/automatic/stable/CHE_energy_consumption_industry.xlsx",
         gbr_residential=rules.baseline_ecuk_final_demand.output.residential,
         gbr_services=rules.baseline_ecuk_final_demand.output.services,
-        cat_names=workflow.source_path("../internal/energy-balance-category-names.csv"),
+        cat_names=workflow.source_path("../internal/eurostat_energy_category_names.csv"),
         carrier_names=workflow.source_path(
-            "../internal/energy-balance-carrier-names.csv"
+            "../internal/eurostat_energy_carrier_names.csv"
         ),
     output:
         temp("<resources>/automatic/annual-energy-balances.parquet"),
@@ -62,7 +62,7 @@ rule process_final_heat_demand:
         population=_annual_energy_balance_proxy_population_inputs,
         country_ids="<resources>/automatic/shapes/{shapes}/country_ids.txt",
         carrier_names=workflow.source_path(
-            "../internal/energy-balance-carrier-names.csv"
+            "../internal/eurostat_energy_carrier_names.csv"
         ),
     output:
         final_demand=temp(

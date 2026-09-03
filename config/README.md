@@ -28,7 +28,7 @@ The supported model period is 2010–2023, so `years.start` must be at least 201
 
 `weather` selects the ERA5 years used to construct the hourly profiles.
 It may differ from `years`, but it must contain the same number of years.
-Years arepaired in order: for example, `years: 2022–2024` and `weather: 2018–2020` use 2018 weather for 2022 demand and 2019 weather for 2023 demand.
+Years are paired in order: for example, `years: 2022–2024` and `weather: 2018–2020` use 2018 weather for 2022 demand and 2019 weather for 2023 demand.
 Hourly output timestamps retain the configured weather years.
 
 ## Threads
