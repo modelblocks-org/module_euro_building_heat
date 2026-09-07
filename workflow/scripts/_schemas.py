@@ -1,8 +1,11 @@
 """Schema validation generics."""
 
 from collections.abc import Iterable
+from pathlib import Path
 
+import numpy as np
 import pandas as pd
+import rasterio
 from pandera import pandas as pa
 from pandera.typing.geopandas import GeoSeries
 from pandera.typing.pandas import Series
@@ -31,6 +34,41 @@ END_USES: tuple[str, ...] = (
 )
 ANNUAL_HEAT_END_USES: tuple[str, ...] = ("cooking", "hot_water", "space_heat")
 BUILDING_CATEGORIES: tuple[str, ...] = ("commercial", "household")
+
+
+def validate_residential_space_heat_weight_raster(
+    path: str | Path, *, check_values: bool = True
+) -> None:
+    """Validate the heat-raster module's one-band support contract."""
+    with rasterio.open(path) as raster:
+        assert raster.count == 1
+        assert raster.crs
+        assert np.allclose(np.abs(raster.res), 100)
+        assert raster.nodatavals == (0.0,)
+        assert raster.descriptions == ("residential_space_heat_weight",)
+        assert raster.units == ("weighted_m2/ha",)
+        if not check_values:
+            return
+        for _, window in raster.block_windows(1):
+            values = raster.read(1, window=window)
+            assert np.isfinite(values).all()
+            assert (values >= 0).all()
+
+
+class ResidentialSpaceHeatWeightSchema(pa.DataFrameModel):
+    """Schema for space-heating support aggregated to Modelblocks shapes."""
+
+    class Config:
+        coerce = True
+        strict = True
+
+    shape_id: Series[str] = pa.Field(unique=True)
+    country_id: Series[str] = pa.Field(str_length=3)
+    weight: Series[float] = pa.Field(ge=0)
+
+    @pa.check("country_id", name="uppercase")
+    def check_country_id(cls, country_id: Series[str]) -> Series[bool]:
+        return country_id.str.isupper()
 
 
 class ShapesSchema(pa.DataFrameModel):

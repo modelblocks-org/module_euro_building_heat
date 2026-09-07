@@ -13,6 +13,13 @@ pathvars:
       default: "<results>"
       description: "location of module result (output) files."
   user_resources:
+    residential_space_heat_weight:
+      default: "<resources>/user/{shapes}/residential_space_heat_weight.tif"
+      description: |
+        Structural residential heat support from module_heat_rasters:
+        A_floor × f(S/V) × f(age), without a climate correction.
+        One 100 m band named residential_space_heat_weight, with units
+        weighted_m2/ha, a CRS, nodata 0, and finite non-negative values.
     edh_api:
       default: "<resources>/user/edh_api.txt"
       description: |
@@ -33,6 +40,9 @@ pathvars:
       default: "<results>/{shapes}/annual/heat_demand_twh.parquet"
       description: |
         Annual useful heat demand in TWh, scaled from countries to shapes.
+        Household space heating uses structural support times ERA5 HDD^elasticity,
+        normalised within each country and paired demand/weather year.
+        Other end uses retain population allocation.
         This table contains the following columns:
         - `end_use`: cooking, hot_water or space_heat.
         - `category`: commercial or households

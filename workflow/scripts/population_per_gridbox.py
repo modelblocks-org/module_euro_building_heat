@@ -1,5 +1,6 @@
 """Calculate population weights per weather gridbox and shape."""
 
+import logging
 import math
 import sys
 import warnings
@@ -10,6 +11,7 @@ import numpy as np
 import pandas as pd
 import rioxarray
 import xarray as xr
+from aggregate_residential_space_heat_weight import aggregate_support
 from gregor.aggregate import aggregate_raster_to_polygon
 from shapely.geometry import box
 
@@ -44,6 +46,9 @@ def population_on_weather_grid(
     lat_name: str,
     lon_name: str,
     out_path: str,
+    residential_raster: str,
+    residential_out_path: str,
+    grid_shapes_out_path: str,
 ) -> None:
     """Uses population as a proxy to regionalise heat demand."""
     # We need the coordinates. This can be any file with gridded data across Europe
@@ -77,6 +82,34 @@ def population_on_weather_grid(
         gridbox, locations, gridboxes_mapped_to_locations
     )
 
+    # Share the weather/shape overlay with structural support aggregation. The
+    # 100 m raster is streamed in blocks through Gregor (pixel-centre assignment).
+    logging.info(
+        "Aggregating structural residential support to weather/shape intersections"
+    )
+    structural = aggregate_support(residential_raster, gridboxes_mapped_to_locations)
+    structural_table = gridboxes_mapped_to_locations[["site", "id"]].copy()
+    structural_table["weight"] = structural
+    structural_weights = (
+        structural_table.groupby(["site", "id"]).weight.sum().to_xarray()
+    )
+    structural_weights = (
+        structural_weights.reindex(
+            site=coordinate_ds.site.values, id=locations.id.values
+        )
+        .fillna(0)
+        .rename("residential_space_heat_weight")
+    )
+    structural_weights.attrs.update(
+        units="weighted_m2",
+        allocator="A_floor * f(S/V) * f(age)",
+        coverage="Gregor pixel-centre assignment; no HDD applied",
+    )
+    structural_weights.to_netcdf(residential_out_path)
+    gridboxes_mapped_to_locations[["site", "id", "geometry"]].to_parquet(
+        grid_shapes_out_path
+    )
+
     gridboxes_mapped_to_locations = _aggregate_population_to_polygons(
         population, gridboxes_mapped_to_locations
     )
@@ -99,9 +132,11 @@ def population_on_weather_grid(
         )
 
     population_da = xr.DataArray.from_series(
-        gridboxes_mapped_to_locations.set_index(["site", "id"]).population
+        gridboxes_mapped_to_locations.groupby(["site", "id"]).population.sum()
     )
-    population_da.to_netcdf(out_path)
+    population_da.reindex(id=locations.id.values).fillna(0).to_netcdf(out_path)
+    coordinate_ds.close()
+    population_raster.close()
 
 
 def _weather_gridbox_polygons(
@@ -200,6 +235,7 @@ def _aggregate_population_to_polygons(
 
 if __name__ == "__main__":
     sys.stderr = open(snakemake.log[0], "w", buffering=1)
+    logging.basicConfig(level=logging.INFO)
     population_on_weather_grid(
         path_to_population=snakemake.input.population,
         path_to_locations=snakemake.input.locations,
@@ -207,4 +243,7 @@ if __name__ == "__main__":
         lat_name=snakemake.params.lat_name,
         lon_name=snakemake.params.lon_name,
         out_path=snakemake.output[0],
+        residential_raster=snakemake.input.residential_raster,
+        residential_out_path=snakemake.output.residential_weights,
+        grid_shapes_out_path=snakemake.output.grid_shapes,
     )

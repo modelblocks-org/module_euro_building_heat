@@ -11,12 +11,14 @@ rule process_gridded_weather_data:
         ),
         wind10m=temp("<resources>/automatic/shapes/{shapes}/gridded_weather/wind10m.nc"),
         tsoil5=temp("<resources>/automatic/shapes/{shapes}/gridded_weather/tsoil5.nc"),
+        hdd="<resources>/automatic/shapes/{shapes}/gridded_weather/hdd.nc",
     log:
         "<logs>/{shapes}/timeseries/process_gridded_weather_data.log",
     conda:
         "../envs/module.yaml"
     params:
         weather_years=WEATHER_YEARS,
+        hdd_base_temperature=config["heat"].get("hdd", {}).get("base_temperature", 15.5),
     message:
         "Process ERA5 weather data for '{wildcards.shapes}'."
     script:
@@ -28,6 +30,7 @@ rule local_unscaled_heat_profiles:
         wind_speed=rules.process_gridded_weather_data.output.wind10m,
         temperature=rules.process_gridded_weather_data.output.temperature,
         grid_weights="<resources>/automatic/shapes/{shapes}/population.nc",
+        residential_weights="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
         when2heat_daily="<resources>/automatic/when2heat/daily_demand.csv",
         when2heat_hourly_com="<resources>/automatic/when2heat/hourly_factors_COM.csv",
         when2heat_hourly_mfh="<resources>/automatic/when2heat/hourly_factors_MFH.csv",
@@ -71,8 +74,11 @@ rule population_per_weather_gridbox:
         weather_grid=rules.process_gridded_weather_data.output.grid,
         population=rules.clip_population.output.path,
         locations=rules.prepare_shapes.output[0],
+        residential_raster="<residential_space_heat_weight>",
     output:
-        temp("<resources>/automatic/shapes/{shapes}/population.nc"),
+        population=temp("<resources>/automatic/shapes/{shapes}/population.nc"),
+        residential_weights="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
+        grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     log:
         "<logs>/{shapes}/timeseries/population_per_weather_gridbox.log",
     conda:

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 if TYPE_CHECKING:
@@ -83,13 +84,47 @@ def write_module_weather_outputs(
         tmp_path.replace(output_path)
 
 
+def heating_degree_days(
+    temperature: xr.DataArray, weather_years: list[int], base_temperature: float
+) -> xr.Dataset:
+    """Sum positive deficits of daily mean temperature, excluding buffer days."""
+    years = []
+    for year in weather_years:
+        hourly = temperature.sel(time=str(year))
+        expected = pd.date_range(
+            f"{year}-01-01", f"{year + 1}-01-01", freq="h", inclusive="left"
+        )
+        if not hourly.time.to_index().equals(expected):
+            raise ValueError(f"HDD calculation requires every ERA5 hour in {year}.")
+        daily = hourly.resample(time="1D").mean(skipna=False)
+        hdd = (base_temperature - daily).clip(min=0).sum("time", skipna=False).compute()
+        if not np.isfinite(hdd.values).all():
+            raise ValueError(f"Non-finite ERA5 temperatures in HDD year {year}.")
+        years.append(hdd)
+    hdd = xr.concat(years, dim=xr.IndexVariable("weather_year", weather_years)).rename(
+        "hdd"
+    )
+    hdd.attrs.update(
+        units="K day",
+        base_temperature_celsius=base_temperature,
+        definition="sum(max(base_temperature - daily_mean_temperature, 0)); UTC days",
+    )
+    return hdd.to_dataset()
+
+
 def process_gridded_weather_data(
-    path_to_era5: str | Path, output_paths: dict[str, str], weather_years: list[int]
+    path_to_era5: str | Path,
+    output_paths: dict[str, str],
+    weather_years: list[int],
+    hdd_base_temperature: float = 15.5,
 ) -> None:
     """Convert a local ERA5 file to the weather files used by the workflow."""
     start, end = weather_time_range(weather_years)
     with xr.open_dataset(path_to_era5, chunks={}) as era5:
         outputs = convert_era5_to_module_datasets(era5)
+        outputs["hdd"] = heating_degree_days(
+            outputs["temperature"].temperature, weather_years, hdd_base_temperature
+        )
         for dataset in outputs.values():
             dataset.attrs.update(
                 {
@@ -111,6 +146,8 @@ if __name__ == "__main__":
             "temperature": snakemake.output.temperature,
             "wind10m": snakemake.output.wind10m,
             "tsoil5": snakemake.output.tsoil5,
+            "hdd": snakemake.output.hdd,
         },
         weather_years=[int(year) for year in snakemake.params.weather_years],
+        hdd_base_temperature=snakemake.params.hdd_base_temperature,
     )

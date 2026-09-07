@@ -11,16 +11,66 @@ if TYPE_CHECKING:
     snakemake: Any
 
 
-def group_gridcells(gridded_data: xr.Dataset, grid_weight: xr.DataArray) -> xr.Dataset:
+def group_gridcells(
+    gridded_data: xr.Dataset,
+    grid_weight: xr.DataArray,
+    residential_weight: xr.DataArray | None = None,
+) -> xr.Dataset:
     """Group gridded heat data into resolution-specific units.
 
     Args:
         gridded_data (xr.Dataset): Gridded timeseries space heat and hot water data.
         grid_weight (xr.DataArray): Weighted mapping from grid (a.k.a. "site") to units.
+        residential_weight: Optional structural weights for household SFH/MFH
+            space-heating profiles. Other profiles retain population weights.
 
     Returns:
         xr.Dataset: Data grouped into resolution-specific units.
     """
+    if residential_weight is not None:
+        if set(residential_weight.dims) != {"site", "id"}:
+            raise ValueError("Residential weights must have dimensions site and id.")
+        if set(residential_weight.id.values) != set(grid_weight.id.values):
+            raise ValueError(
+                "Residential and population weights must cover the same shapes."
+            )
+        grid_weight, residential_weight = xr.align(
+            grid_weight.fillna(0),
+            residential_weight.fillna(0),
+            join="outer",
+            fill_value=0,
+        )
+        # Retain zero-demand shapes in both categories. A fallback profile only
+        # supplies a temporal shape; annual zero demand remains zero.
+        population_weights = grid_weight.where(
+            grid_weight.sum("site") > 0, residential_weight
+        )
+        heat_weights = residential_weight.where(
+            residential_weight.sum("site") > 0, grid_weight
+        )
+        population_profiles = group_gridcells(gridded_data, population_weights)
+        if (
+            "space_heat" not in gridded_data
+            or "building" not in gridded_data.space_heat.dims
+        ):
+            return population_profiles
+        household_buildings = [
+            b for b in gridded_data.building.values if b in {"SFH", "MFH"}
+        ]
+        if not household_buildings:
+            return population_profiles
+        household_profiles = group_gridcells(
+            gridded_data[["space_heat"]].sel(building=household_buildings), heat_weights
+        )
+        population_profiles["space_heat"] = xr.where(
+            population_profiles.building.isin(household_buildings),
+            household_profiles.space_heat.reindex(
+                building=population_profiles.building, fill_value=0
+            ),
+            population_profiles.space_heat,
+        )
+        return population_profiles
+
     required_dimensions = {"site", "id"}
     if set(grid_weight.dims) != required_dimensions:
         raise ValueError(

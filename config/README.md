@@ -35,6 +35,9 @@ The workflow selects the available population epoch closest to `demand_years.sta
   - `household_end_use`: proxies residential carrier-level end-use shares.
   - `jrc_idees`: proxies commercial carrier-level end-use shares.
 - `heat`: controls conversion to useful heat and average heat-pump performance.
+  - `hdd`: annual household space-heating severity correction.
+    - `base_temperature`: daily-mean ERA5 temperature threshold in °C (default `15.5`).
+    - `elasticity`: exponent applied to HDD (default `0.5`); `0` disables the correction.
   - `useful_heat_demand`: This is optional.
     `actual` (the default) uses published useful heat where available, while `calculate_all` applies the configured efficiencies everywhere.
   - `tech_efficiencies`: final-to-useful conversion factors by carrier under `space_heat`, `hot_water`, and `cooking`.
@@ -47,6 +50,43 @@ The workflow selects the available population epoch closest to `demand_years.sta
       Please omit exactly one configured sink to designate it for hot water.
     - `heat_pump_shares`: `ashp` and `gshp` shares, each between zero and one and together summing to one.
     - `correction_factor`: positive multiplier applied to the COP curves.
+
+## Residential space-heating allocation
+
+Provide the structural 100 m raster from `module_heat_rasters` through the
+`residential_space_heat_weight` path variable. Its values are
+`A_floor × f(S/V) × f(age)` and must not already include climate correction.
+Gregor sums this support over the intersections of Modelblocks shapes and ERA5
+cells. Aggregation runs in raster windows to bound memory and uses Gregor's
+pixel-centre boundary assignment, matching the population aggregation convention.
+
+For each configured weather year, HDD is the sum of
+`max(base_temperature - daily_mean_temperature, 0)` over UTC calendar days.
+The calculation uses the existing local ERA5 download, includes leap days,
+and excludes the extra days downloaded for hourly profile calculations.
+For shape `s`, weather cell `g`, and paired demand/weather year `y`, the annual
+household space-heating weight is `W[s,y] = sum_g(structural[s,g] × HDD[g,y]^elasticity)`.
+Each shape receives its country's national household space-heating demand times
+`W[s,y] / sum_country(W[:,y])`. There is no NUTS3 normalization. The denominator
+covers the supplied shapes in that country, so their combined demand equals the
+national total even when the supplied shapes cover only part of a country.
+Countries with zero resulting support raise an error instead of silently changing
+their totals. Hot water, cooking, and commercial demand retain population allocation.
+
+Hourly When2Heat calculations are unchanged. Household SFH/MFH space-heating
+profiles use structural weather-cell weights; hot water and commercial profiles
+use population. Because each regional hourly profile is normalized to its annual
+total, annual spatial heating severity is supplied by the HDD correction above.
+Heat-pump COP aggregation remains population weighted because its current inputs
+combine household and commercial categories.
+
+The annual allocation also writes
+`resources/automatic/{shapes}/household_space_heat_demand_mwh.tif` on the original
+100 m raster grid, with annual useful energy in **MWh per cell**, not per square metre.
+Each band records its demand year and paired weather year. It includes household
+space heating across all carriers, and uses the same pixel assignment and country
+normalization as the shape table. Zero marks cells without allocated demand.
+National totals and raster energy sums are checked during execution.
 
 This data module is part of the [Modelblocks](https://www.modelblocks.org/) project.
 Please consult the [Modelblocks documentation](https://modelblocks.readthedocs.io/) for more details.

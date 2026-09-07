@@ -35,12 +35,14 @@ data_proxies:
     MNE: [BGR, HRV, HUN, ROU, GRC]
     SMR: [ITA]
     SRB: [BGR, HRV, HUN, ROU, GRC]
+    XKX: [BGR, HRV, HUN, ROU, GRC]
   # annual_energy_balance uses energy balance data from the proxy country and scales with population.
   annual_energy_balance:
     AND: [ESP]
     LIE: [CHE]
     MCO: [FRA]
     SMR: [ITA]
+    XKX: [BGR, HRV, HUN, ROU, GRC]
   # household_end_use uses household end use data from the proxy country to scale annual energy balance data.
   household_end_use:
     ALB: [BGR, HRV, HUN, ROU, GRC]
@@ -54,6 +56,7 @@ data_proxies:
     NOR: [SWE, DNK]
     SMR: [ITA]
     SRB: [BGR, HRV, HUN, ROU, GRC]
+    XKX: [BGR, HRV, HUN, ROU, GRC]
   # jrc_idees uses JRC-IDEES commercial end-use shares from the proxy country.
   jrc_idees:
     ALB: [BGR, HRV, HUN, ROU, GRC]
@@ -67,9 +70,15 @@ data_proxies:
     NOR: [SWE, DNK]
     SMR: [ITA]
     SRB: [BGR, HRV, HUN, ROU, GRC]
+    XKX: [BGR, HRV, HUN, ROU, GRC]
 
 
 heat:
+  hdd:
+    # HDD = sum over days of max(base_temperature - daily mean ERA5 °C, 0).
+    base_temperature: 15.5
+    # Annual household space-heat weights = structural support * HDD^elasticity.
+    elasticity: 0.5
   # Use published JRC-IDEES useful heat where available (actual), except for the
   # UK where ECUK final demand is always converted with the efficiencies below.
   # Use calculate_all to convert final energy for every country.

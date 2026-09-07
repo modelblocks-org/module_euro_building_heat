@@ -114,6 +114,21 @@ properties:
     additionalProperties: false
     required: [tech_efficiencies]
     properties:
+      hdd:
+        description: Annual residential space-heating severity correction from ERA5.
+        type: object
+        additionalProperties: false
+        default: {}
+        properties:
+          base_temperature:
+            description: HDD base temperature in degrees Celsius, using daily mean temperature.
+            type: number
+            default: 15.5
+          elasticity:
+            description: Exponent applied to HDD before country-normalised household space-heat allocation. Zero disables the correction.
+            type: number
+            minimum: 0
+            default: 0.5
       useful_heat_demand:
         description: >
           Chooses whether to use published useful-heat data where available

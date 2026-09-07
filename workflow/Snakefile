@@ -12,6 +12,7 @@ pathvars:
     # User resources
     shapes="<resources>/user/{shapes}/shapes.parquet",
     edh_api="<resources>/user/edh_api.txt",
+    residential_space_heat_weight="<resources>/user/{shapes}/residential_space_heat_weight.tif",
     # Module results
     annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
     heat_demand="<results>/{shapes}/hourly/heat_demand_mwh.parquet",
@@ -58,6 +59,7 @@ workflow.source_path("scripts/_ecuk.py")
 workflow.source_path("scripts/_plots.py")
 workflow.source_path("scripts/_timeseries.py")
 workflow.source_path("scripts/_utils.py")
+workflow.source_path("scripts/aggregate_residential_space_heat_weight.py")
 
 # Run additional check on configuration / settings
 additional_config_validation()

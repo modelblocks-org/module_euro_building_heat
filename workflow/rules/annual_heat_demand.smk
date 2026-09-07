@@ -110,8 +110,13 @@ rule rescale_annual_heat_demand_to_shapes:
         annual_demand=rules.process_useful_heat.output.total_demand,
         shapes=rules.prepare_shapes.output[0],
         population="<resources>/automatic/shapes/{shapes}/population.nc",
+        space_heat_weight="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
+        hdd="<resources>/automatic/shapes/{shapes}/gridded_weather/hdd.nc",
+        residential_raster="<residential_space_heat_weight>",
+        grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     output:
         annual_demand="<annual_heat_demand>",
+        raster="<resources>/automatic/{shapes}/household_space_heat_demand_mwh.tif",
         choropleth=report(
             "<resources>/automatic/shapes/{shapes}/plots/annual_heat_demand.png",
             category="European Building Heat",
@@ -121,6 +126,9 @@ rule rescale_annual_heat_demand_to_shapes:
         "<logs>/{shapes}/annual/rescale_annual_heat_demand_to_shapes.log",
     conda:
         "../envs/module.yaml"
+    params:
+        weather_demand_years=WEATHER_DEMAND_YEARS,
+        hdd_elasticity=config["heat"].get("hdd", {}).get("elasticity", 0.5),
     message:
         "Scale national annual heat demand to '{wildcards.shapes}' shapes."
     script:
