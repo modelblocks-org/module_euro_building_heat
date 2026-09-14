@@ -162,8 +162,17 @@ Thanks goes to these wonderful people, sorted alphabetically ([emoji key](https:
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Yegberink"><img src="https://avatars.githubusercontent.com/u/152057926?v=4?s=100" width="100px;" alt="Yegberink"/><br /><sub><b>Yegberink</b></sub></a><br /><a href="#ideas-Yegberink" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=Yegberink" title="Code">💻</a> <a href="#maintenance-Yegberink" title="Maintenance">🚧</a> <a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=Yegberink" title="Documentation">📖</a></td>
+    </tr>
+  </tbody>
+</table>
+
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->
+
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
