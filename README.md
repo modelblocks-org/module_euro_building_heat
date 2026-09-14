@@ -165,6 +165,7 @@ Thanks goes to these wonderful people, sorted alphabetically ([emoji key](https:
 <table>
   <tbody>
     <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/brynpickering"><img src="https://avatars.githubusercontent.com/u/17178478?v=4?s=100" width="100px;" alt="Bryn Pickering"/><br /><sub><b>Bryn Pickering</b></sub></a><br /><a href="#ideas-brynpickering" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=brynpickering" title="Code">💻</a> <a href="#maintenance-brynpickering" title="Maintenance">🚧</a> <a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=brynpickering" title="Documentation">📖</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Yegberink"><img src="https://avatars.githubusercontent.com/u/152057926?v=4?s=100" width="100px;" alt="Yegberink"/><br /><sub><b>Yegberink</b></sub></a><br /><a href="#ideas-Yegberink" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=Yegberink" title="Code">💻</a> <a href="#maintenance-Yegberink" title="Maintenance">🚧</a> <a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=Yegberink" title="Documentation">📖</a></td>
     </tr>
   </tbody>
