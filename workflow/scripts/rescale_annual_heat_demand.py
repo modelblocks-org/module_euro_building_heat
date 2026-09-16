@@ -117,8 +117,11 @@ def rescale_to_shapes(
     shape_to_country: pd.Series,
     population: pd.Series,
     space_heat_weights: pd.DataFrame,
+    commercial_weights: pd.DataFrame,
+    residential_hot_water_weights: pd.Series,
+    commercial_hot_water_weights: pd.Series,
 ) -> pd.DataFrame:
-    """Use heat support for household space heat and population otherwise."""
+    """Use sector support for heating, adding HDD only for space heat."""
     common_shapes = shape_to_country.index.intersection(population.index).intersection(
         space_heat_weights.index
     )
@@ -160,9 +163,33 @@ def rescale_to_shapes(
             for year in national_demand.index.get_level_values("year").unique()
         }
     )
+    commercial_share = pd.DataFrame(
+        {
+            year: country_normalised_share(
+                commercial_weights.loc[common_shapes, year],
+                shape_to_country,
+                f"HDD-adjusted commercial support ({year})",
+            )
+            for year in residential_space_heat_share.columns
+        }
+    )
+    commercial_space_heat = (
+        national_demand.index.get_level_values("end_use") == "space_heat"
+    ) & (national_demand.index.get_level_values("cat_name") == "commercial")
     household_space_heat = (
         national_demand.index.get_level_values("end_use") == "space_heat"
     ) & (national_demand.index.get_level_values("cat_name") == "household")
+    hot_water_shares = {
+        category: country_normalised_share(
+            weights.reindex(common_shapes),
+            shape_to_country,
+            f"{category} hot water structural support",
+        )
+        for category, weights in {
+            "household": residential_hot_water_weights,
+            "commercial": commercial_hot_water_weights,
+        }.items()
+    }
     columns = {}
     for shape_id, country_id in shape_to_country.items():
         values = national_demand[country_id] * population_share.loc[shape_id]
@@ -171,6 +198,18 @@ def rescale_to_shapes(
             national_demand.loc[household_space_heat, country_id]
             * residential_space_heat_share.loc[shape_id, years].to_numpy()
         )
+        years = national_demand.index.get_level_values("year")[commercial_space_heat]
+        values.loc[commercial_space_heat] = (
+            national_demand.loc[commercial_space_heat, country_id]
+            * commercial_share.loc[shape_id, years].to_numpy()
+        )
+        for category, shares in hot_water_shares.items():
+            hot_water = (
+                national_demand.index.get_level_values("end_use") == "hot_water"
+            ) & (national_demand.index.get_level_values("cat_name") == category)
+            values.loc[hot_water] = (
+                national_demand.loc[hot_water, country_id] * shares.loc[shape_id]
+            )
         columns[shape_id] = values
     demand = pd.DataFrame(columns)
     return demand
@@ -240,13 +279,14 @@ def write_demand_raster(
     severity: xr.DataArray,
     weather_demand_years: dict[int, int],
     elasticity: float,
+    category: str = "household",
 ) -> None:
-    """Write annual household space heat in MWh per original 100 m cell.
+    """Write annual sector space heat in MWh per original 100 m cell.
 
     The same Gregor pixel-centre assignment and country denominators as the
     shape allocation ensure consistent totals.
     """
-    mask = (national_demand.index.get_level_values("cat_name") == "household") & (
+    mask = (national_demand.index.get_level_values("cat_name") == category) & (
         national_demand.index.get_level_values("end_use") == "space_heat"
     )
     national = national_demand.loc[mask].groupby(level="year").sum()
@@ -290,7 +330,7 @@ def write_demand_raster(
     raster_totals = np.zeros(len(pairs))
     with rasterio.open(output_path, "w", **profile) as output:
         output.update_tags(
-            end_use="household space heating",
+            end_use=f"{category} space heating",
             units="MWh/cell",
             allocation="structural support * HDD^elasticity; country-normalised",
             hdd_elasticity=elasticity,
@@ -300,12 +340,14 @@ def write_demand_raster(
         )
         for band, (weather_year, demand_year) in enumerate(pairs, start=1):
             output.set_band_description(
-                band, f"household_space_heat_{demand_year}_weather_{weather_year}"
+                band, f"{category}_space_heat_{demand_year}_weather_{weather_year}"
             )
             output.set_band_unit(band, "MWh/cell")
             output.update_tags(band, demand_year=demand_year, weather_year=weather_year)
         for window, block_shape, contributions in iter_weight_blocks(
-            source_path, grid_shapes
+            source_path,
+            grid_shapes,
+            "residential" if category == "household" else "commercial",
         ):
             block = np.zeros((len(pairs), *block_shape), dtype=np.float64)
             for index, rows, columns, support in contributions:
@@ -340,14 +382,29 @@ def main() -> None:
     with (
         xr.open_dataarray(snakemake.input.space_heat_weight) as structural,
         xr.open_dataset(snakemake.input.hdd) as weather,
+        xr.open_dataarray(snakemake.input.commercial_weights) as commercial,
     ):
         space_heat_weights, severity = climate_adjusted_weights(
             structural.load(), weather.hdd.load(), weather_demand_years, elasticity
         )
+        commercial_weights, commercial_severity = climate_adjusted_weights(
+            commercial.load(), weather.hdd.load(), weather_demand_years, elasticity
+        )
         severity.attrs.update(weather.hdd.attrs)
+        commercial_severity.attrs.update(weather.hdd.attrs)
+        residential_hot_water_weights = structural.sum("site").to_series()
+        commercial_hot_water_weights = commercial.sum("site").to_series()
     shapes = gpd.read_parquet(snakemake.input.shapes)
 
-    scaled = rescale_to_shapes(demand, mapping, population, space_heat_weights)
+    scaled = rescale_to_shapes(
+        demand,
+        mapping,
+        population,
+        space_heat_weights,
+        commercial_weights,
+        residential_hot_water_weights,
+        commercial_hot_water_weights,
+    )
     report_country_total_discrepancies(demand, scaled, mapping)
     tidy = tidy_annual_heat_demand(scaled)
     validated = _schemas.AnnualHeatDemandSchema.validate(tidy)
@@ -366,6 +423,19 @@ def main() -> None:
         severity,
         weather_demand_years,
         elasticity,
+    )
+
+    write_demand_raster(
+        snakemake.input.commercial_raster,
+        snakemake.output.commercial_raster,
+        gpd.read_parquet(snakemake.input.grid_shapes),
+        demand,
+        mapping,
+        commercial_weights,
+        commercial_severity,
+        weather_demand_years,
+        elasticity,
+        category="commercial",
     )
 
 

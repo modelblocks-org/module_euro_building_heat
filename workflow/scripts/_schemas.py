@@ -37,7 +37,7 @@ BUILDING_CATEGORIES: tuple[str, ...] = ("commercial", "household")
 
 
 def validate_residential_space_heat_weight_raster(
-    path: str | Path, *, check_values: bool = True
+    path: str | Path, *, check_values: bool = True, sector: str = "residential"
 ) -> None:
     """Validate the heat-raster module's one-band support contract."""
     with rasterio.open(path) as raster:
@@ -45,8 +45,14 @@ def validate_residential_space_heat_weight_raster(
         assert raster.crs
         assert np.allclose(np.abs(raster.res), 100)
         assert raster.nodatavals == (0.0,)
-        assert raster.descriptions == ("residential_space_heat_weight",)
-        assert raster.units == ("weighted_m2/ha",)
+        assert sector in {"residential", "commercial"}
+        assert raster.descriptions == (f"{sector}_space_heat_weight",)
+        expected_unit = "m2/ha" if sector == "commercial" else "weighted_m2/ha"
+        if raster.units != (expected_unit,):
+            raise ValueError(
+                f"{sector.capitalize()} support raster {path} must use units "
+                f"{expected_unit!r}; got {raster.units!r}."
+            )
         if not check_values:
             return
         for _, window in raster.block_windows(1):

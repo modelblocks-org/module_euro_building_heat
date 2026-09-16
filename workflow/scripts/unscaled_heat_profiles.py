@@ -41,6 +41,7 @@ def get_unscaled_heat_profiles(
     path_to_temperature: str,
     path_to_grid_weights: str,
     path_to_residential_weights: str,
+    path_to_commercial_weights: str,
     path_to_when2heat_daily: str,
     path_to_when2heat_hourly_com: str,
     path_to_when2heat_hourly_mfh: str,
@@ -59,6 +60,7 @@ def get_unscaled_heat_profiles(
         path_to_temperature (str): Gridded air temperature data in degrees C.
         path_to_grid_weights (str): Population weights from weather sites to shapes.
         path_to_residential_weights (str): Structural residential weights per site/shape.
+        path_to_commercial_weights (str): Structural commercial weights per site/shape.
         path_to_when2heat_daily (str): When2Heat daily demand parameters.
         path_to_when2heat_hourly_com (str): Commercial hourly profile factors.
         path_to_when2heat_hourly_mfh (str): Multi-family home hourly profile factors.
@@ -91,12 +93,18 @@ def get_unscaled_heat_profiles(
             path_to_grid_weights, decode_timedelta=True
         ) as grid_weights_file,
         xr.open_dataarray(path_to_residential_weights) as residential_weights_file,
+        xr.open_dataarray(path_to_commercial_weights) as commercial_weights_file,
     ):
         grid_weights = grid_weights_file.load()
         residential_weights = residential_weights_file.load()
-        population_by_site = grid_weights.fillna(0).sum("id").reindex(
-            site=residential_weights.site, fill_value=0
-        ) + residential_weights.fillna(0).sum("id")
+        commercial_weights = commercial_weights_file.load()
+        population_by_site = (
+            grid_weights.fillna(0)
+            .sum("id")
+            .reindex(site=residential_weights.site, fill_value=0)
+            + residential_weights.fillna(0).sum("id")
+            + commercial_weights.fillna(0).sum("id")
+        )
         relevant_sites = population_by_site.site.where(
             population_by_site > 0, drop=True
         )
@@ -123,6 +131,7 @@ def get_unscaled_heat_profiles(
                     ),
                     grid_weights,
                     residential_weights,
+                    commercial_weights,
                 )
                 grouped_hourly_heat.attrs["time_basis"] = LOCAL_TIME_BASIS
                 grouped_hourly_heat.attrs["weather_year"] = weather_year
@@ -441,6 +450,7 @@ if __name__ == "__main__":
         path_to_temperature=snakemake.input.temperature,
         path_to_grid_weights=snakemake.input.grid_weights,
         path_to_residential_weights=snakemake.input.residential_weights,
+        path_to_commercial_weights=snakemake.input.commercial_weights,
         path_to_when2heat_daily=snakemake.input.when2heat_daily,
         path_to_when2heat_hourly_com=snakemake.input.when2heat_hourly_com,
         path_to_when2heat_hourly_mfh=snakemake.input.when2heat_hourly_mfh,

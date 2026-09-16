@@ -111,12 +111,15 @@ rule rescale_annual_heat_demand_to_shapes:
         shapes=rules.prepare_shapes.output[0],
         population="<resources>/automatic/shapes/{shapes}/population.nc",
         space_heat_weight="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
+        commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
         hdd="<resources>/automatic/shapes/{shapes}/gridded_weather/hdd.nc",
         residential_raster="<residential_space_heat_weight>",
+        commercial_raster="<commercial_space_heat_weight>",
         grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     output:
         annual_demand="<annual_heat_demand>",
         raster="<resources>/automatic/{shapes}/household_space_heat_demand_mwh.tif",
+        commercial_raster="<resources>/automatic/{shapes}/commercial_space_heat_demand_mwh.tif",
         choropleth=report(
             "<resources>/automatic/shapes/{shapes}/plots/annual_heat_demand.png",
             category="European Building Heat",
@@ -139,7 +142,9 @@ rule gridded_heat_demand:
     input:
         annual_demand=rules.rescale_annual_heat_demand_to_shapes.output.annual_demand,
         household_space_heat=rules.rescale_annual_heat_demand_to_shapes.output.raster,
-        population=rules.clip_population.output.path,
+        commercial_space_heat=rules.rescale_annual_heat_demand_to_shapes.output.commercial_raster,
+        residential_support="<residential_space_heat_weight>",
+        commercial_support="<commercial_space_heat_weight>",
         shapes=rules.prepare_shapes.output[0],
     output:
         space_heat="<space_heat_demand>",

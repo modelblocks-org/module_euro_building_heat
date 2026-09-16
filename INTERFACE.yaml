@@ -20,6 +20,13 @@ pathvars:
         A_floor × f(S/V) × f(age), without a climate correction.
         One 100 m band named residential_space_heat_weight, with units
         weighted_m2/ha, a CRS, nodata 0, and finite non-negative values.
+    commercial_space_heat_weight:
+      default: "<resources>/user/{shapes}/commercial_space_heat_weight.tif"
+      description: |
+        Required commercial/public floor-area support, without climate correction.
+        Same contract as residential support: one 100 m band named
+        commercial_space_heat_weight, units m2/ha, a CRS, nodata 0,
+        and finite non-negative values. There is no missing-file population fallback.
     edh_api:
       default: "<resources>/user/edh_api.txt"
       description: |
@@ -40,9 +47,11 @@ pathvars:
       default: "<results>/{shapes}/annual/heat_demand_twh.parquet"
       description: |
         Annual useful heat demand in TWh, scaled from countries to shapes.
-        Household space heating uses structural support times ERA5 HDD^elasticity,
+        Household and commercial space heating use their sector structural support
+        times ERA5 HDD^elasticity,
         normalised within each country and paired demand/weather year.
-        Other end uses retain population allocation.
+        Hot water uses the same sector structural support without HDD.
+        Cooking retains population allocation.
         This table contains the following columns:
         - `end_use`: cooking, hot_water or space_heat.
         - `category`: commercial or households
@@ -58,8 +67,8 @@ pathvars:
       description: |
         Annual useful space heat demand for households and commercial buildings
         in MWh per cell on the input residential support raster's 100 m grid.
-        Household demand retains structural support times HDD^elasticity;
-        commercial demand uses average-resampled population normalised per shape.
+        Both sectors retain their own structural support times HDD^elasticity,
+        normalised per shape. Commercial demand is resampled to this output grid.
         Cell sums preserve annual shape totals. One band per configured
         demand/weather year pair, recorded in band descriptions and tags.
         CRS and transform match the residential support raster; nodata is 0.
@@ -68,8 +77,10 @@ pathvars:
       description: |
         Annual useful hot water demand for households and commercial buildings
         in MWh per cell on the input residential support raster's 100 m grid.
-        Uses average-resampled population normalised per shape, preserving annual
-        shape totals. One band per configured demand/weather year pair, recorded
+        Allocates household and commercial demand separately using their original
+        structural proxies, without HDD, normalised per shape, then sums sectors.
+        Commercial support is average-resampled to the residential grid. Cell sums
+        preserve annual shape totals. One band per demand/weather year pair, recorded
         in band descriptions and tags. CRS and transform match the residential
         support raster; nodata is 0.
     space_heat_profile:

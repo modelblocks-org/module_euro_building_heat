@@ -49,6 +49,8 @@ def population_on_weather_grid(
     residential_raster: str,
     residential_out_path: str,
     grid_shapes_out_path: str,
+    commercial_raster: str,
+    commercial_out_path: str,
 ) -> None:
     """Uses population as a proxy to regionalise heat demand."""
     # We need the coordinates. This can be any file with gridded data across Europe
@@ -84,28 +86,36 @@ def population_on_weather_grid(
 
     # Share the weather/shape overlay with structural support aggregation. The
     # 100 m raster is streamed in blocks through Gregor (pixel-centre assignment).
-    logging.info(
-        "Aggregating structural residential support to weather/shape intersections"
-    )
-    structural = aggregate_support(residential_raster, gridboxes_mapped_to_locations)
-    structural_table = gridboxes_mapped_to_locations[["site", "id"]].copy()
-    structural_table["weight"] = structural
-    structural_weights = (
-        structural_table.groupby(["site", "id"]).weight.sum().to_xarray()
-    )
-    structural_weights = (
-        structural_weights.reindex(
-            site=coordinate_ds.site.values, id=locations.id.values
+    for sector, raster_path, output_path in [
+        ("residential", residential_raster, residential_out_path),
+        ("commercial", commercial_raster, commercial_out_path),
+    ]:
+        logging.info(
+            "Aggregating structural %s support to weather/shape intersections", sector
         )
-        .fillna(0)
-        .rename("residential_space_heat_weight")
-    )
-    structural_weights.attrs.update(
-        units="weighted_m2",
-        allocator="A_floor * f(S/V) * f(age)",
-        coverage="Gregor pixel-centre assignment; no HDD applied",
-    )
-    structural_weights.to_netcdf(residential_out_path)
+        structural = aggregate_support(
+            raster_path, gridboxes_mapped_to_locations, sector
+        )
+        structural_table = gridboxes_mapped_to_locations[["site", "id"]].copy()
+        structural_table["weight"] = structural
+        structural_weights = (
+            structural_table.groupby(["site", "id"]).weight.sum().to_xarray()
+        )
+        structural_weights = (
+            structural_weights.reindex(
+                site=coordinate_ds.site.values, id=locations.id.values
+            )
+            .fillna(0)
+            .rename(f"{sector}_space_heat_weight")
+        )
+        structural_weights.attrs.update(
+            units="m2" if sector == "commercial" else "weighted_m2",
+            allocator="A_floor"
+            if sector == "commercial"
+            else "A_floor * f(S/V) * f(age)",
+            coverage="Gregor pixel-centre assignment; no HDD applied",
+        )
+        structural_weights.to_netcdf(output_path)
     gridboxes_mapped_to_locations[["site", "id", "geometry"]].to_parquet(
         grid_shapes_out_path
     )
@@ -245,5 +255,7 @@ if __name__ == "__main__":
         out_path=snakemake.output[0],
         residential_raster=snakemake.input.residential_raster,
         residential_out_path=snakemake.output.residential_weights,
+        commercial_raster=snakemake.input.commercial_raster,
+        commercial_out_path=snakemake.output.commercial_weights,
         grid_shapes_out_path=snakemake.output.grid_shapes,
     )

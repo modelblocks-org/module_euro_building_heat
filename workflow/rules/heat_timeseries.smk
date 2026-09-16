@@ -31,6 +31,7 @@ rule local_unscaled_heat_profiles:
         temperature=rules.process_gridded_weather_data.output.temperature,
         grid_weights="<resources>/automatic/shapes/{shapes}/population.nc",
         residential_weights="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
+        commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
         when2heat_daily="<resources>/automatic/when2heat/daily_demand.csv",
         when2heat_hourly_com="<resources>/automatic/when2heat/hourly_factors_COM.csv",
         when2heat_hourly_mfh="<resources>/automatic/when2heat/hourly_factors_MFH.csv",
@@ -75,9 +76,11 @@ rule population_per_weather_gridbox:
         population=rules.clip_population.output.path,
         locations=rules.prepare_shapes.output[0],
         residential_raster="<residential_space_heat_weight>",
+        commercial_raster="<commercial_space_heat_weight>",
     output:
         population=temp("<resources>/automatic/shapes/{shapes}/population.nc"),
         residential_weights="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
+        commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
         grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     log:
         "<logs>/{shapes}/timeseries/population_per_weather_gridbox.log",

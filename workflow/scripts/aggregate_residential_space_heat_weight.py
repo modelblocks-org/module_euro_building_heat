@@ -27,10 +27,12 @@ logger = logging.getLogger(__name__)
 
 
 def _iter_raster_blocks(
-    raster_path: str, polygons: gpd.GeoDataFrame
+    raster_path: str, polygons: gpd.GeoDataFrame, sector: str = "residential"
 ) -> Iterator[tuple]:
     """Yield validated raster blocks with intersecting, clipped polygons."""
-    validate_residential_space_heat_weight_raster(raster_path, check_values=False)
+    validate_residential_space_heat_weight_raster(
+        raster_path, check_values=False, sector=sector
+    )
     with rasterio.open(raster_path) as raster:
         projected = polygons.to_crs(raster.crs).reset_index(drop=True)
         spatial_index = projected.sindex
@@ -62,9 +64,13 @@ def _iter_raster_blocks(
             yield window, values, local, raster.window_transform(window)
 
 
-def iter_weight_blocks(raster_path: str, polygons: gpd.GeoDataFrame) -> Iterator[tuple]:
+def iter_weight_blocks(
+    raster_path: str, polygons: gpd.GeoDataFrame, sector: str = "residential"
+) -> Iterator[tuple]:
     """Yield sparse support contributions using Gregor's pixel-centre convention."""
-    for window, values, local, transform in _iter_raster_blocks(raster_path, polygons):
+    for window, values, local, transform in _iter_raster_blocks(
+        raster_path, polygons, sector
+    ):
         contributions = []
         for index, geometry in local.geometry.items():
             mask = geometry_mask(
@@ -81,10 +87,14 @@ def iter_weight_blocks(raster_path: str, polygons: gpd.GeoDataFrame) -> Iterator
         yield window, values.shape, contributions
 
 
-def aggregate_support(raster_path: str, polygons: gpd.GeoDataFrame) -> np.ndarray:
+def aggregate_support(
+    raster_path: str, polygons: gpd.GeoDataFrame, sector: str = "residential"
+) -> np.ndarray:
     """Accumulate Gregor zonal sums while loading only one raster block at a time."""
     weights = np.zeros(len(polygons), dtype=np.float64)
-    for _, values, local, transform in _iter_raster_blocks(raster_path, polygons):
+    for _, values, local, transform in _iter_raster_blocks(
+        raster_path, polygons, sector
+    ):
         if local.empty:
             continue
         raster = (

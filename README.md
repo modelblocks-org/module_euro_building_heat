@@ -101,8 +101,11 @@ path variable for use by importing workflows. The two rasters share the input
 residential support grid and preserve annual demand totals per shape. Household
 space heat uses structural support and HDD, normalized within each output shape
 to account for boundary-cell differences in the upstream weather intersections.
-Commercial space heat and hot water use population resampled onto that grid and
-normalized within each shape.
+Commercial space heat uses its own structural support and HDD, resampled onto
+that grid and normalized within each shape. Hot water uses the original residential
+and commercial structural proxies without HDD: each sector is allocated separately
+and then summed. National-to-shape hot water allocation also uses these proxies
+without HDD.
 
 
 ## Development

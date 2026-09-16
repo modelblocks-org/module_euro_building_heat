@@ -15,6 +15,7 @@ def group_gridcells(
     gridded_data: xr.Dataset,
     grid_weight: xr.DataArray,
     residential_weight: xr.DataArray | None = None,
+    commercial_weight: xr.DataArray | None = None,
 ) -> xr.Dataset:
     """Group gridded heat data into resolution-specific units.
 
@@ -22,11 +23,51 @@ def group_gridcells(
         gridded_data (xr.Dataset): Gridded timeseries space heat and hot water data.
         grid_weight (xr.DataArray): Weighted mapping from grid (a.k.a. "site") to units.
         residential_weight: Optional structural weights for household SFH/MFH
-            space-heating profiles. Other profiles retain population weights.
+            space-heating profiles.
+        commercial_weight: Optional structural weights for commercial space heat.
+            Hot-water profiles retain population weights.
 
     Returns:
         xr.Dataset: Data grouped into resolution-specific units.
     """
+    if commercial_weight is not None:
+        if set(commercial_weight.dims) != {"site", "id"}:
+            raise ValueError("Commercial weights must have dimensions site and id.")
+        if set(commercial_weight.id.values) != set(grid_weight.id.values):
+            raise ValueError(
+                "Commercial and population weights must cover the same shapes."
+            )
+        population, commercial = xr.align(
+            grid_weight.fillna(0),
+            commercial_weight.fillna(0),
+            join="outer",
+            fill_value=0,
+        )
+        # As for households, a zero-support shape can use a population profile;
+        # its annual structural allocation remains zero.
+        profiles = group_gridcells(
+            gridded_data,
+            population.where(population.sum("site") > 0, commercial),
+            residential_weight,
+        )
+        if (
+            "space_heat" in gridded_data
+            and "building" in gridded_data.space_heat.dims
+            and "COM" in gridded_data.building
+        ):
+            commercial_profiles = group_gridcells(
+                gridded_data[["space_heat"]].sel(building=["COM"]),
+                commercial.where(commercial.sum("site") > 0, population),
+            )
+            profiles["space_heat"] = xr.where(
+                profiles.building == "COM",
+                commercial_profiles.space_heat.reindex(
+                    building=profiles.building, fill_value=0
+                ),
+                profiles.space_heat,
+            )
+        return profiles
+
     if residential_weight is not None:
         if set(residential_weight.dims) != {"site", "id"}:
             raise ValueError("Residential weights must have dimensions site and id.")
