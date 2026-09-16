@@ -86,6 +86,24 @@ Git.
 
 Please consult the [interface file](./INTERFACE.yaml) for more information.
 
+The module also exports heat demand separately for space heating and hot water:
+
+- `annual/space_heat_demand_mwh.tif` and `annual/hot_water_demand_mwh.tif`:
+  annual useful heat demand in MWh per 100 m cell, combining households and
+  commercial buildings. Each band identifies its demand and weather years.
+- `hourly/space_heat_profile.parquet` and `hourly/hot_water_profile.parquet`:
+  normalized hourly shares with a UTC `timesteps` index and one column per shape.
+  Each shape and weather year sums to 1 (or 0 for zero demand). Multiply these
+  shares by the matching annual sink demand in MWh to obtain hourly MWh.
+
+These paths are relative to `<results>/{shapes}/`. Each output has its own
+path variable for use by importing workflows. The two rasters share the input
+residential support grid and preserve annual demand totals per shape. Household
+space heat uses structural support and HDD, normalized within each output shape
+to account for boundary-cell differences in the upstream weather intersections.
+Commercial space heat and hot water use population resampled onto that grid and
+normalized within each shape.
+
 
 ## Development
 <!-- Please do not modify this templated section -->

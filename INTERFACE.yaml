@@ -53,6 +53,41 @@ pathvars:
       default: "<results>/{shapes}/hourly/heat_demand_mwh.parquet"
       description: |
         Shape-aggregated heat demand in MWh with a harmonised UTC hourly index.
+    space_heat_demand:
+      default: "<results>/{shapes}/annual/space_heat_demand_mwh.tif"
+      description: |
+        Annual useful space heat demand for households and commercial buildings
+        in MWh per cell on the input residential support raster's 100 m grid.
+        Household demand retains structural support times HDD^elasticity;
+        commercial demand uses average-resampled population normalised per shape.
+        Cell sums preserve annual shape totals. One band per configured
+        demand/weather year pair, recorded in band descriptions and tags.
+        CRS and transform match the residential support raster; nodata is 0.
+    hot_water_demand:
+      default: "<results>/{shapes}/annual/hot_water_demand_mwh.tif"
+      description: |
+        Annual useful hot water demand for households and commercial buildings
+        in MWh per cell on the input residential support raster's 100 m grid.
+        Uses average-resampled population normalised per shape, preserving annual
+        shape totals. One band per configured demand/weather year pair, recorded
+        in band descriptions and tags. CRS and transform match the residential
+        support raster; nodata is 0.
+    space_heat_profile:
+      default: "<results>/{shapes}/hourly/space_heat_profile.parquet"
+      description: |
+        Normalised hourly space heat shares (p.u.) for households and commercial
+        buildings combined, weighted by their annual demand. UTC-aware hourly
+        timesteps index and one column per shape ID. Each shape/weather year sums
+        to 1; zero annual demand yields all zeros. Attributes include units,
+        end use, normalisation, shape timezones, and weather-to-demand year mapping.
+    hot_water_profile:
+      default: "<results>/{shapes}/hourly/hot_water_profile.parquet"
+      description: |
+        Normalised hourly hot water shares (p.u.) for households and commercial
+        buildings combined, weighted by their annual demand. UTC-aware hourly
+        timesteps index and one column per shape ID. Each shape/weather year sums
+        to 1; zero annual demand yields all zeros. Attributes include units,
+        end use, normalisation, shape timezones, and weather-to-demand year mapping.
     heat_pump_cop:
       default: "<results>/{shapes}/hourly/heat_pump_cop_pu.parquet"
       description: >

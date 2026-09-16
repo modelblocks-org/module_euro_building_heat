@@ -4,6 +4,7 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import _plots
+import numpy as np
 import pandas as pd
 import xarray as xr
 from _timeseries import write_hourly_parquet
@@ -120,6 +121,27 @@ def prepare_annual_demand(annual_demand: pd.DataFrame) -> xr.Dataset:
     )
 
 
+def heat_sink_profile(scaled_profiles: xr.DataArray, sink: str) -> pd.DataFrame:
+    """Return annual hourly shares by shape, with zero shares for zero demand."""
+    hourly = (
+        scaled_profiles.sel(end_use=sink, drop=True)
+        .to_series()
+        .unstack("id")
+        .rename_axis(index="timesteps")
+    )
+    if not np.isfinite(hourly.to_numpy()).all() or (hourly.to_numpy() < 0).any():
+        raise ValueError(
+            f"Invalid hourly {sink} demand: expected finite non-negative values."
+        )
+    totals = hourly.groupby(hourly.index.year).transform("sum")
+    profile = hourly.div(totals.where(totals > 0)).fillna(0)
+    profile.attrs.update(
+        end_use=sink,
+        normalization="sum of hourly shares per shape and UTC weather year is 1; zero demand yields 0",
+    )
+    return profile
+
+
 def main() -> None:
     """Main Snakemake process."""
     annual_demand = pd.read_parquet(snakemake.input.annual_demand)
@@ -138,6 +160,18 @@ def main() -> None:
         building_shares,
         snakemake.params.weather_demand_years,
     )
+
+    for sink, path in {
+        "space_heat": snakemake.output.space_heat_profile,
+        "hot_water": snakemake.output.hot_water_profile,
+    }.items():
+        profile = heat_sink_profile(scaled_profiles, sink)
+        profile.attrs["weather_demand_years"] = {
+            str(k): int(v) for k, v in snakemake.params.weather_demand_years.items()
+        }
+        write_hourly_parquet(
+            profile, path, snakemake.input.shape_timezones, units="p.u."
+        )
 
     final_df = (
         scaled_profiles.sum("end_use")

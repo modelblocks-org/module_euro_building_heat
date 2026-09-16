@@ -16,6 +16,10 @@ pathvars:
     # Module results
     annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
     heat_demand="<results>/{shapes}/hourly/heat_demand_mwh.parquet",
+    space_heat_demand="<results>/{shapes}/annual/space_heat_demand_mwh.tif",
+    hot_water_demand="<results>/{shapes}/annual/hot_water_demand_mwh.tif",
+    space_heat_profile="<results>/{shapes}/hourly/space_heat_profile.parquet",
+    hot_water_profile="<results>/{shapes}/hourly/hot_water_profile.parquet",
     heat_pump_cop="<results>/{shapes}/hourly/heat_pump_cop_pu.parquet",
     heat_pump_electricity_demand="<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet",
 

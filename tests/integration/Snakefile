@@ -25,6 +25,10 @@ module module_euro_building_heat:
         edh_api="resources/user/edh_api.txt",
         # Redirect specific module results (outputs)
         heat_demand="results/output/{shapes}/hourly/heat_demand_mwh.parquet",
+        space_heat_demand="results/output/{shapes}/annual/space_heat_demand_mwh.tif",
+        hot_water_demand="results/output/{shapes}/annual/hot_water_demand_mwh.tif",
+        space_heat_profile="results/output/{shapes}/hourly/space_heat_profile.parquet",
+        hot_water_profile="results/output/{shapes}/hourly/hot_water_profile.parquet",
         heat_pump_cop="results/output/{shapes}/hourly/heat_pump_cop_pu.parquet",
         # Redirect intermediate files that are internal to the module
         logs="resources/module/logs",
@@ -45,6 +49,10 @@ rule all:
     default_target: True
     input:
         "results/output/test/hourly/heat_demand_mwh.parquet",
+        "results/output/test/annual/space_heat_demand_mwh.tif",
+        "results/output/test/annual/hot_water_demand_mwh.tif",
+        "results/output/test/hourly/space_heat_profile.parquet",
+        "results/output/test/hourly/hot_water_profile.parquet",
         "results/output/test/hourly/heat_pump_cop_pu.parquet",
     message:
         "A generic dry-run test case for the heat demand module."

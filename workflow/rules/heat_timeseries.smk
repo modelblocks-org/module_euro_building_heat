@@ -101,6 +101,8 @@ rule heat_demand_final_timeseries:
         shape_timezones=rules.prepare_shape_timezones.output[0],
     output:
         timeseries="<heat_demand>",
+        space_heat_profile="<space_heat_profile>",
+        hot_water_profile="<hot_water_profile>",
         plot=report(
             "<resources>/automatic/shapes/{shapes}/plots/heat_demand_timeseries.pdf",
             category="European Building Heat",

@@ -133,3 +133,22 @@ rule rescale_annual_heat_demand_to_shapes:
         "Scale national annual heat demand to '{wildcards.shapes}' shapes."
     script:
         "../scripts/rescale_annual_heat_demand.py"
+
+
+rule gridded_heat_demand:
+    input:
+        annual_demand=rules.rescale_annual_heat_demand_to_shapes.output.annual_demand,
+        household_space_heat=rules.rescale_annual_heat_demand_to_shapes.output.raster,
+        population=rules.clip_population.output.path,
+        shapes=rules.prepare_shapes.output[0],
+    output:
+        space_heat="<space_heat_demand>",
+        hot_water="<hot_water_demand>",
+    log:
+        "<logs>/{shapes}/annual/gridded_heat_demand.log",
+    conda:
+        "../envs/module.yaml"
+    message:
+        "Write annual space heat and hot water demand rasters for '{wildcards.shapes}'."
+    script:
+        "../scripts/gridded_heat_demand.py"
