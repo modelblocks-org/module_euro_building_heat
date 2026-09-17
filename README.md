@@ -58,8 +58,8 @@ flowchart LR
    annual demand rasters directly, preserving country and shape totals.
 7. Aggregate When2Heat profiles, align local behaviour to UTC, and scale to annual
    demand. Calculate heat-pump COP and electricity demand with the existing methods.
-8. Produce report figures through separate plotting rules; the import example
-   includes them in its default target.
+8. Produce report figures alongside their data outputs, making them available
+   automatically when reporting on those data targets.
 
 ### Reusing building downloads
 
@@ -136,18 +136,28 @@ The shared population source defaults to 2025 at 100 m. This intentionally
 replaces the previous heat branch's nearest-demand-year, 1 km population source
 and can change population-based demand and profile aggregation.
 
-Diagnostic figures retain their existing heat paths and Snakemake `report(...)`
-annotations. Request `<resources>/automatic/shapes/{shapes}/plots/report_manifest.txt`
-to build all report figures, or request individual figure paths. The report
-includes annual heat maps, hourly demand, COP and electricity profiles, applicable
-JRC/Swiss/UK baselines, and the merged workflow's building-count and structural
-support maps. The three building maps are `building_count.png`,
-`residential_space_heat_weight.png`, and `commercial_space_heat_weight.png` in
-the same plots directory. Plot changes do not rerun numerical processing.
+Diagnostic figures are produced by the data-processing scripts and declared as
+Snakemake `report(...)` outputs of the same rules. Reporting on a completed data
+target therefore includes its figures and those from upstream processing rules:
 
-The [import example](tests/integration/Snakefile) requests the report figures
-alongside all nine data outputs. From its directory, build both the outputs and
-an HTML report with:
+```shell
+snakemake results/working_EU/hourly/heat_pump_cop_pu.parquet --report report_working_EU.html
+```
+
+To build missing outputs before creating the report, add `--cores 4 --report-after-run`.
+Existing runs created before plots were restored to the processing rules need
+one normal workflow run to generate missing figures.
+
+The report includes annual heat maps, hourly demand, COP and electricity
+profiles, applicable JRC/Swiss/UK baselines, and building-count and structural
+support maps. Request
+`<resources>/automatic/shapes/{shapes}/plots/report_manifest.txt` to explicitly
+build all report figures, or request individual figure paths. Figures are
+co-outputs of data-processing jobs, so rebuilding them can rerun those jobs.
+
+The [import example](tests/integration/Snakefile) requests all nine data outputs
+and the optional report manifest. From its directory, build the outputs and an
+HTML report with:
 
 ```shell
 snakemake --use-conda --cores 2 --report report.html --report-after-run

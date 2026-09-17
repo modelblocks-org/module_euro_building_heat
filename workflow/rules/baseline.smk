@@ -11,6 +11,11 @@ rule baseline_jrc_idees_sector:
     output:
         final="<resources>/automatic/baseline/jrc_idees/{sector}_final.parquet",
         useful="<resources>/automatic/baseline/jrc_idees/{sector}_useful.parquet",
+        plot=report(
+            "<resources>/automatic/baseline/jrc_idees/{sector}.pdf",
+            category="European Building Heat",
+            subcategory="Baseline",
+        ),
     log:
         "<logs>/baseline/baseline_jrc_idees_{sector}.log",
     conda:
@@ -30,6 +35,16 @@ rule baseline_che_final_demand:
     output:
         residential="<resources>/automatic/baseline/che/residential_final.parquet",
         services="<resources>/automatic/baseline/che/services_final.parquet",
+        residential_plot=report(
+            "<resources>/automatic/baseline/che/residential.pdf",
+            category="European Building Heat",
+            subcategory="Baseline",
+        ),
+        services_plot=report(
+            "<resources>/automatic/baseline/che/services.pdf",
+            category="European Building Heat",
+            subcategory="Baseline",
+        ),
     log:
         "<logs>/baseline/baseline_che.log",
     conda:
@@ -47,6 +62,16 @@ rule baseline_ecuk_final_demand:
     output:
         residential="<resources>/automatic/baseline/ecuk/residential_final.parquet",
         services="<resources>/automatic/baseline/ecuk/services_final.parquet",
+        residential_plot=report(
+            "<resources>/automatic/baseline/ecuk/residential.pdf",
+            category="European Building Heat",
+            subcategory="Baseline",
+        ),
+        services_plot=report(
+            "<resources>/automatic/baseline/ecuk/services.pdf",
+            category="European Building Heat",
+            subcategory="Baseline",
+        ),
     log:
         "<logs>/baseline/baseline_ecuk.log",
     conda:

@@ -4,6 +4,7 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import _ecuk
+import _plots
 import _schemas
 
 if TYPE_CHECKING:
@@ -11,13 +12,19 @@ if TYPE_CHECKING:
 
 
 def main() -> None:
-    """Create residential and services baselines."""
+    """Create and plot residential and services baselines."""
     raw_file = snakemake.input.raw_stats
 
     for sector in ["residential", "services"]:
         df = _ecuk.get_sector_demand(raw_file, sector)
         df = _schemas.BaselineSchema.validate_countries(df, ["GBR"])
         df.to_parquet(snakemake.output[sector], index=False)
+
+        fig, _ = _plots.plot_bar_histogram(
+            df, "end_use", container_col="country_code", unit="TWh"
+        )
+        fig.suptitle(f"{sector.capitalize()} final energy demand")
+        _plots.save_figure(fig, snakemake.output[f"{sector}_plot"], bbox_inches="tight")
 
 
 if __name__ == "__main__":

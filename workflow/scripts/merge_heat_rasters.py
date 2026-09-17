@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import _plots
 import geopandas as gpd
 import pandas as pd
 import rasterio
@@ -118,3 +119,39 @@ else:
     )
     validate_heat_diagnostics(diagnostics)
     diagnostics.to_parquet(snakemake.output.diagnostics, index=False)
+
+
+plots = (
+    [
+        (
+            "building_count",
+            "Residential, commercial and public buildings",
+            "Buildings per hectare",
+        )
+    ]
+    if snakemake.params.mode == "counts"
+    else [
+        (
+            "residential_space_heat_weight",
+            "Residential space-heating support",
+            "Space-heating support (weighted m²/ha)",
+        ),
+        (
+            "commercial_space_heat_weight",
+            "Commercial and public floor area",
+            "Floor area (m²/ha)",
+        ),
+    ]
+)
+for dataset, title, unit in plots:
+    _plots.plot_floor_area(
+        snakemake.output[dataset],
+        1,
+        title,
+        snakemake.output[f"{dataset}_plot"],
+        snakemake.params.population["chunk_size"],
+        snakemake.params.plotting["max_size"],
+        shapes,
+        snakemake.params.plotting["outline"],
+        unit,
+    )

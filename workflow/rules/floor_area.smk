@@ -115,6 +115,16 @@ rule merge_structural_support:
         residential_space_heat_weight="<resources>/automatic/shapes/{shapes}/support/residential_space_heat_weight.tif",
         commercial_space_heat_weight="<resources>/automatic/shapes/{shapes}/support/commercial_space_heat_weight.tif",
         diagnostics="<resources>/automatic/{shapes}/space_heat_weight/diagnostics.parquet",
+        residential_space_heat_weight_plot=report(
+            "<resources>/automatic/shapes/{shapes}/plots/residential_space_heat_weight.png",
+            category="European Building Heat",
+            subcategory="Buildings",
+        ),
+        commercial_space_heat_weight_plot=report(
+            "<resources>/automatic/shapes/{shapes}/plots/commercial_space_heat_weight.png",
+            category="European Building Heat",
+            subcategory="Buildings",
+        ),
     log:
         "<logs>/{shapes}/merge_structural_support.log",
     conda:
@@ -122,6 +132,7 @@ rule merge_structural_support:
     resources:
         mem_mb=4096,
     params:
+        plotting=config["plotting"],
         mode="support",
         population=config["population"],
         microsoft=config["buildings_microsoft"],

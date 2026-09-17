@@ -4,6 +4,7 @@ import logging
 import sys
 from typing import TYPE_CHECKING, Any
 
+import _plots
 import _schemas
 import geopandas as gpd
 import numpy as np
@@ -334,6 +335,10 @@ def main() -> None:
         },
         hdd_elasticity=elasticity,
         hdd_base_temperature=severity.attrs["base_temperature_celsius"],
+    )
+
+    _plots.plot_annual_heat_demand_choropleth(
+        shapes, validated, snakemake.output.choropleth
     )
 
 

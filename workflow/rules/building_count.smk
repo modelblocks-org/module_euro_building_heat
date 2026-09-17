@@ -29,6 +29,11 @@ rule merge_building_count:
         support=floor_area_batch_inputs,
     output:
         building_count="<building_count>",
+        building_count_plot=report(
+            "<resources>/automatic/shapes/{shapes}/plots/building_count.png",
+            category="European Building Heat",
+            subcategory="Buildings",
+        ),
     log:
         "<logs>/{shapes}/merge_building_count.log",
     conda:
@@ -36,6 +41,7 @@ rule merge_building_count:
     resources:
         mem_mb=4096,
     params:
+        plotting=config["plotting"],
         mode="counts",
         population=config["population"],
         eubucco=config["buildings_eubucco"],

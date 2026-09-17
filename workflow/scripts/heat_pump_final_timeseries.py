@@ -3,6 +3,7 @@
 import sys
 from typing import TYPE_CHECKING, Any
 
+import _plots
 import pandas as pd
 import xarray as xr
 from _timeseries import utc_aware_hourly_frame, write_hourly_parquet
@@ -126,6 +127,10 @@ def main() -> None:
         snakemake.output.electricity_demand,
         snakemake.input.shape_timezones,
         units="MWh",
+    )
+    _plots.plot_timeseries(final_df, snakemake.output.cop_plot, "COP")
+    _plots.plot_timeseries(
+        electricity_demand, snakemake.output.electricity_demand_plot, "MWh"
     )
 
 

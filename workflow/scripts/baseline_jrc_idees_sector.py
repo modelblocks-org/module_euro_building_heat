@@ -4,6 +4,7 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import _jrc
+import _plots
 import _schemas
 import _utils
 import pandas as pd
@@ -42,6 +43,24 @@ def main() -> None:
         jrc_files, sector, "useful_energy", countries
     )
     useful_df.to_parquet(snakemake.output.useful, index=False)
+
+    fig, axes = _plots.plot_bar_histogram(
+        final_df,
+        "end_use",
+        container_col="country_code",
+        format_container=False,
+        unit="TWh",
+    )
+    _plots.plot_value_histogram(
+        useful_df,
+        container_col="country_code",
+        label="useful_energy",
+        fig=fig,
+        axes=axes,
+        unit="TWh",
+    )
+    fig.suptitle(f"{sector.capitalize()} energy demand")
+    _plots.save_figure(fig, snakemake.output.plot, bbox_inches="tight")
 
 
 if __name__ == "__main__":

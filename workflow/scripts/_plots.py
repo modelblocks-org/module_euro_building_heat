@@ -1,7 +1,6 @@
 """Plotting utilities."""
 
 import math
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -417,69 +416,3 @@ def plot_floor_area(
     axis.set(title=title, xlabel="Easting (m)", ylabel="Northing (m)")
     figure.colorbar(image, ax=axis, label=colorbar_label)
     save_figure(figure, output_path, dpi=200)
-
-
-def main(job) -> None:
-    """Render independently scheduled diagnostics from completed datasets."""
-    kind = job.params.kind
-    if kind == "report_manifest":
-        path = Path(job.output[0])
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("\n".join(job.input) + "\n")
-        return
-    with plt.rc_context(PLOT_STYLE):
-        if kind == "raster":
-            plot_floor_area(
-                job.input.data,
-                1,
-                job.params.title,
-                job.output[0],
-                job.params.chunk_size,
-                job.params.plotting["max_size"],
-                gpd.read_parquet(job.input.shapes),
-                job.params.plotting["outline"],
-                job.params.unit,
-            )
-        elif kind == "annual":
-            plot_annual_heat_demand_choropleth(
-                gpd.read_parquet(job.input.shapes),
-                pd.read_parquet(job.input.data),
-                job.output[0],
-            )
-        elif kind == "timeseries":
-            plot_timeseries(
-                pd.read_parquet(job.input.data),
-                job.output[0],
-                job.params.unit,
-                normalise=job.params.normalise,
-            )
-        elif kind == "baseline":
-            data = pd.read_parquet(job.input.data)
-            fig, axes = plot_bar_histogram(
-                data,
-                "end_use",
-                container_col="country_code",
-                format_container=not bool(job.input.useful),
-                unit="TWh",
-            )
-            if job.input.useful:
-                plot_value_histogram(
-                    pd.read_parquet(job.input.useful[0]),
-                    container_col="country_code",
-                    label="useful_energy",
-                    fig=fig,
-                    axes=axes,
-                    unit="TWh",
-                )
-            sector = data.sector.iat[0]
-            fig.suptitle(
-                f"{sector.capitalize()} {'energy' if job.input.useful else 'final energy'} demand"
-            )
-            save_figure(fig, job.output[0], bbox_inches="tight")
-        else:
-            raise ValueError(f"Unknown plot kind: {kind}")
-
-
-if __name__ == "__main__":
-    sys.stderr = open(snakemake.log[0], "w")
-    main(snakemake)

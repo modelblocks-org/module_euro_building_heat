@@ -309,36 +309,22 @@ def intermediate_raster_settings():
     return {**raster_settings(), "dtype": config["processing"]["intermediate_dtype"]}
 
 
-HOURLY_PLOTS = {
-    "heat_demand": ("<heat_demand>", "Per unit", True),
-    "heat_pump_cop": ("<heat_pump_cop>", "COP", False),
-    "heat_pump_electricity_demand": ("<heat_pump_electricity_demand>", "MWh", False),
-}
-RASTER_PLOTS = {
-    "building_count": (
-        "<building_count>",
-        "Residential, commercial and public buildings",
-        "Buildings per hectare",
-    ),
-    "residential_space_heat_weight": (
-        "<resources>/automatic/shapes/{shapes}/support/residential_space_heat_weight.tif",
-        "Residential space-heating support",
-        "Space-heating support (weighted m²/ha)",
-    ),
-    "commercial_space_heat_weight": (
-        "<resources>/automatic/shapes/{shapes}/support/commercial_space_heat_weight.tif",
-        "Commercial and public floor area",
-        "Floor area (m²/ha)",
-    ),
-}
-
-
 def report_figure_inputs(wildcards):
     """Include heat, building and applicable baseline figures in one report DAG."""
     root = "<resources>/automatic/shapes/{shapes}/plots"
     figures = [root + "/annual_heat_demand.png"]
-    figures += [root + f"/{dataset}_timeseries.pdf" for dataset in HOURLY_PLOTS]
-    figures += [root + f"/{dataset}.png" for dataset in RASTER_PLOTS]
+    figures += [
+        root + f"/{dataset}_timeseries.pdf"
+        for dataset in ("heat_demand", "heat_pump_cop", "heat_pump_electricity_demand")
+    ]
+    figures += [
+        root + f"/{dataset}.png"
+        for dataset in (
+            "building_count",
+            "residential_space_heat_weight",
+            "commercial_space_heat_weight",
+        )
+    ]
     for sector in ["residential", "services"]:
         figures.append(f"<resources>/automatic/baseline/jrc_idees/{sector}.pdf")
         figures += [
