@@ -61,7 +61,7 @@ rule unzip_raw_population:
     input:
         rules.download_raw_population.output[0],
     output:
-        temp("<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.tif"),
+        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.tif",
     log:
         "<logs>/automatic/unzip_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
     params:
@@ -79,14 +79,12 @@ rule prepare_shapes:
     input:
         shapes="<shapes>",
     output:
-        "<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
+        shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
+        scope="<resources>/automatic/shapes/{shapes}/scope_equal_area.parquet",
     log:
         "<logs>/{shapes}/prepare_shapes.log",
     conda:
         "../envs/module.yaml"
-    params:
-        dataset_scopes=internal["scope"]["datasets"],
-        data_proxies=config.get("data_proxies", {}),
     message:
         "Filter non-land regions from '{wildcards.shapes}' shapes."
     script:
@@ -109,19 +107,3 @@ rule prepare_shape_timezones:
         "Assign geometry-derived IANA timezones to '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_shape_timezones.py"
-
-
-rule clip_population:
-    input:
-        raster=get_configured_population_file(),
-        like_vector=rules.prepare_shapes.output[0],
-    output:
-        path=temp("<resources>/automatic/shapes/{shapes}/proxy.tif"),
-    log:
-        "<logs>/{shapes}/clip_population.log",
-    params:
-        buffer=0,
-    message:
-        "Clipping proxy raster with '{wildcards.shapes}' shapes."
-    wrapper:
-        "v9.12.0/geo/rasterio/clip"

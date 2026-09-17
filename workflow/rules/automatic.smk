@@ -1,7 +1,5 @@
 """Rules to download automatic resource files for heat demand."""
 
-CURL_ARGS = "--fail --silent --show-error --location --retry 5 --retry-delay 5 --retry-all-errors --continue-at -"
-
 
 rule download_when2heat_params:
     output:
@@ -104,23 +102,27 @@ rule download_era5_data:
 
 rule download_raw_population:
     output:
-        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip",
+        archive=update(
+            "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip"
+        ),
     log:
         "<logs>/automatic/download_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
-    localrule: True
     conda:
         "../envs/module.yaml"
     params:
-        curl_args=CURL_ARGS,
+        kind="population",
+        resolution=lambda wc: int(wc.ghsl_resolution),
+        member=lambda wc: internal["resources"]["ghsl"]["stem"].format(
+            epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
+        )
+        + "_V1_0.tif",
         url=lambda wc: internal["resources"]["ghsl"]["url"].format(
             stem=internal["resources"]["ghsl"]["stem"].format(
                 epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
             )
         ),
-    message:
-        "Download GHSL gridded population data for {wildcards.ghsl_epoch} at {wildcards.ghsl_resolution} m."
-    shell:
-        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
+    script:
+        "../scripts/download.py"
 
 
 rule download_jrc_idees:

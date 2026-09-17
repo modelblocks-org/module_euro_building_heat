@@ -4,7 +4,8 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import geopandas as gpd
-from _schemas import ShapesSchema
+from _schemas import validate_shape_source
+from _utils import processing_crs, scope_geometry
 
 if TYPE_CHECKING:
     snakemake: Any
@@ -54,19 +55,12 @@ def check_proxied_country_scope(
 
 def main() -> None:
     """Main snakemake process."""
-    shapes = gpd.read_parquet(snakemake.input.shapes)
-    if shapes.crs is None:
-        raise ValueError("The shapes GeoParquet file must define a CRS.")
+    shapes = validate_shape_source(snakemake.input.shapes)
     shapes = shapes.to_crs(WGS84)
-    shapes = shapes.loc[shapes["shape_class"] == "land"]
-    shapes = ShapesSchema.validate(shapes)
-    if shapes.empty:
-        raise ValueError("No land shapes remain after filtering non-land regions.")
-
-    check_proxied_country_scope(
-        shapes, snakemake.params.dataset_scopes, snakemake.params.data_proxies
-    )
-    shapes.to_parquet(snakemake.output[0])
+    shapes.to_parquet(snakemake.output.shapes, index=False)
+    crs = processing_crs(shapes)
+    scope = gpd.GeoDataFrame(geometry=[scope_geometry(shapes, crs)], crs=crs)
+    scope.to_parquet(snakemake.output.scope, index=False)
 
 
 if __name__ == "__main__":

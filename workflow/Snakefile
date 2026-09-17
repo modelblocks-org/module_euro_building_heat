@@ -1,6 +1,6 @@
 import yaml
 
-from snakemake.utils import min_version, validate
+from snakemake.utils import min_version, update_config, validate
 
 min_version("9.19")
 
@@ -12,9 +12,11 @@ pathvars:
     # User resources
     shapes="<resources>/user/{shapes}/shapes.parquet",
     edh_api="<resources>/user/edh_api.txt",
-    residential_space_heat_weight="<resources>/user/{shapes}/residential_space_heat_weight.tif",
-    commercial_space_heat_weight="<resources>/user/{shapes}/commercial_space_heat_weight.tif",
+    # Persistent building caches can be shared with other workflows.
+    eubucco_cache="<resources>/automatic/eubucco",
+    microsoft_cache="<resources>/automatic/microsoft",
     # Module results
+    building_count="<results>/{shapes}/rasters/building_count.tif",
     annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
     heat_demand="<results>/{shapes}/hourly/heat_demand_mwh.parquet",
     space_heat_demand="<results>/{shapes}/annual/space_heat_demand_mwh.tif",
@@ -25,8 +27,13 @@ pathvars:
     heat_pump_electricity_demand="<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet",
 
 
-# Load the example configuration. This will be overridden by users.
-configfile: workflow.source_path("../config/config.yaml")
+# Explicitly merge defaults: Snakemake skips a module's configfile directive
+# when its consumer supplies a config dictionary.
+with open(workflow.source_path("../config/config.yaml")) as stream:
+    defaults = yaml.safe_load(stream)
+update_config(defaults, config)
+config.clear()
+config.update(defaults)
 
 
 # Validate the configuration using the schema file.
@@ -48,10 +55,15 @@ wildcard_constraints:
 include: "rules/_utils.smk"
 include: "rules/automatic.smk"
 include: "rules/prepare.smk"
+include: "rules/sources.smk"
+include: "rules/building_count.smk"
+include: "rules/floor_area.smk"
+include: "rules/space_heat_weight.smk"
 include: "rules/baseline.smk"
 include: "rules/annual_heat_demand.smk"
 include: "rules/heat_timeseries.smk"
 include: "rules/heat_pump_cop.smk"
+include: "rules/plots.smk"
 
 
 # Add additional files to be delivered alongside the workflow here.
@@ -64,7 +76,14 @@ workflow.source_path("scripts/_ecuk.py")
 workflow.source_path("scripts/_plots.py")
 workflow.source_path("scripts/_timeseries.py")
 workflow.source_path("scripts/_utils.py")
-workflow.source_path("scripts/aggregate_residential_space_heat_weight.py")
+workflow.source_path("scripts/prepare_shapes.py")
+workflow.source_path("scripts/_eubucco.py")
+workflow.source_path("scripts/_microsoft.py")
+workflow.source_path("scripts/_floor_area.py")
+workflow.source_path("scripts/_building_count.py")
+workflow.source_path("scripts/_space_heat_weight.py")
+
+workflow.source_path("scripts/gridded_heat_demand.py")
 
 # Run additional check on configuration / settings
 additional_config_validation()

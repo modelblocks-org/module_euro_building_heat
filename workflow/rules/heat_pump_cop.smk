@@ -27,7 +27,7 @@ rule heat_pump_cop:
 rule group_gridded_timeseries_heat_pump_cop:
     input:
         gridded_timeseries_data=rules.heat_pump_cop.output[0],
-        grid_weights=rules.population_per_weather_gridbox.output[0],
+        grid_weights=rules.prepare_spatial_weights.output[0],
     output:
         temp("<resources>/automatic/shapes/{shapes}/heat-pump-cop.nc"),
     log:
@@ -50,16 +50,6 @@ rule heat_pump_electricity_demand_timeseries:
     output:
         cop="<heat_pump_cop>",
         electricity_demand="<heat_pump_electricity_demand>",
-        cop_plot=report(
-            "<resources>/automatic/shapes/{shapes}/plots/heat_pump_cop_timeseries.pdf",
-            category="European Building Heat",
-            subcategory="Heat pumps",
-        ),
-        electricity_demand_plot=report(
-            "<resources>/automatic/shapes/{shapes}/plots/heat_pump_electricity_demand_timeseries.pdf",
-            category="European Building Heat",
-            subcategory="Heat pumps",
-        ),
     log:
         "<logs>/{shapes}/heat-pump/heat_pump_electricity_demand_timeseries.log",
     conda:

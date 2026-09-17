@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Any
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import rioxarray
+import rasterio
 import xarray as xr
-from aggregate_residential_space_heat_weight import aggregate_support
-from gregor.aggregate import aggregate_raster_to_polygon
+from _space_heat_weight import climate_adjusted_weights
+from _utils import aggregate_support
 from shapely.geometry import box
 
 if TYPE_CHECKING:
@@ -51,6 +51,11 @@ def population_on_weather_grid(
     grid_shapes_out_path: str,
     commercial_raster: str,
     commercial_out_path: str,
+    hdd_path: str,
+    annual_weights_path: str,
+    weather_demand_years: dict[int, int],
+    elasticity: float,
+    block_size: int = 2048,
 ) -> None:
     """Uses population as a proxy to regionalise heat demand."""
     # We need the coordinates. This can be any file with gridded data across Europe
@@ -62,14 +67,12 @@ def population_on_weather_grid(
     # Locations are parquet shape files at the resolution of interest.
     locations = _prepare_locations(gpd.read_parquet(path_to_locations))
 
-    population_raster = rioxarray.open_rasterio(path_to_population, masked=True)
-    if not isinstance(population_raster, xr.DataArray):
-        raise TypeError("Expected the population raster to contain one data array.")
-    population = population_raster.squeeze(drop=True).fillna(0)
+    with rasterio.open(path_to_population) as source:
+        population_crs = source.crs
     gridbox = _weather_gridbox_polygons(coordinate_ds, lat_name, lon_name).to_crs(
-        population.rio.crs
+        population_crs
     )
-    locations = locations.to_crs(population.rio.crs)
+    locations = locations.to_crs(population_crs)
     minx, miny, maxx, maxy = locations.total_bounds
     gridbox = gridbox.cx[minx:maxx, miny:maxy]
     if gridbox.empty:
@@ -86,6 +89,9 @@ def population_on_weather_grid(
 
     # Share the weather/shape overlay with structural support aggregation. The
     # 100 m raster is streamed in blocks through Gregor (pixel-centre assignment).
+    annual_weights = {}
+    with xr.open_dataset(hdd_path) as weather:
+        hdd = weather.hdd.load()
     for sector, raster_path, output_path in [
         ("residential", residential_raster, residential_out_path),
         ("commercial", commercial_raster, commercial_out_path),
@@ -116,14 +122,22 @@ def population_on_weather_grid(
             coverage="Gregor pixel-centre assignment; no HDD applied",
         )
         structural_weights.to_netcdf(output_path)
+        adjusted, severity = climate_adjusted_weights(
+            structural_weights, hdd, weather_demand_years, elasticity
+        )
+        annual_weights[sector] = xr.DataArray(adjusted, dims=("id", "year"))
+    severity.attrs.update(hdd.attrs)
+    xr.Dataset({**annual_weights, "severity": severity}).to_netcdf(annual_weights_path)
     gridboxes_mapped_to_locations[["site", "id", "geometry"]].to_parquet(
         grid_shapes_out_path
     )
 
     gridboxes_mapped_to_locations = _aggregate_population_to_polygons(
-        population, gridboxes_mapped_to_locations
+        path_to_population, gridboxes_mapped_to_locations, block_size
     )
-    locations = _aggregate_population_to_polygons(population, locations)
+    locations = _aggregate_population_to_polygons(
+        path_to_population, locations, block_size
+    )
 
     total_population = locations.population.sum()
     assigned_population = gridboxes_mapped_to_locations.population.sum()
@@ -146,7 +160,6 @@ def population_on_weather_grid(
     )
     population_da.reindex(id=locations.id.values).fillna(0).to_netcdf(out_path)
     coordinate_ds.close()
-    population_raster.close()
 
 
 def _weather_gridbox_polygons(
@@ -234,12 +247,11 @@ def _assign_unmapped_locations_to_nearest_gridbox(
     )
 
 
-def _aggregate_population_to_polygons(
-    population: xr.DataArray, polygons: gpd.GeoDataFrame
-) -> gpd.GeoDataFrame:
-    aggregated = aggregate_raster_to_polygon(population, polygons, stats="sum")
+def _aggregate_population_to_polygons(path, polygons, block_size=2048):
     polygons = polygons.copy()
-    polygons["population"] = aggregated["sum"].to_numpy()
+    polygons["population"] = aggregate_support(
+        path, polygons, sector=None, block_size=block_size
+    )
     return polygons
 
 
@@ -258,4 +270,9 @@ if __name__ == "__main__":
         commercial_raster=snakemake.input.commercial_raster,
         commercial_out_path=snakemake.output.commercial_weights,
         grid_shapes_out_path=snakemake.output.grid_shapes,
+        hdd_path=snakemake.input.hdd,
+        annual_weights_path=snakemake.output.annual_weights,
+        weather_demand_years=snakemake.params.weather_demand_years,
+        elasticity=snakemake.params.hdd_elasticity,
+        block_size=snakemake.params.chunk_size,
     )

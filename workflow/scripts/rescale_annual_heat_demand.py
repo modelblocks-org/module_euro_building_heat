@@ -2,17 +2,14 @@
 
 import logging
 import sys
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import _plots
 import _schemas
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import rasterio
 import xarray as xr
-from aggregate_residential_space_heat_weight import iter_weight_blocks
+from gridded_heat_demand import write_heat_demand_rasters
 
 if TYPE_CHECKING:
     snakemake: Any
@@ -60,41 +57,6 @@ def country_map(path: str) -> pd.Series:
         )
         raise ValueError(f"Shapes contain duplicate shape IDs: {duplicate_ids}")
     return mapping
-
-
-def climate_adjusted_weights(
-    structural: xr.DataArray,
-    hdd: xr.DataArray,
-    weather_demand_years: dict[int, int],
-    elasticity: float,
-) -> tuple[pd.DataFrame, xr.DataArray]:
-    """Sum structural support times HDD^elasticity to shapes for each year.
-
-    Any country-wide HDD reference would cancel during country normalisation.
-    Elasticity zero explicitly disables severity, including sites with zero HDD.
-    """
-    if set(structural.dims) != {"site", "id"}:
-        raise ValueError("Structural weights must have dimensions site and id.")
-    if (
-        structural.id.to_index().has_duplicates
-        or structural.site.to_index().has_duplicates
-    ):
-        raise ValueError("Structural weights contain duplicate shape or site IDs.")
-    if not np.isfinite(structural.values).all() or (structural.values < 0).any():
-        raise ValueError("Structural weights must be finite and non-negative.")
-    if not np.isfinite(elasticity) or elasticity < 0:
-        raise ValueError("HDD elasticity must be finite and non-negative.")
-    hdd = hdd.sel(site=structural.site, weather_year=list(weather_demand_years))
-    if not np.isfinite(hdd.values).all() or (hdd.values < 0).any():
-        raise ValueError(
-            "HDD must be finite and non-negative for every weather cell/year."
-        )
-    severity = xr.ones_like(hdd) if elasticity == 0 else hdd**elasticity
-    weights = (
-        (structural * severity).sum("site").transpose("id", "weather_year").to_pandas()
-    )
-    weights.columns = [weather_demand_years[int(year)] for year in weights.columns]
-    return weights, severity
 
 
 def country_normalised_share(
@@ -269,23 +231,16 @@ def report_country_total_discrepancies(
     raise ValueError("Shape disaggregation changed national heat-demand totals.")
 
 
-def write_demand_raster(
-    source_path: str,
-    output_path: str,
-    grid_shapes: gpd.GeoDataFrame,
-    national_demand: pd.DataFrame,
-    shape_to_country: pd.Series,
-    annual_weights: pd.DataFrame,
-    severity: xr.DataArray,
-    weather_demand_years: dict[int, int],
-    elasticity: float,
-    category: str = "household",
-) -> None:
-    """Write annual sector space heat in MWh per original 100 m cell.
-
-    The same Gregor pixel-centre assignment and country denominators as the
-    shape allocation ensure consistent totals.
-    """
+def country_allocation_factors(
+    grid_shapes,
+    national_demand,
+    shape_to_country,
+    annual_weights,
+    severity,
+    weather_demand_years,
+    category="household",
+):
+    """Return the original country-normalised factors per weather/shape intersection."""
     mask = (national_demand.index.get_level_values("cat_name") == category) & (
         national_demand.index.get_level_values("end_use") == "space_heat"
     )
@@ -311,63 +266,7 @@ def write_demand_raster(
     factors = np.asarray(factors)
     if not np.isfinite(factors).all():
         raise ValueError("Non-finite country allocation factors for demand raster.")
-    with rasterio.open(source_path) as source:
-        profile = source.profile.copy()
-    profile.update(
-        driver="GTiff",
-        count=len(pairs),
-        dtype="float64",
-        nodata=0,
-        tiled=True,
-        blockxsize=512,
-        blockysize=512,
-        compress="deflate",
-        predictor=3,
-        BIGTIFF="IF_SAFER",
-    )
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    assigned = np.zeros_like(factors)
-    raster_totals = np.zeros(len(pairs))
-    with rasterio.open(output_path, "w", **profile) as output:
-        output.update_tags(
-            end_use=f"{category} space heating",
-            units="MWh/cell",
-            allocation="structural support * HDD^elasticity; country-normalised",
-            hdd_elasticity=elasticity,
-            hdd_base_temperature_celsius=severity.attrs.get(
-                "base_temperature_celsius", ""
-            ),
-        )
-        for band, (weather_year, demand_year) in enumerate(pairs, start=1):
-            output.set_band_description(
-                band, f"{category}_space_heat_{demand_year}_weather_{weather_year}"
-            )
-            output.set_band_unit(band, "MWh/cell")
-            output.update_tags(band, demand_year=demand_year, weather_year=weather_year)
-        for window, block_shape, contributions in iter_weight_blocks(
-            source_path,
-            grid_shapes,
-            "residential" if category == "household" else "commercial",
-        ):
-            block = np.zeros((len(pairs), *block_shape), dtype=np.float64)
-            for index, rows, columns, support in contributions:
-                for band in range(len(pairs)):
-                    energy = support * factors[band, index]
-                    block[band, rows, columns] += energy
-                    assigned[band, index] += energy.sum()
-            raster_totals += block.sum(axis=(1, 2))
-            output.write(block, window=window)
-    for band, (_, demand_year) in enumerate(pairs):
-        actual = (
-            pd.Series(assigned[band]).groupby(countries.reset_index(drop=True)).sum()
-        )
-        expected = national.loc[demand_year, actual.index] * 1e6
-        if not np.allclose(actual, expected, rtol=1e-6, atol=1e-3):
-            raise ValueError(f"Demand raster changed country totals for {demand_year}.")
-        if not np.isclose(raster_totals[band], expected.sum(), rtol=1e-6, atol=1e-3):
-            raise ValueError(
-                f"Demand raster cell sum differs from allocated energy for {demand_year}."
-            )
+    return factors
 
 
 def main() -> None:
@@ -381,17 +280,12 @@ def main() -> None:
     elasticity = float(snakemake.params.hdd_elasticity)
     with (
         xr.open_dataarray(snakemake.input.space_heat_weight) as structural,
-        xr.open_dataset(snakemake.input.hdd) as weather,
         xr.open_dataarray(snakemake.input.commercial_weights) as commercial,
+        xr.open_dataset(snakemake.input.annual_weights) as weights,
     ):
-        space_heat_weights, severity = climate_adjusted_weights(
-            structural.load(), weather.hdd.load(), weather_demand_years, elasticity
-        )
-        commercial_weights, commercial_severity = climate_adjusted_weights(
-            commercial.load(), weather.hdd.load(), weather_demand_years, elasticity
-        )
-        severity.attrs.update(weather.hdd.attrs)
-        commercial_severity.attrs.update(weather.hdd.attrs)
+        space_heat_weights = weights.residential.transpose("id", "year").to_pandas()
+        commercial_weights = weights.commercial.transpose("id", "year").to_pandas()
+        severity = weights.severity.load()
         residential_hot_water_weights = structural.sum("site").to_series()
         commercial_hot_water_weights = commercial.sum("site").to_series()
     shapes = gpd.read_parquet(snakemake.input.shapes)
@@ -410,32 +304,36 @@ def main() -> None:
     validated = _schemas.AnnualHeatDemandSchema.validate(tidy)
     validated.attrs["units"] = "TWh"
     validated.to_parquet(snakemake.output.annual_demand, index=False)
-    _plots.plot_annual_heat_demand_choropleth(
-        shapes, validated, snakemake.output.choropleth
-    )
-    write_demand_raster(
+    grid_shapes = gpd.read_parquet(snakemake.input.grid_shapes)
+    factors = {
+        category: country_allocation_factors(
+            grid_shapes,
+            demand,
+            mapping,
+            sector_weights,
+            severity,
+            weather_demand_years,
+            category,
+        )
+        for category, sector_weights in [
+            ("household", space_heat_weights),
+            ("commercial", commercial_weights),
+        ]
+    }
+    write_heat_demand_rasters(
+        validated,
+        shapes,
         snakemake.input.residential_raster,
-        snakemake.output.raster,
-        gpd.read_parquet(snakemake.input.grid_shapes),
-        demand,
-        mapping,
-        space_heat_weights,
-        severity,
-        weather_demand_years,
-        elasticity,
-    )
-
-    write_demand_raster(
         snakemake.input.commercial_raster,
-        snakemake.output.commercial_raster,
-        gpd.read_parquet(snakemake.input.grid_shapes),
-        demand,
-        mapping,
-        commercial_weights,
-        commercial_severity,
+        grid_shapes,
+        factors,
         weather_demand_years,
-        elasticity,
-        category="commercial",
+        {
+            "space_heat": snakemake.output.space_heat,
+            "hot_water": snakemake.output.hot_water,
+        },
+        hdd_elasticity=elasticity,
+        hdd_base_temperature=severity.attrs["base_temperature_celsius"],
     )
 
 

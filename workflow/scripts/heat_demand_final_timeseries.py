@@ -3,7 +3,6 @@
 import sys
 from typing import TYPE_CHECKING, Any
 
-import _plots
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -73,9 +72,9 @@ def scale_heat_demand_profiles(
         xr.DataArray: merged and scaled heat demand profiles.
     """
     building_to_category = xr.DataArray(
-        pd.Series(
-            {"COM": "commercial", "SFH": "household", "MFH": "household"}
-        ).rename_axis(index="building")
+        np.array(["commercial", "household", "household"]),
+        dims="building",
+        coords={"building": ["COM", "SFH", "MFH"]},
     )
     grouped_unscaled_demand = (
         (unscaled_demand_profiles * building_shares)
@@ -186,7 +185,6 @@ def main() -> None:
         snakemake.input.shape_timezones,
         units="MWh",
     )
-    _plots.plot_heat_demand_timeseries(final_df, snakemake.output.plot)
 
 
 if __name__ == "__main__":

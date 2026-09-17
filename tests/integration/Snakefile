@@ -23,7 +23,13 @@ module module_euro_building_heat:
         # Redirect specific user resources (inputs)
         shapes=rules.create_external_shapes.output[0],
         edh_api="resources/user/edh_api.txt",
+        # Share persistent building downloads with the local module checkout.
+        eubucco_cache="../../resources/automatic/eubucco",
+        microsoft_cache="../../resources/automatic/microsoft",
         # Redirect specific module results (outputs)
+        building_count="results/output/{shapes}/rasters/building_count.tif",
+        annual_heat_demand="results/output/{shapes}/annual/heat_demand_twh.parquet",
+        heat_pump_electricity_demand="results/output/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet",
         heat_demand="results/output/{shapes}/hourly/heat_demand_mwh.parquet",
         space_heat_demand="results/output/{shapes}/annual/space_heat_demand_mwh.tif",
         hot_water_demand="results/output/{shapes}/annual/hot_water_demand_mwh.tif",
@@ -48,11 +54,16 @@ use rule * from module_euro_building_heat as module_euro_building_heat_*
 rule all:
     default_target: True
     input:
+        "results/output/test/rasters/building_count.tif",
+        "results/output/test/annual/heat_demand_twh.parquet",
+        "results/output/test/hourly/heat_pump_electricity_demand_mwh.parquet",
         "results/output/test/hourly/heat_demand_mwh.parquet",
         "results/output/test/annual/space_heat_demand_mwh.tif",
         "results/output/test/annual/hot_water_demand_mwh.tif",
         "results/output/test/hourly/space_heat_profile.parquet",
         "results/output/test/hourly/hot_water_profile.parquet",
         "results/output/test/hourly/heat_pump_cop_pu.parquet",
+        # Request every annotated heat/building figure for `snakemake --report`.
+        "resources/module/resources/automatic/shapes/test/plots/report_manifest.txt",
     message:
         "A generic dry-run test case for the heat demand module."

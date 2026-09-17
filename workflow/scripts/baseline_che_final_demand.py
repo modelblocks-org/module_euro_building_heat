@@ -4,7 +4,6 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import _che
-import _plots
 import _schemas
 
 if TYPE_CHECKING:
@@ -22,11 +21,6 @@ def main() -> None:
         df = _schemas.BaselineSchema.validate(df)
         sector = df["sector"].iat[0]
         df.to_parquet(snakemake.output[sector], index=False)
-        fig, _ = _plots.plot_bar_histogram(
-            df, "end_use", container_col="country_code", unit="TWh"
-        )
-        fig.suptitle(f"{sector.capitalize()} final energy demand")
-        fig.savefig(snakemake.output[f"{sector}_plot"], bbox_inches="tight")
 
 
 if __name__ == "__main__":

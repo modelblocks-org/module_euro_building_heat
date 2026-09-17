@@ -24,35 +24,60 @@ and the `snakemake` [documentation](https://snakemake.readthedocs.io/en/stable/s
 
 This module combines national annual heat-demand statistics with weather-driven
 hourly profiles and scales them to user-provided European regions using
-population weights.
+building floor area, population, and heating degree days (HDD). It includes
+building acquisition and hectare-raster preparation in the same workflow.
 
 Data processing steps:
 
-<p align="center">
-  <img src="./figures/rulegraph.png" width="100%">
-</p>
+```mermaid
+flowchart LR
+    S[Shapes and shared population] --> B[Cached building preparation]
+    B --> C[Buildings per hectare]
+    B --> W[Structural sector support]
+    W --> A[Annual heat allocation]
+    E[ERA5 and national heat statistics] --> A
+    W --> H[Hourly demand and heat pumps]
+    A --> H
+    C --> P[Report figures]
+    A --> P
+    H --> P
+```
 
-1. Read and validate the user-provided regions. Only land shapes are processed,
-   and configured proxy countries fill gaps in the available statistics.
-2. Retrieve the required weather, population, timezone, and building-energy
-   datasets from ERA5, GHSL, Eurostat, JRC-IDEES, ECUK, and Swiss sources.
-3. Combine these statistics into national annual heat demand for households and
-   services. Published useful-heat data take precedence where available;
-   otherwise, configured technology efficiencies convert final to useful demand.
-4. Allocate national demand to the requested shapes using population weights,
-   producing a disaggregated annual TWh dataset.
+1. Validate the land shapes and prepare shared geography. Preserve the input shape IDs.
+2. Reuse or download pinned EUBUCCO/Microsoft buildings and one GHSL 2025 population
+   raster at 100 m. Prepare complete NUTS-region floor-area totals and count proxies.
+3. Process balanced building batches once, retaining floor area, population,
+   compactness statistics, and counts. Export residential/commercial/public
+   buildings per hectare independently of the weather and heat-demand branches.
+4. Build residential structural support from the floor-area/population blend,
+   compactness, and age. Commercial support uses commercial/public floor area.
+5. Combine national Eurostat, JRC-IDEES, ECUK, and Swiss statistics into useful heat.
+   Reuse ERA5 temperatures to calculate annual HDD and weather-driven hourly profiles.
+6. Allocate national space heat with structural support times HDD; hot water uses
+   structural support without HDD and cooking uses population. Write both final
+   annual demand rasters directly, preserving country and shape totals.
+7. Aggregate When2Heat profiles, align local behaviour to UTC, and scale to annual
+   demand. Calculate heat-pump COP and electricity demand with the existing methods.
+8. Produce report figures through separate plotting rules; the import example
+   includes them in its default target.
 
-<p align="center">
-  <img src="./figures/annual_heat_demand.png" width="50%">
-</p>
+### Reusing building downloads
 
-5. Derive local building-type shares and timezones, then combine ERA5 weather
-   with When2Heat profiles to represent space heat and hot water demand.
-6. Aggregate profiles to the requested shapes, align local behavior to a
-   continuous UTC timeline, and scale each profile to its annual demand total.
-7. Calculate air-source and ground-source heat-pump COP from weather and the
-   configured sink temperatures and technology shares.
-8. Write hourly heat demand, heat-pump electricity / COP timeseries.
+The raw caches are persistent and shared across shape cases. `eubucco_cache` and
+`microsoft_cache` path variables default to `resources/automatic/eubucco` and
+`resources/automatic/microsoft`. Override them in the importing module to point
+at existing caches, including those from `module_heat_rasters`. See the
+[integration example](tests/integration/Snakefile).
+
+The EUBUCCO v0.2 source layout and Microsoft 2026-08-13 release layout are
+unchanged. Completed files are validated without another download, even if a
+rule is forced to rerun. Partial transfers resume; only missing partitions or
+bytes are fetched. Invalid completed files fail validation without being replaced.
+EUBUCCO metadata are also versioned and cached independently of source planning.
+
+For this local integration, the existing large cache directories are linked in
+place; they were not copied or moved. Retain the original directories while
+those links are in use. The code itself has no dependency on the other repository.
 
 ### Timezone handling
 
@@ -96,16 +121,37 @@ The module also exports heat demand separately for space heating and hot water:
   Each shape and weather year sums to 1 (or 0 for zero demand). Multiply these
   shares by the matching annual sink demand in MWh to obtain hourly MWh.
 
-These paths are relative to `<results>/{shapes}/`. Each output has its own
-path variable for use by importing workflows. The two rasters share the input
-residential support grid and preserve annual demand totals per shape. Household
-space heat uses structural support and HDD, normalized within each output shape
-to account for boundary-cell differences in the upstream weather intersections.
-Commercial space heat uses its own structural support and HDD, resampled onto
-that grid and normalized within each shape. Hot water uses the original residential
-and commercial structural proxies without HDD: each sector is allocated separately
-and then summed. National-to-shape hot water allocation also uses these proxies
-without HDD.
+These paths are relative to `<results>/{shapes}/`. Existing public paths,
+annual year-pair metadata, and UTC profile schemas are retained. The additional
+`rasters/building_count.tif` output contains one `building_count` band in
+`buildings/ha`, excluding other building uses; proxy counts can be fractional.
+All three public rasters use the same aligned 100 m grid, with nodata 0.
+
+Both sectors retain their own structural weights, with HDD applied only to
+annual space heat. The final raster allocation corrects weather-intersection
+boundary differences to preserve each shape's annual demand. The structural
+support rasters are generated internally; they are no longer user inputs.
+
+The shared population source defaults to 2025 at 100 m. This intentionally
+replaces the previous heat branch's nearest-demand-year, 1 km population source
+and can change population-based demand and profile aggregation.
+
+Diagnostic figures retain their existing heat paths and Snakemake `report(...)`
+annotations. Request `<resources>/automatic/shapes/{shapes}/plots/report_manifest.txt`
+to build all report figures, or request individual figure paths. The report
+includes annual heat maps, hourly demand, COP and electricity profiles, applicable
+JRC/Swiss/UK baselines, and the merged workflow's building-count and structural
+support maps. The three building maps are `building_count.png`,
+`residential_space_heat_weight.png`, and `commercial_space_heat_weight.png` in
+the same plots directory. Plot changes do not rerun numerical processing.
+
+The [import example](tests/integration/Snakefile) requests the report figures
+alongside all nine data outputs. From its directory, build both the outputs and
+an HTML report with:
+
+```shell
+snakemake --use-conda --cores 2 --report report.html --report-after-run
+```
 
 
 ## Development
@@ -121,7 +167,7 @@ pixi install --all
 ```
 
 Please be aware that this is a multi-environment project (see [pixi.toml](./pixi.toml) for details).
-- `default`: used for development and integration testing.
+- `default`: includes the module dependencies plus development and test tools.
 Because it contains `Snakemake`, `conda` and `pytest` as dependencies it **should not be used** in `Snakemake` rules.
 - `module`: contains minimal dependencies used in `Snakemake` rules.
 If modified, be sure to export it to `Snakemake` so it can be recreated by module users:
@@ -135,7 +181,14 @@ pixi run export-snakemake-env module
 ## Testing
 <!-- Please do not modify this templated section -->
 
-For testing, simply run:
+Run focused checks without downloads or an ERA5 key:
+
+```shell
+pixi run pytest tests/test_*.py
+```
+
+The full integration run below downloads any missing sources and calculates the
+configured case; it is intended for production validation:
 
 ```shell
 pixi run test-integration
@@ -154,6 +207,9 @@ snakemake --use-conda --cores 2  # run the workflow!
 
 This module is based on the following research and datasets:
 
+- EUBUCCO v0.2 building footprints: <https://docs.eubucco.com/v0.2/>
+- Microsoft Global ML Building Footprints: <https://github.com/microsoft/GlobalMLBuildingFootprints>
+- Floor-area/compactness methodology: Müller et al. (2019), <https://doi.org/10.3390/en12244789>
 - When2Heat heat-demand profile methodology and parameters:
   <https://github.com/oruhnau/when2heat>
 - Earth Data Hub ERA5 hourly single-level weather data used for temperature,

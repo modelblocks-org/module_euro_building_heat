@@ -12,6 +12,8 @@ checkpoint prepare_shape_country_scope:
     conda:
         "../envs/module.yaml"
     params:
+        dataset_scopes=internal["scope"]["datasets"],
+        data_proxies=config.get("data_proxies", {}),
         commercial_end_use_scope=internal["scope"]["datasets"]["commercial_end_use"][
             "countries"
         ],
@@ -112,19 +114,14 @@ rule rescale_annual_heat_demand_to_shapes:
         population="<resources>/automatic/shapes/{shapes}/population.nc",
         space_heat_weight="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
         commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
-        hdd="<resources>/automatic/shapes/{shapes}/gridded_weather/hdd.nc",
-        residential_raster="<residential_space_heat_weight>",
-        commercial_raster="<commercial_space_heat_weight>",
+        annual_weights="<resources>/automatic/shapes/{shapes}/annual_spatial_weights.nc",
+        residential_raster=rules.merge_structural_support.output.residential_space_heat_weight,
+        commercial_raster=rules.merge_structural_support.output.commercial_space_heat_weight,
         grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     output:
         annual_demand="<annual_heat_demand>",
-        raster="<resources>/automatic/{shapes}/household_space_heat_demand_mwh.tif",
-        commercial_raster="<resources>/automatic/{shapes}/commercial_space_heat_demand_mwh.tif",
-        choropleth=report(
-            "<resources>/automatic/shapes/{shapes}/plots/annual_heat_demand.png",
-            category="European Building Heat",
-            subcategory="Heat demand",
-        ),
+        space_heat="<space_heat_demand>",
+        hot_water="<hot_water_demand>",
     log:
         "<logs>/{shapes}/annual/rescale_annual_heat_demand_to_shapes.log",
     conda:
@@ -136,24 +133,3 @@ rule rescale_annual_heat_demand_to_shapes:
         "Scale national annual heat demand to '{wildcards.shapes}' shapes."
     script:
         "../scripts/rescale_annual_heat_demand.py"
-
-
-rule gridded_heat_demand:
-    input:
-        annual_demand=rules.rescale_annual_heat_demand_to_shapes.output.annual_demand,
-        household_space_heat=rules.rescale_annual_heat_demand_to_shapes.output.raster,
-        commercial_space_heat=rules.rescale_annual_heat_demand_to_shapes.output.commercial_raster,
-        residential_support="<residential_space_heat_weight>",
-        commercial_support="<commercial_space_heat_weight>",
-        shapes=rules.prepare_shapes.output[0],
-    output:
-        space_heat="<space_heat_demand>",
-        hot_water="<hot_water_demand>",
-    log:
-        "<logs>/{shapes}/annual/gridded_heat_demand.log",
-    conda:
-        "../envs/module.yaml"
-    message:
-        "Write annual space heat and hot water demand rasters for '{wildcards.shapes}'."
-    script:
-        "../scripts/gridded_heat_demand.py"

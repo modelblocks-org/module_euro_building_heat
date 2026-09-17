@@ -1,103 +1,126 @@
-We recommend consulting the following before using this module:
-- `config/config.yaml`: a generic example configuration of this module.
-- `workflow/internal/config.schema.yaml`: a schematic overview of all the configuration options of this module.
-- `INTERFACE.yaml`: lists module input and output files, and their default locations.
-- `tests/integration/Snakefile`: an example of how to call this module from another workflow.
+# Configuration
 
-## Overview
+The example in `config/config.yaml` supplies all defaults. Imported workflows
+can override individual settings; `workflow/internal/config.schema.yaml`
+validates the merged configuration. Public files are listed in `INTERFACE.yaml`.
 
-This is only a brief overview of the configuration options.
-Consult the configuration example and the schema for additional information.
+## Shared sources and building processing
 
-- `demand_years`: annual heat-demand years, from 2010 through 2023.
-  - `start`: first year to include.
-  - `end`: first year not to include; it may be no later than 2024.
-- `weather_years`: ERA5 years used to create the hourly profiles.
-This range must contain as many years as `demand_years`, with both ranges being paired in order.
-**Output timeseries use this year range in their timestamps**.
-  - `start`: first weather year to include.
-  - `end`: first weather year not to include.
-- `threads`: parallelism available to aggregation tasks.
-  - `aggregation`: maximum worker count, with a minimum of `1`.
-- `population`: GHSL population data used to allocate demand to the input shapes.
-The workflow selects the available population epoch closest to `demand_years.start`.
-  - `resolution`: raster resolution in metres. Use `1000` for a smaller,
-    faster calculation or `100` for more spatial detail.
-- `crs`: coordinate reference systems used for geometry calculations.
-  - `projected`: projected CRS for operations such as centroid calculation, for example `EPSG:3035` or `3035`.
-- `data_proxies`: optional mappings for requested countries missing from baseline datasets.
-    Map each target ISO alpha-3 code to one or more covered reference-country codes.
-    Multiple references are averaged.
-  - `sfh_mfh_shares`: proxies single and multi-family dwelling shares.
-  - `annual_energy_balance`: proxies per-capita energy intensities and scales
-    them to the target population.
-    The target and references must have land shapes with positive assigned population.
-  - `household_end_use`: proxies residential carrier-level end-use shares.
-  - `jrc_idees`: proxies commercial carrier-level end-use shares.
-- `heat`: controls conversion to useful heat and average heat-pump performance.
-  - `hdd`: annual space-heating severity correction.
-    - `base_temperature`: daily-mean ERA5 temperature threshold in °C (default `15.5`).
-    - `elasticity`: exponent applied to HDD (default `0.5`); `0` disables the correction.
-  - `useful_heat_demand`: This is optional.
-    `actual` (the default) uses published useful heat where available, while `calculate_all` applies the configured efficiencies everywhere.
-  - `tech_efficiencies`: final-to-useful conversion factors by carrier under `space_heat`, `hot_water`, and `cooking`.
-    Keep the carrier keys shown in the example configuration and adjust their numeric factors as needed.
-  - `heat_pump`: settings used to calculate the combined air-source and
-    ground-source heat-pump COP profile.
-    - `sink_temperature`: operating temperature in degrees Celsius for each heat-delivery method.
-    - `space_heat_sink_shares`: space-heating share for each sink.
-      Values must sum to one.
-      Please omit exactly one configured sink to designate it for hot water.
-    - `heat_pump_shares`: `ashp` and `gshp` shares, each between zero and one and together summing to one.
-    - `correction_factor`: positive multiplier applied to the COP curves.
+- `population`: one GHSL GHS-POP source for building preparation, annual heat,
+  and hourly aggregation. `epoch` defaults to **2025**, `resolution` is **100 m**,
+  and `chunk_size` controls bounded aggregation windows. The previous automatic
+  nearest-demand-year selection and 1 km heat population source are removed.
+  Population summaries are cached across building control and reference regions.
+  Only exact matching projected geometries reuse a sum; floor-area references
+  retain their GISCO/Eurostat coverage and count references retain EUBUCCO coverage.
+- `buildings_eubucco`: version `0.2`, source `full` by default, centroid assignment,
+  and floor-bin representatives. The `lightweight` source requires
+  `heat.spatial_weights.surface_volume.method: equivalent_square`; observed
+  `footprint_perimeter` requires the full source.
+- `buildings_microsoft`: pinned release `2026-08-13`. Sparse tiles below the
+  configured `minimum_building_count`, and populated cells without a retained
+  centroid, share the existing population fallback for both floor area and counts.
+- `eurostat`: Census 2021 floor-area assumptions, including useful-to-gross ratio,
+  representative dwelling areas and room counts. All values remain configurable.
+- `processing`: balanced NUTS processing batches and persistent float64
+  intermediates. Building centroids and population cells retain their original
+  clipping conventions; complete NUTS-region totals are normalized before clipping.
+- `raster`: aligned 100 m equal-area grid, output dtype, compression, tile size,
+  and nodata 0. Automatic CRS selection retains EPSG:3035 for European scopes
+  and Mollweide otherwise. All public rasters share this grid.
+- `building_count`: independent reference-count shares and counts-per-person
+  proxies. Residential, commercial, and public buildings are included; other
+  uses are excluded. Proxy counts can be fractional.
+- `plotting`: raster diagnostic maximum size and outline style. These settings
+  affect only plot jobs. The import example requests all annotated report figures
+  through `plots/report_manifest.txt`, alongside the nine data outputs. Individual
+  figures remain independently requestable; count-only targets do not require
+  the heat report.
 
-## Space-heating allocation
+## Persistent building caches
 
-Provide the structural 100 m raster from `module_heat_rasters` through the
-`residential_space_heat_weight` and `commercial_space_heat_weight` path variables
-for the respective sectors. Both files are required; missing files do not fall back
-to population. Each band must be named after its path variable. Residential values
-are `A_floor × f(S/V) × f(age)` in `weighted_m2/ha`; commercial values are
-commercial/public floor area in `m2/ha`. Neither includes climate correction.
-Gregor sums this support over the intersections of Modelblocks shapes and ERA5
-cells. Aggregation runs in raster windows to bound memory and uses Gregor's
-pixel-centre boundary assignment, matching the population aggregation convention.
+Override `eubucco_cache` and `microsoft_cache` in the importing module's
+`pathvars` to reuse existing caches, without copying or moving the large files:
 
-For each configured weather year, HDD is the sum of
-`max(base_temperature - daily_mean_temperature, 0)` over UTC calendar days.
-The calculation uses the existing local ERA5 download, includes leap days,
-and excludes the extra days downloaded for hourly profile calculations.
-For shape `s`, weather cell `g`, and paired demand/weather year `y`, the annual
-sector space-heating weight is `W[s,y] = sum_g(structural[s,g] × HDD[g,y]^elasticity)`.
-Each shape receives its country's national sector space-heating demand times
-`W[s,y] / sum_country(W[:,y])`. There is no NUTS3 normalization. The denominator
-covers the supplied shapes in that country, so their combined demand equals the
-national total even when the supplied shapes cover only part of a country.
-Countries with zero resulting support raise an error instead of silently changing
-their totals. Hot water uses each sector’s structural support summed over weather
-cells without HDD, normalized within each country. Cooking retains population
-allocation. The final hot water raster allocates each shape’s household and
-commercial demand separately using the original sector proxies without HDD,
-then sums both sectors on the residential 100 m grid. Commercial support is
-average-resampled to that grid. Cell sums preserve the annual shape totals.
+```python
+module building_heat:
+    snakefile: "path/to/module_euro_building_heat/workflow/Snakefile"
+    pathvars:
+        eubucco_cache="/existing/resources/automatic/eubucco",
+        microsoft_cache="/existing/resources/automatic/microsoft"
+use rule * from building_heat as building_heat_*
+```
 
-Hourly When2Heat calculations are unchanged. Household SFH/MFH space-heating
-profiles use residential structural weather-cell weights; commercial space-heating
-profiles use commercial structural weights. Hot water uses population.
-As for households, a shape with zero commercial support can use a population
-profile, but its annual structural allocation remains zero. Because each regional hourly profile is normalized to its annual
-total, annual spatial heating severity is supplied by the HDD correction above.
-Heat-pump COP aggregation remains population weighted because its current inputs
-combine household and commercial categories.
+The defaults are `<resources>/automatic/eubucco` and
+`<resources>/automatic/microsoft`. Keep these layouts intact:
 
-The annual allocation also writes
-`resources/automatic/{shapes}/household_space_heat_demand_mwh.tif` on the original
-100 m raster grid, with annual useful energy in **MWh per cell**, not per square metre.
-Each band records its demand year and paired weather year. An equivalent
-`commercial_space_heat_demand_mwh.tif` is written on the commercial support grid.
-Each includes its sector’s space heating across all carriers, and uses the same pixel assignment and country
-normalization as the shape table. Zero marks cells without allocated demand.
-National totals and raster energy sums are checked during execution.
+- EUBUCCO: `v{version}/{source}/downloads/{region}.parquet`, including
+  `eubucco_lat_lon.parquet` for the lightweight source.
+- Microsoft: `{release}/dataset-links.csv` and
+  `{release}/downloads/{quadkey}-{part}.csv.gz`, where parts are five digits
+  numbered using the existing sorted URL order.
 
-This data module is part of the [Modelblocks](https://www.modelblocks.org/) project.
-Please consult the [Modelblocks documentation](https://modelblocks.readthedocs.io/) for more details.
+These are persistent `update(...)` outputs. A rerun validates completed files
+without invoking curl. Partial transfers retain their names and resume with
+`--continue-at -`; validation succeeds before a partial file is renamed.
+Invalid completed files cause a validation error and are not replaced.
+Changes to heat assumptions, environments, or Snakemake history must never
+cause an existing building partition to be downloaded again.
+
+EUBUCCO region metadata have independent persistent rules under
+`<resources>/automatic/eubucco-metadata/v{version}/`. Source planning reads these
+files instead of fetching them again. During local integration, metadata were
+seeded from the original module after checking its saved source version.
+
+Changing the source/version or requesting a wider geographic scope can require
+previously uncached files. Existing releases and partitions remain available.
+
+## Demand, weather and proxies
+
+- `demand_years` selects annual statistics from 2010 through 2023. `start` is
+  inclusive and `end` exclusive.
+- `weather_years` uses the same range convention and must have the same length;
+  years are paired in order. Output timestamps follow the weather years.
+- `threads.aggregation` controls hourly aggregation parallelism.
+- `crs.projected` controls geometry calculations such as timezone centroids.
+- `data_proxies.floor_area` retains the raster module's method and reference
+  countries. Count proxies share this country list but use independent ratios.
+- Other `data_proxies` entries retain their existing meanings:
+  `sfh_mfh_shares`, `annual_energy_balance`, `household_end_use`, and `jrc_idees`.
+  Energy-balance population proxies still require the relevant target and
+  reference countries in the supplied shapes.
+- `heat.useful_heat_demand`, `heat.tech_efficiencies`, and `heat.heat_pump`
+  retain the existing useful-energy conversion and heat-pump assumptions.
+  Heat-pump source shares and sink shares each sum to one; exactly one sink
+  omitted from space-heat shares represents hot water.
+
+## Spatial and hourly weighting
+
+`heat.spatial_weights` contains the imported population blend, compactness
+elasticity/method, and age assumptions. Residential support blends floor-area
+and eligible population shares within complete NUTS regions, then applies
+country-centred compactness and observed-age factors. Eligible population is
+restricted to cells with residential floor area; diagnostics report eligible
+and excluded population. Missing height/observed age and Microsoft compactness
+retain neutral corrections. The combined 1981–2000 census age bin keeps its
+explicit configured multiplier. Commercial support is physical commercial/public
+floor area without those additional corrections.
+
+`heat.hdd` defines the daily-mean ERA5 base temperature (15.5 °C) and annual
+severity exponent (0.5). For each paired year, spatial space-heat weights are
+`sum_weather_cells(structural_support * HDD**elasticity)`. These weights are
+normalized over supplied shapes within each country. Their demand sums to the
+national total even when the supplied shapes cover only part of that country.
+An elasticity of zero disables HDD, including in zero-HDD cells.
+
+Hot water uses the structural sector support without HDD, and cooking uses
+population. The two final demand GeoTIFFs are written directly in MWh/cell.
+Each sector is normalized separately to its annual shape totals before summing;
+this retains the existing corrections for weather-intersection boundary cells.
+There are no intermediate household/commercial demand GeoTIFFs or commercial
+resampling step. Building counts and support remain cached independently of HDD.
+
+Hourly When2Heat profiles retain structural sector weights for space heat and
+population weights for hot water. Annual HDD is not applied again to hourly
+profiles. Heat-pump COP aggregation remains population weighted. UTC alignment,
+geometry-derived IANA timezones, DST, and leap-year handling remain unchanged.

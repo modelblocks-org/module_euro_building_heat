@@ -1,5 +1,7 @@
 """Snakemake helper functions and utilities."""
 
+CURL_ARGS = "--fail --silent --show-error --location --retry 5 --retry-delay 5 --retry-all-errors --continue-at -"
+
 
 def _get_year_range(group: str) -> list[int]:
     """Get ordered year range (lower->higher)."""
@@ -68,10 +70,7 @@ def get_jrc_url(country: str, version: int | str) -> str:
 
 def get_configured_population_file() -> str:
     """Helper to obtain the GHSL population file from the configuration."""
-    epoch = min(
-        internal["resources"]["ghsl"]["epochs"],
-        key=lambda year: abs(year - config["demand_years"]["start"]),
-    )
+    epoch = config["population"]["epoch"]
     resolution = config["population"]["resolution"]
     return f"<resources>/automatic/ghsl/pop_{epoch}_{resolution}.tif"
 
@@ -146,3 +145,204 @@ def _get_ecuk_baseline_file() -> str:
         if year > config["demand_years"]["end"] - 1
     )
     return f"<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"
+
+
+def building_source_outputs(wildcards):
+    return checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
+
+
+def building_plan_input(wildcards):
+    return building_source_outputs(wildcards).manifest
+
+
+def eubucco_stats_input(wildcards):
+    return rules.download_eubucco_stats.output.table
+
+
+def read_building_plan(wildcards):
+    import json
+
+    path = building_source_outputs(wildcards).manifest
+    with open(path) as stream:
+        return json.load(stream)
+
+
+def eubucco_download_inputs(wildcards):
+    plan = read_building_plan(wildcards)
+    regions = (
+        ["eubucco_lat_lon"]
+        if plan["eubucco_source"] == "lightweight"
+        else sorted(
+            {
+                nuts2
+                for region in plan["regions"].values()
+                for nuts2 in region["eubucco_nuts2_ids"]
+                if "eubucco"
+                in {region["residential_source"], region["commercial_source"]}
+            }
+        )
+    )
+    return [
+        str(rules.download_eubucco.output.table).format(region=region)
+        for region in regions
+    ]
+
+
+def eubucco_download_url(wildcards):
+    return internal["resources"]["automatic"][
+        f"eubucco_{config['buildings_eubucco']['source']}"
+    ].format(
+        version=config["buildings_eubucco"]["version"],
+        nuts2=wildcards.region,
+    )
+
+
+def microsoft_download_rows(wildcards):
+    import csv
+
+    plan = read_building_plan(wildcards)
+    quadkeys = {
+        key
+        for region in plan["regions"].values()
+        for key in region["microsoft_quadkeys"]
+    }
+    with open(rules.download_microsoft_index.output.table, newline="") as stream:
+        rows = [row for row in csv.DictReader(stream) if row["QuadKey"] in quadkeys]
+    return sorted(rows, key=lambda row: (row["QuadKey"], row["Url"]))
+
+
+def microsoft_download_inputs(wildcards):
+    counts = {}
+    downloads = []
+    for row in microsoft_download_rows(wildcards):
+        part = counts.get(row["QuadKey"], 0)
+        counts[row["QuadKey"]] = part + 1
+        downloads.append(
+            str(rules.download_microsoft.output.table).format(
+                quadkey=row["QuadKey"], part=f"{part:05d}"
+            )
+        )
+    return downloads
+
+
+def selected_eubucco_input(wildcards):
+    outputs = building_source_outputs(wildcards)
+    plan = read_building_plan(wildcards)
+    if any(
+        region["eubucco_nuts2_ids"]
+        and "eubucco" in {region["residential_source"], region["commercial_source"]}
+        for region in plan["regions"].values()
+    ):
+        return str(rules.process_eubucco.output.table).format(shapes=wildcards.shapes)
+    return outputs.empty_eubucco
+
+
+def selected_microsoft_input(wildcards):
+    outputs = building_source_outputs(wildcards)
+    plan = read_building_plan(wildcards)
+    if any(region["microsoft_quadkeys"] for region in plan["regions"].values()):
+        return str(rules.process_microsoft.output.table).format(shapes=wildcards.shapes)
+    return outputs.empty_microsoft
+
+
+def selected_microsoft_statistics_input(wildcards):
+    outputs = building_source_outputs(wildcards)
+    plan = read_building_plan(wildcards)
+    if any(region["microsoft_quadkeys"] for region in plan["regions"].values()):
+        return str(rules.process_microsoft.output.statistics).format(
+            shapes=wildcards.shapes
+        )
+    return outputs.empty_microsoft_statistics
+
+
+def read_floor_area_batch_plan(wildcards):
+    import json
+
+    path = checkpoints.prepare_floor_area_batches.get(
+        shapes=wildcards.shapes
+    ).output.manifest
+    with open(path) as stream:
+        return json.load(stream)
+
+
+def floor_area_batch_plan_input(wildcards):
+    return checkpoints.prepare_floor_area_batches.get(
+        shapes=wildcards.shapes
+    ).output.manifest
+
+
+def floor_area_batch_inputs(wildcards):
+    plan = read_floor_area_batch_plan(wildcards)
+    return [
+        str(rules.create_floor_area_batch.output.partials).format(
+            shapes=wildcards.shapes, batch=batch
+        )
+        for batch in plan["batches"]
+    ]
+
+
+def space_heat_weight_batch_inputs(wildcards):
+    plan = read_floor_area_batch_plan(wildcards)
+    return [
+        str(rules.create_space_heat_weight_batch.output.partials).format(
+            shapes=wildcards.shapes, batch=batch
+        )
+        for batch in plan["batches"]
+    ]
+
+
+def selected_microsoft_totals_input(wildcards):
+    outputs = building_source_outputs(wildcards)
+    plan = read_building_plan(wildcards)
+    if any(region["microsoft_quadkeys"] for region in plan["regions"].values()):
+        return str(rules.process_microsoft.output.totals).format(
+            shapes=wildcards.shapes
+        )
+    return outputs.empty_microsoft_totals
+
+
+def raster_settings():
+    return config["raster"]
+
+
+def intermediate_raster_settings():
+    return {**raster_settings(), "dtype": config["processing"]["intermediate_dtype"]}
+
+
+HOURLY_PLOTS = {
+    "heat_demand": ("<heat_demand>", "Per unit", True),
+    "heat_pump_cop": ("<heat_pump_cop>", "COP", False),
+    "heat_pump_electricity_demand": ("<heat_pump_electricity_demand>", "MWh", False),
+}
+RASTER_PLOTS = {
+    "building_count": (
+        "<building_count>",
+        "Residential, commercial and public buildings",
+        "Buildings per hectare",
+    ),
+    "residential_space_heat_weight": (
+        "<resources>/automatic/shapes/{shapes}/support/residential_space_heat_weight.tif",
+        "Residential space-heating support",
+        "Space-heating support (weighted m²/ha)",
+    ),
+    "commercial_space_heat_weight": (
+        "<resources>/automatic/shapes/{shapes}/support/commercial_space_heat_weight.tif",
+        "Commercial and public floor area",
+        "Floor area (m²/ha)",
+    ),
+}
+
+
+def report_figure_inputs(wildcards):
+    """Include heat, building and applicable baseline figures in one report DAG."""
+    root = "<resources>/automatic/shapes/{shapes}/plots"
+    figures = [root + "/annual_heat_demand.png"]
+    figures += [root + f"/{dataset}_timeseries.pdf" for dataset in HOURLY_PLOTS]
+    figures += [root + f"/{dataset}.png" for dataset in RASTER_PLOTS]
+    for sector in ["residential", "services"]:
+        figures.append(f"<resources>/automatic/baseline/jrc_idees/{sector}.pdf")
+        figures += [
+            path.removesuffix("_final.parquet") + ".pdf"
+            for path in _official_final_demand_inputs(wildcards, sector)
+        ]
+    return figures

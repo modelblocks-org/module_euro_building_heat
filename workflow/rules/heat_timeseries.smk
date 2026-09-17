@@ -70,29 +70,34 @@ rule unscaled_heat_profiles:
         "../scripts/align_unscaled_heat_profiles.py"
 
 
-rule population_per_weather_gridbox:
+rule prepare_spatial_weights:
     input:
         weather_grid=rules.process_gridded_weather_data.output.grid,
-        population=rules.clip_population.output.path,
+        hdd=rules.process_gridded_weather_data.output.hdd,
+        population=get_configured_population_file(),
         locations=rules.prepare_shapes.output[0],
-        residential_raster="<residential_space_heat_weight>",
-        commercial_raster="<commercial_space_heat_weight>",
+        residential_raster=rules.merge_structural_support.output.residential_space_heat_weight,
+        commercial_raster=rules.merge_structural_support.output.commercial_space_heat_weight,
     output:
-        population=temp("<resources>/automatic/shapes/{shapes}/population.nc"),
+        population="<resources>/automatic/shapes/{shapes}/population.nc",
+        annual_weights="<resources>/automatic/shapes/{shapes}/annual_spatial_weights.nc",
         residential_weights="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
         commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
         grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     log:
-        "<logs>/{shapes}/timeseries/population_per_weather_gridbox.log",
+        "<logs>/{shapes}/timeseries/prepare_spatial_weights.log",
     conda:
         "../envs/module.yaml"
     params:
+        weather_demand_years=WEATHER_DEMAND_YEARS,
+        hdd_elasticity=config["heat"]["hdd"]["elasticity"],
+        chunk_size=config["population"]["chunk_size"],
         lat_name="lat",
         lon_name="lon",
     message:
         "Calculate population weights per weather gridbox for '{wildcards.shapes}'."
     script:
-        "../scripts/population_per_gridbox.py"
+        "../scripts/prepare_spatial_weights.py"
 
 
 rule heat_demand_final_timeseries:
@@ -106,11 +111,6 @@ rule heat_demand_final_timeseries:
         timeseries="<heat_demand>",
         space_heat_profile="<space_heat_profile>",
         hot_water_profile="<hot_water_profile>",
-        plot=report(
-            "<resources>/automatic/shapes/{shapes}/plots/heat_demand_timeseries.pdf",
-            category="European Building Heat",
-            subcategory="Heat demand",
-        ),
     log:
         "<logs>/{shapes}/timeseries/heat_demand_final_timeseries.log",
     conda:
