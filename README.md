@@ -76,8 +76,8 @@ the repeated autumn hour is selected twice. ERA5 analysis timestamps remain UTC.
 Please consult the configuration [README](./config/README.md) and
 [example](./config/config.yaml) for all configuration options.
 
-Earth Data Hub access requires an account and an API key from the
-[account settings](https://earthdatahub.destine.eu/account-settings#my-personal-access-tokens).
+Earth Data Hub access requires an account and an API key. Look at
+[their webpage](https://earthdatahub.destine.eu) for how to obtain one.
 Save the key by itself in `resources/user/edh_api.txt`; the file is ignored by
 Git.
 
