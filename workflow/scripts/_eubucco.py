@@ -1,7 +1,9 @@
 """Shared EUBUCCO region-mapping and canonical-table operations.
 
-This module maps the legacy NUTS 2016 regions used by EUBUCCO to the workflow's
-current NUTS-3 geography and converts either distribution to the local table.
+Map legacy NUTS 2016 regions to the workflow's current NUTS-3 geography and
+convert both building distributions to a shared Arrow schema. Building region
+IDs remain in the legacy geography; downstream allocation assigns centroids
+to current control regions.
 
 Sources:
     EUBUCCO data and schema: https://docs.eubucco.com/v0.2/
@@ -17,6 +19,8 @@ import pyarrow.compute as pc
 import pyarrow.dataset as ds
 import shapely
 
+# Both distributions use metric building measures and centroid coordinates in
+# the workflow's processing CRS. Lightweight data have no observed perimeter.
 EUBUCCO_COLUMNS = [
     "id",
     "region_id",
@@ -46,7 +50,12 @@ EUBUCCO_SCHEMA = pa.schema(
 
 
 def canonical_from_lightweight(batch: pa.RecordBatch, transformer) -> pa.Table:
-    """Convert pinned WGS84 centroids to the canonical output CRS."""
+    """Convert lightweight building attributes to the shared output schema.
+
+    The transformer must map WGS84 longitude/latitude to the processing CRS
+    with x/y axis order. Retain the source footprint area and height in square
+    metres and metres; leave perimeter null because footprints are unavailable.
+    """
     x, y = transformer.transform(
         batch.column("lon").to_numpy(zero_copy_only=False),
         batch.column("lat").to_numpy(zero_copy_only=False),
@@ -69,7 +78,12 @@ def canonical_from_lightweight(batch: pa.RecordBatch, transformer) -> pa.Table:
 
 
 def canonical_from_full(batch: pa.RecordBatch, transformer) -> pa.Table:
-    """Reduce EPSG:3035 footprints to metric shape measures and centroids."""
+    """Reduce full-distribution footprints to building measures and centroids.
+
+    Decode WKB geometry in EPSG:3035, where area and perimeter are measured in
+    square metres and metres. The transformer maps these centroids to the
+    processing CRS with x/y axis order; polygon geometry is not retained.
+    """
     geometry = shapely.from_wkb(
         pc.cast(batch.column("geometry"), pa.binary()).to_numpy(zero_copy_only=False)
     )
@@ -93,7 +107,12 @@ def canonical_from_full(batch: pa.RecordBatch, transformer) -> pa.Table:
 
 
 def eubucco_batch_filter(region_ids, bounds):
-    """Select legacy regions within the complete current-NUTS batch bounds."""
+    """Build an Arrow filter for legacy IDs and processing-CRS centroid bounds.
+
+    Bounds are (left, bottom, right, top) for complete current control regions.
+    This coarse selection limits reads; callers must still test centroids
+    against individual region polygons before allocating regional totals.
+    """
     left, bottom, right, top = bounds
     return (
         ds.field("region_id").isin(pa.array(region_ids, type=pa.string()))
@@ -111,12 +130,18 @@ def assign_region_batches(mapping, stats, batch_count: int) -> dict[str, list[st
     overlapping legacy EUBUCCO selections. Unique EUBUCCO building counts
     approximate each group's processing cost; largest-first assignment limits
     stragglers while identifiers provide deterministic tie-breaking.
+
+    Mapping entries contain ``eubucco_region_ids``; statistics contain the
+    legacy ``region_id`` and building count ``n``. Return zero-padded batch IDs
+    mapped to sorted current-region IDs, with at most ``batch_count`` batches.
     """
     counts = stats.set_index("region_id").n
     groups: dict[str, list[str]] = {}
     for region in mapping:
+        # Five-character NUTS-3 IDs share a NUTS-2 prefix; shape fallbacks stand alone.
         group = region[:4] if len(region) == 5 else region
         groups.setdefault(group, []).append(region)
+    # Count each legacy region once per group, even when current regions share it.
     weights = {
         group: int(
             counts.reindex(
@@ -137,6 +162,7 @@ def assign_region_batches(mapping, stats, batch_count: int) -> dict[str, list[st
     loads = {batch: 0 for batch in batches}
     ordered = sorted(groups, key=lambda item: (-weights[item], item))
     for index, group in enumerate(ordered):
+        # Seed every batch before assigning remaining groups to the lightest load.
         batch = (
             f"{index:03d}"
             if index < size
@@ -152,8 +178,14 @@ def map_regions(
 ) -> dict[str, dict[str, list[str]]]:
     """Map current NUTS-3 polygons to legacy EUBUCCO regions.
 
-    A same-country, positive-area intersection is required, so generalized
-    borders cannot introduce neighbouring regions.
+    Both GeoDataFrames must use the same projected CRS and contain ``region_id``.
+    Only legacy NUTS-3 regions present in ``covered_regions`` are candidates.
+    Require matching country prefixes and positive-area overlap to exclude
+    cross-country matches and boundary-only touches.
+
+    Return each current ID's sorted legacy ``region_ids`` and parent
+    ``nuts2_ids`` for download selection. Regions without coverage retain empty
+    lists so source planning can select the Microsoft fallback.
     """
     legacy = eubucco_regions.loc[
         eubucco_regions.region_id.str.len().eq(5)
@@ -177,6 +209,6 @@ def map_regions(
 
 
 def read_plan(path: str | Path) -> dict:
-    """Read an EUBUCCO planning manifest."""
+    """Read a workflow-generated source or batch planning manifest from JSON."""
     with open(path) as stream:
         return json.load(stream)

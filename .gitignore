@@ -28,3 +28,6 @@ gurobi.log
 **/results/*
 **/temp/*
 **/tmp/*
+
+# Ignore reports
+report*

@@ -37,7 +37,13 @@ from _utils import population_summaries, processing_crs
 
 
 def building_sources(snakemake):
-    """Plan EUBUCCO-first building acquisition for one shape case."""
+    """Choose building sources per control region and sector for one shape case.
+
+    Positive floor-area sums in intersecting legacy regions select EUBUCCO
+    independently for residential and commercial/public buildings. Otherwise
+    select Microsoft tiles, requiring a configured proxy country. Write the
+    source manifest and empty tables for branches that do not need a source.
+    """
     regions = gpd.read_parquet(snakemake.input.regions)
     links = pd.read_csv(snakemake.input.microsoft_index, dtype={"QuadKey": str})
     available_quadkeys = set(links.QuadKey)
@@ -51,6 +57,8 @@ def building_sources(snakemake):
     for row in regions.to_crs(4326).itertuples():
         eubucco = mapping[row.region_id]
         selected = stats.reindex(eubucco["region_ids"])
+        # Metadata determine source availability before downloading buildings.
+        # Commercial support includes both commercial and public subtypes.
         residential = selected.floor_area_type_residential.sum() > 0
         commercial = (
             selected.floor_area_subtype_commercial.sum()
@@ -83,6 +91,7 @@ def building_sources(snakemake):
     Path(snakemake.output.manifest).parent.mkdir(parents=True, exist_ok=True)
     with open(snakemake.output.manifest, "w") as stream:
         json.dump(plan, stream, indent=2)
+    # Downstream rules can read a consistent schema even for an unused source.
     pq.write_table(
         pa.Table.from_batches([], schema=EUBUCCO_SCHEMA), snakemake.output.empty_eubucco
     )
@@ -102,7 +111,11 @@ def building_sources(snakemake):
 
 
 def floor_area_batches(snakemake):
-    """Prepare balanced batches for control-region floor-area processing."""
+    """Write a batch manifest balanced by legacy EUBUCCO building counts.
+
+    Keep current NUTS-2 groups together to reuse overlapping legacy selections.
+    Batch entries contain complete control regions, including shape fallbacks.
+    """
     eubucco = read_plan(snakemake.input.plan)
     stats = gpd.read_parquet(snakemake.input.stats)
     plan = {
@@ -178,7 +191,11 @@ def floor_area_totals(snakemake):
     )
 
     def reference_mean_floors(reference_countries):
-        """Equal-weight effective storeys from EUBUCCO stock statistics."""
+        """Average country mean storeys using configured floor-bin representatives.
+
+        Building counts weight bins within each country; reference countries
+        then receive equal weight regardless of their building-stock size.
+        """
         values = []
         representatives = pd.Series(eubucco["floor_bin_representatives"])
         for country in reference_countries:
@@ -189,7 +206,11 @@ def floor_area_totals(snakemake):
         return np.mean(values)
 
     def reference_sector_shares(reference_countries):
-        """Return equal-weight reference-country residential and commercial shares."""
+        """Average reference-country residential and commercial/public area shares.
+
+        Shares use only these two sectors, excluding other building types.
+        Countries receive equal weight, rather than pooling their floor areas.
+        """
         values = []
         for country in reference_countries:
             selected = stats.loc[stats.country.eq(countries[country])]

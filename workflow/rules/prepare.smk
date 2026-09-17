@@ -3,7 +3,7 @@
 
 rule prepare_sfh_mfh_shares:
     input:
-        census="<resources>/automatic/stable/cens_21dwbo_r2.tsv.gz",
+        census="<resources>/automatic/eurostat/cens_21dwbnr_r3.tsv.gz",
         shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
     output:
         temp("<resources>/automatic/shapes/{shapes}/sfh_mfh_shares.parquet"),

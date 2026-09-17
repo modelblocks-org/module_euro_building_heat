@@ -1,4 +1,4 @@
-"""Calculate national SFH/MFH shares from the 2021 Eurostat census."""
+"""Calculate national SFH/MFH shares from the NUTS-3 dwelling floor-space table."""
 
 import sys
 from pathlib import Path
@@ -29,7 +29,8 @@ def calculate_sfh_mfh_shares(path: str) -> pd.DataFrame:
     data = _read_eurostat_values(path)
     selected = data.loc[
         data["freq"].eq("A")
-        & data["housing"].eq("DW")
+        & data["area"].eq("TOTAL")
+        & data["n_room"].eq("TOTAL")
         & data["building"].isin(BUILDING_TYPE)
         & data["unit"].eq("NR")
         & data["geo"].str.fullmatch(r"[A-Z]{2}")

@@ -71,6 +71,8 @@ low_quadkeys = low_coverage_quadkeys(
 
 population_source = rasterio.open(snakemake.input.population)
 
+# Read overlapping legacy regions within the complete batch bounds. Clipping to
+# the requested scope here would change the denominator of regional allocations.
 legacy_ids = sorted(
     {
         legacy
@@ -89,6 +91,7 @@ eubucco = (
 eubucco = gpd.GeoDataFrame(
     eubucco, geometry=gpd.points_from_xy(eubucco.x, eubucco.y, crs=regions.crs)
 )
+# ASSUME gross building floor area equals footprint area times reported storeys.
 eubucco["floor_area_m2"] = eubucco.footprint_area_m2 * eubucco.floors
 
 microsoft = (
@@ -109,6 +112,8 @@ for region_id, region in regions.iterrows():
     clipped = region.geometry.intersection(scope)
     region_totals = totals.loc[region_id]
     legacy = plan["regions"][region_id]["eubucco_region_ids"]
+    # Legacy IDs identify candidates; centroid containment assigns buildings to
+    # the current region after any administrative boundary changes.
     selected = eubucco.loc[
         eubucco.region_id.isin(legacy) & eubucco.geometry.within(region.geometry)
     ]
@@ -144,6 +149,8 @@ for region_id, region in regions.iterrows():
         )
 
     if plan["regions"][region_id]["residential_source"] == "eubucco":
+        # Preserve relative building weights while matching the residential
+        # control total derived from census data or configured country proxies.
         support = residential.floor_area_m2.sum()
         assert support > 0
         residential = residential.copy()
@@ -158,6 +165,7 @@ for region_id, region in regions.iterrows():
         )
 
     if plan["regions"][region_id]["commercial_source"] == "eubucco":
+        # Commercial/public EUBUCCO area is retained at its observed total.
         assert not commercial.empty
         commercial_proxy = np.zeros_like(population)
     else:
@@ -170,7 +178,8 @@ for region_id, region in regions.iterrows():
         )
 
     # Keep additive compactness statistics before country centring. Missing
-    # observations and Microsoft support contribute to F but not V or Q.
+    # observations and Microsoft support contribute to total floor area (F), but
+    # not valid-observation area (V) or the area-weighted compactness sum (Q).
     if plan["regions"][region_id]["residential_source"] == "eubucco":
         settings = snakemake.params.surface_volume
         ratio = surface_to_volume_ratio(
@@ -196,6 +205,8 @@ for region_id, region in regions.iterrows():
     validate_conserved_total(full_floor.sum(), region_totals.residential_total_m2)
     full_valid = point_grid(full_profile, residential, residential.valid_area)
     full_power = point_grid(full_profile, residential, residential.weighted_power)
+    # Only now clip output support to the requested scope. Complete-region grids
+    # remain available for normalisation; scoped grids retain the local share.
     profile = output_profile(clipped.bounds, snakemake.params.raster, regions.crs)
     inside = residential.loc[points_within_scope(residential, scope)]
     commercial_inside = commercial.loc[points_within_scope(commercial, scope)]
