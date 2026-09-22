@@ -7,9 +7,8 @@ def matches_precomputed(config, baseline):
     actual["population"] = {
         key: value for key, value in config["population"].items() if key != "chunk_size"
     }
-    actual["processing"] = {
-        key: value for key, value in config["processing"].items() if key != "nuts3_batches"
+    actual["spatial_weights"] = {
+        key: value for key, value in config["spatial_weights"].items() if key != "hdd"
     }
-    actual["heat"] = {"spatial_weights": config["heat"]["spatial_weights"]}
     actual["data_proxies"] = {"floor_area": config["data_proxies"]["floor_area"]}
     return actual == baseline

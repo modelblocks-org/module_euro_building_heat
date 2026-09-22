@@ -60,7 +60,7 @@ def cop(
     hot_water_methods = set(sink_temperature) - set(space_heat_sink_shares)
     if len(hot_water_methods) != 1:
         raise ValueError(
-            "`heat.heat_pump.sink_temperature` must define exactly one hot-water "
+            "`heat_pump.sink_temperature` must define exactly one hot-water "
             "sink method not listed in `space_heat_sink_shares`."
         )
     hot_water_method = hot_water_methods.pop()

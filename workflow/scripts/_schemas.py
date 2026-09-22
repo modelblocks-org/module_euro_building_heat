@@ -203,23 +203,23 @@ def validate_nuts3_source(path: str | Path) -> gpd.GeoDataFrame:
     return nuts3
 
 
-def validate_census(path: str | Path, year: int) -> pd.DataFrame:
+def validate_census(path: str | Path) -> pd.DataFrame:
     """Validate the Eurostat dwelling floor-space table structure."""
     data = pd.read_csv(path, sep="\t", dtype=str)
     assert data.columns[0].endswith("\\TIME_PERIOD")
     dimensions = data.columns[0].removesuffix("\\TIME_PERIOD").split(",")
     assert dimensions == ["freq", "area", "n_room", "building", "unit", "geo"]
-    assert sum(column.strip() == str(year) for column in data.columns) == 1
+    assert sum(column.strip() == "2021" for column in data.columns) == 1
     return data
 
 
-def validate_building_age_census(path: str | Path, year: int) -> pd.DataFrame:
+def validate_building_age_census(path: str | Path) -> pd.DataFrame:
     """Validate the Eurostat NUTS-3 dwelling construction-period table."""
     data = pd.read_csv(path, sep="\t", dtype=str)
     assert data.columns[0].endswith("\\TIME_PERIOD")
     dimensions = data.columns[0].removesuffix("\\TIME_PERIOD").split(",")
     assert dimensions == ["freq", "housing", "y_const", "unit", "geo"]
-    assert sum(column.strip() == str(year) for column in data.columns) == 1
+    assert sum(column.strip() == "2021" for column in data.columns) == 1
     return data
 
 
@@ -302,12 +302,12 @@ def validate_eubucco_source(path: str | Path, source: str) -> None:
         }
 
 
-def validate_population_raster(path: str | Path, resolution: int) -> None:
+def validate_population_raster(path: str | Path) -> None:
     """Validate a GHSL GHS-POP Mollweide raster."""
     with rasterio.open(path) as raster:
         assert raster.count == 1
         assert raster.crs.to_string() == "ESRI:54009"
-        assert np.allclose(np.abs(raster.res), resolution)
+        assert np.allclose(np.abs(raster.res), 100)
         assert np.issubdtype(np.dtype(raster.dtypes[0]), np.floating)
 
 

@@ -18,7 +18,9 @@ rule process_gridded_weather_data:
         "../envs/module.yaml"
     params:
         weather_years=WEATHER_YEARS,
-        hdd_base_temperature=config["heat"].get("hdd", {}).get("base_temperature", 15.5),
+        hdd_base_temperature=config["spatial_weights"]
+        .get("hdd", {})
+        .get("base_temperature", 15.5),
     message:
         "Process ERA5 weather data for '{wildcards.shapes}'."
     script:
@@ -90,7 +92,7 @@ rule prepare_spatial_weights:
         "../envs/module.yaml"
     params:
         weather_demand_years=WEATHER_DEMAND_YEARS,
-        hdd_elasticity=config["heat"]["hdd"]["elasticity"],
+        hdd_elasticity=config["spatial_weights"]["hdd"]["elasticity"],
         chunk_size=config["population"]["chunk_size"],
         lat_name="lat",
         lon_name="lon",

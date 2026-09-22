@@ -24,7 +24,6 @@ rule download_eurostat_floor_area:
         "../envs/module.yaml"
     params:
         kind="floor_area",
-        year=config["eurostat"]["reference_year"],
         url=internal["resources"]["stable"]["url"].format(
             dataset="cens_21dwbnr_r3.tsv.gz"
         ),
@@ -35,7 +34,7 @@ rule download_eurostat_floor_area:
 rule download_eubucco_nuts:
     output:
         table=update(
-            f"<resources>/automatic/eubucco-metadata/v{config['buildings_eubucco']['version']}/NUTS-regions-2016.parquet"
+            "<resources>/automatic/eubucco-metadata/v0.2/NUTS-regions-2016.parquet"
         ),
     log:
         "<logs>/download_eubucco_nuts.log",
@@ -43,27 +42,21 @@ rule download_eubucco_nuts:
         "../envs/module.yaml"
     params:
         kind="eubucco_nuts",
-        url=internal["resources"]["automatic"]["eubucco_nuts"].format(
-            version=config["buildings_eubucco"]["version"]
-        ),
+        url=internal["resources"]["automatic"]["eubucco_nuts"],
     script:
         "../scripts/download.py"
 
 
 rule download_eubucco_stats:
     output:
-        table=update(
-            f"<resources>/automatic/eubucco-metadata/v{config['buildings_eubucco']['version']}/region-stats.parquet"
-        ),
+        table=update("<resources>/automatic/eubucco-metadata/v0.2/region-stats.parquet"),
     log:
         "<logs>/download_eubucco_stats.log",
     conda:
         "../envs/module.yaml"
     params:
         kind="eubucco_stats",
-        url=internal["resources"]["automatic"]["eubucco_stats"].format(
-            version=config["buildings_eubucco"]["version"]
-        ),
+        url=internal["resources"]["automatic"]["eubucco_stats"],
     script:
         "../scripts/download.py"
 
@@ -113,10 +106,10 @@ checkpoint prepare_building_sources:
 rule download_eubucco:
     output:
         table=update(
-            f"<eubucco_cache>/v{config['buildings_eubucco']['version']}/{config['buildings_eubucco']['source']}/downloads/{{region}}.parquet"
+            f"<eubucco_cache>/v0.2/{config['buildings_eubucco']['source']}/downloads/{{region}}.parquet"
         ),
     log:
-        f"<logs>/eubucco/v{config['buildings_eubucco']['version']}/{config['buildings_eubucco']['source']}/download_{{region}}.log",
+        f"<logs>/eubucco/v0.2/{config['buildings_eubucco']['source']}/download_{{region}}.log",
     conda:
         "../envs/module.yaml"
     params:
@@ -133,9 +126,9 @@ rule process_eubucco:
         regions=rules.prepare_nuts3.output.regions,
         downloads=eubucco_download_inputs,
     output:
-        table=f"<resources>/automatic/{{shapes}}/eubucco/v{config['buildings_eubucco']['version']}/{config['buildings_eubucco']['source']}/buildings.parquet",
+        table=f"<resources>/automatic/{{shapes}}/eubucco/v0.2/{config['buildings_eubucco']['source']}/buildings.parquet",
     log:
-        f"<logs>/{{shapes}}/eubucco/v{config['buildings_eubucco']['version']}/{config['buildings_eubucco']['source']}/process.log",
+        f"<logs>/{{shapes}}/eubucco/v0.2/{config['buildings_eubucco']['source']}/process.log",
     conda:
         "../envs/module.yaml"
     resources:

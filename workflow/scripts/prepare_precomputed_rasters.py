@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 def crop_grid(source, target, shapes, settings):
     """Copy aligned blocks, rejecting unsupported coverage or grid alignment."""
-    crs = processing_crs(shapes) if settings["crs"] == "auto" else settings["crs"]
+    crs = processing_crs(shapes)
     shapes = shapes.to_crs(crs)
     profile = output_profile(shapes.total_bounds, settings, crs, count=1)
     geometry = shapes.geometry.union_all()
@@ -78,7 +78,7 @@ def crop_grid(source, target, shapes, settings):
                     raise ValueError(
                         "Published grids must contain finite, nonnegative values."
                     )
-                values[~inside] = settings["nodata"]
+                values[~inside] = 0
                 dst.write(values, 1, window=window)
     return shapes
 

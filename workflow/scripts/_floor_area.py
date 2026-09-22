@@ -31,16 +31,16 @@ from _utils import point_grid
 from rasterio.features import geometry_mask
 
 
-def select_building_sectors(buildings, residential_type, commercial_subtypes):
+def select_building_sectors(buildings):
     """Return residential and commercial/public building subsets."""
     return (
-        buildings.loc[buildings["type"].eq(residential_type)],
-        buildings.loc[buildings["subtype"].isin(commercial_subtypes)],
+        buildings.loc[buildings["type"].eq("residential")],
+        buildings.loc[buildings["subtype"].isin(["commercial", "public"])],
     )
 
 
-def census_values(path: str, year: int) -> pd.DataFrame:
-    """Read one Eurostat census year into explicit dimension columns.
+def census_values(path: str) -> pd.DataFrame:
+    """Read Eurostat Census 2021 values into explicit dimension columns.
 
     Eurostat bulk TSV files encode all non-time dimensions in the first column
     and append observation flags to values. Splitting the series key and parsing
@@ -49,7 +49,7 @@ def census_values(path: str, year: int) -> pd.DataFrame:
     data = pd.read_csv(path, sep="\t", dtype=str)
     series_key = data.columns[0]
     dimensions = series_key.removesuffix("\\TIME_PERIOD").split(",")
-    year_column = next(column for column in data if column.strip() == str(year))
+    year_column = next(column for column in data if column.strip() == "2021")
     data[dimensions] = data.pop(series_key).str.split(",", expand=True)
     data["value"] = pd.to_numeric(
         data.pop(year_column).str.strip().str.split().str[0], errors="coerce"
@@ -78,10 +78,12 @@ def residential_floor_area(data: pd.DataFrame, settings: dict[str, Any]) -> pd.S
         .mul(pd.Series(settings["floor_space_m2"]))
         .sum(axis=1, min_count=1)
     )
+    # Classes 1–8 report exact counts; only the open-ended class needs an assumption.
+    room_counts = {str(count): count for count in range(1, 9)} | settings["rooms"]
     rooms = (
-        common.loc[common.area.eq("TOTAL") & common.n_room.isin(settings["rooms"])]
+        common.loc[common.area.eq("TOTAL") & common.n_room.isin(room_counts)]
         .pivot_table(index="geo", columns="n_room", values="value", aggfunc="sum")
-        .mul(pd.Series(settings["rooms"]))
+        .mul(pd.Series(room_counts))
         .sum(axis=1, min_count=1)
         .mul(settings["floor_area_per_room_m2"])
     )

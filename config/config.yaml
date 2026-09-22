@@ -2,33 +2,46 @@
 # epoch/resolution, building sources/proxies, Eurostat assumptions, spatial_weights,
 # intermediate_dtype or raster settings automatically rebuilds from raw buildings.
 # See config/README.md for the complete list and publication setup.
+# Resolution and intermediate_dtype mentioned above are now fixed workflow
+# assumptions; only the remaining exposed settings can be changed.
+# Fixed invariants: 100 m population/output grids, Census 2021, EUBUCCO v0.2,
+# centroid assignment, residential and commercial/public building sectors.
 building_rasters:
   source: rebuild  # auto: download for matching defaults; rebuild: always calculate
 
 # Minimal example configuration for the heat demand workflow.
 demand_years:
   # End year is exclusive, matching the Modelblocks module convention.
+  # Annual statistics years; start inclusive, end exclusive (available: 2010–2023).
   start: 2023
   end: 2024
 
 weather_years:
   # Weather years used to shape hourly heat demand profiles. End year is exclusive.
+  # ERA5 years for hourly profiles and HDD; start inclusive, end exclusive.
+  # Must span as many years as demand_years; years are paired in order.
   start: 2023
   end: 2024
 
 threads:
+  # Maximum worker threads for gridded demand and heat-pump aggregation.
   aggregation: 8
 
 population:
   # One GHSL source for buildings, annual demand and hourly aggregation.
+  # Shared GHSL GHS-POP snapshot; 1975–2030 in five-year steps, always at 100 m.
   epoch: 2025
-  resolution: 100
+  # Aggregation window width/height in pixels; larger windows use more memory.
+  # Must be a multiple of 256, at least 256.
   chunk_size: 2048
 
 crs:
   # Projected CRS used for geometry calculations such as shape centroids.
+  # Output rasters select their equal-area CRS automatically (see raster below).
   projected: EPSG:3035
 
+# Proxy country keys and lists use ISO alpha-3 codes. floor_area.method estimates
+# mean storeys from reference countries; its countries also provide count proxies.
 data_proxies:
   floor_area:
     method: mean_floors
@@ -99,131 +112,150 @@ data_proxies:
     XKX: [BGR, HRV, HUN, ROU, GRC]
 
 
-heat:
-  spatial_weights:
-    population:
-      share: 0.5
-      resampling: sum
-      eubucco_support: residential_floor_area
-    surface_volume:
-      elasticity: 0.33
-      method: footprint_perimeter
-    age:
-      enabled: true
-      dataset: cens_21dwop_r3
-      multipliers:
-        before_1991: 1.25
-        '1991_2000': 1.0
-        after_2000: 0.8
-      cutoff_spanning_bin_multipliers:
-        Y1981-2000: 1.125
+# Spatial allocation of annual space heat. Residential structural support combines
+# floor area/population, compactness and age; commercial support uses floor area.
+spatial_weights:
+  population:
+    # Population fraction of the residential blend (0: floor area; 1: population).
+    # Population is always summed and restricted to cells with residential floor area.
+    share: 0.5
+  surface_volume:
+    # Exponent on surface-to-volume ratio before country centring; 0 is neutral.
+    elasticity: 0.33
+    # footprint_perimeter uses measured geometry and requires full EUBUCCO.
+    # equivalent_square estimates perimeter from area and also supports lightweight.
+    method: footprint_perimeter
+  age:
+    # Always use cens_21dwop_r3 (Census 2021). Factors are centred on the country's
+    # floor-area-weighted mean; missing age observations receive a neutral factor.
+    # Set every multiplier below to 1 to make age weighting neutral.
+    multipliers:
+      before_1991: 1.25  # Relative heat intensity for dwellings built before 1991.
+      '1991_2000': 1.0  # Dwellings built in 1991–2000.
+      after_2000: 0.8  # Dwellings built after 2000.
+    cutoff_spanning_bin_multipliers:
+      # Separate factor for countries reporting one bin across the 1991 cutoff.
+      Y1981-2000: 1.125
   hdd:
     # HDD = sum over days of max(base_temperature - daily mean ERA5 °C, 0).
-    base_temperature: 15.5
+    base_temperature: 15.5  # Base temperature in °C.
     # Annual household space-heat weights = structural support * HDD^elasticity.
+    # Applies to households and commercial buildings, normalised within each
+    # country. 0 disables HDD; structural building grids are unaffected.
     elasticity: 0.5
-  # Use published JRC-IDEES useful heat where available (actual), except for the
-  # UK where ECUK final demand is always converted with the efficiencies below.
-  # Use calculate_all to convert final energy for every country.
-  useful_heat_demand: actual
-  tech_efficiencies:
-    space_heat:
-      gas: 0.97
-      oil: 0.9
-      solid_fossil: 0.8
-      biowaste: 0.8
-      solar_thermal: 1
-      electricity: 1
-    hot_water:
-      gas: 0.97
-      oil: 0.9
-      solid_fossil: 0.8
-      biowaste: 0.8
-      solar_thermal: 1
-      electricity: 1
-    cooking:
-      gas: 0.28
-      oil: 0.28
-      solid_fossil: 0.15
-      biowaste: 0.1
-      electricity: 0.5
-  heat_pump:
-    sink_temperature:
-      underfloor: 35
-      radiator_large: 50
-      radiator_conventional: 65
-      hot_water: 60
-    space_heat_sink_shares:
-      underfloor: 0.1
-      radiator_large: 0.15
-      radiator_conventional: 0.75
-    heat_pump_shares:
-      ashp: 0.9
-      gshp: 0.1
-    correction_factor: 0.85
+
+# Use published JRC-IDEES useful heat where available (actual), except for the
+# UK where ECUK final demand is always converted with the efficiencies below.
+# Use calculate_all to convert final energy for every country.
+useful_heat_demand: actual
+
+# Final-to-useful energy fractions by end use and fuel: 0.9 gives 0.9 units of
+# useful heat per unit of final energy. Electricity here excludes heat pumps.
+# biowaste means biomass/waste; solid_fossil means solid fossil fuels.
+tech_efficiencies:
+  space_heat:  # Space-heating conversion factors.
+    gas: 0.97
+    oil: 0.9
+    solid_fossil: 0.8
+    biowaste: 0.8
+    solar_thermal: 1
+    electricity: 1
+  hot_water:  # Domestic hot-water conversion factors.
+    gas: 0.97
+    oil: 0.9
+    solid_fossil: 0.8
+    biowaste: 0.8
+    solar_thermal: 1
+    electricity: 1
+  cooking:  # Cooking conversion factors.
+    gas: 0.28
+    oil: 0.28
+    solid_fossil: 0.15
+    biowaste: 0.1
+    electricity: 0.5
+
+heat_pump:
+  # Delivery temperatures in °C. Exactly one sink omitted from space_heat_sink_shares
+  # represents hot water; the remaining names identify space-heating systems.
+  sink_temperature:
+    underfloor: 35
+    radiator_large: 50
+    radiator_conventional: 65
+    hot_water: 60
+  # Fractions of space heat supplied by each sink system; must sum to 1.
+  space_heat_sink_shares:
+    underfloor: 0.1
+    radiator_large: 0.15
+    radiator_conventional: 0.75
+  # Fractions used to combine air-source (ashp) and ground-source (gshp) COP;
+  # must sum to 1.
+  heat_pump_shares:
+    ashp: 0.9
+    gshp: 0.1
+  # Positive multiplier reducing manufacturer COP to expected operating performance.
+  correction_factor: 0.85
 
 processing:
+  # Number of balanced region batches for building processing. Intermediate rasters
+  # always use float64 to preserve additive totals.
   nuts3_batches: 128
-  intermediate_dtype: float64
 
 buildings_microsoft:
+  # Dated footprint release to download and cache (YYYY-MM-DD).
   release: '2026-08-13'
-  population_fallback: sparse_tiles_and_empty_cells
+  # Tiles with fewer retained buildings use population fallback. Populated cells
+  # without a retained centroid also always use population fallback.
   minimum_building_count: 2000
 
 buildings_eubucco:
-  version: '0.2'
+  # full includes observed footprint perimeters; lightweight requires
+  # spatial_weights.surface_volume.method: equivalent_square.
   source: full
-  residential_type: residential
-  commercial_subtypes:
-  - commercial
-  - public
-  assignment: centroid
+  # Representative storey counts for reported bins; estimate reference-country
+  # mean storeys and missing floor-area totals. Bin names encode their bounds.
   floor_bin_representatives:
     n_floors_0_2: 1
     n_floors_2_4: 3
     n_floors_4_7: 5.5
     n_floors_7_inf: 9
 
+# Census 2021 dwelling counts (cens_21dwbnr_r3) provide NUTS-3 residential
+# floor-area totals. The source dataset and year are fixed.
 eurostat:
-  reference_year: 2021
+  # Multiply useful dwelling area by this factor to estimate gross building area,
+  # including walls and shared space.
   useful_to_gross_ratio: 1.2
+  # Representative useful m² per dwelling, multiplied by census dwelling counts.
   floor_space_m2:
-    SQM_LT30: 25
-    SQM30-39: 35
-    SQM40-49: 45
-    SQM50-59: 55
-    SQM60-79: 70
-    SQM80-99: 90
-    SQM100-119: 110
-    SQM120-149: 135
-    SQM_GE150: 180
+    SQM_LT30: 25  # Dwellings with less than 30 m².
+    SQM30-39: 35  # 30–39 m².
+    SQM40-49: 45  # 40–49 m².
+    SQM50-59: 55  # 50–59 m².
+    SQM60-79: 70  # 60–79 m².
+    SQM80-99: 90  # 80–99 m².
+    SQM100-119: 110  # 100–119 m².
+    SQM120-149: 135  # 120–149 m².
+    SQM_GE150: 180  # 150 m² or more.
+  # Room-count fallback when floor-space totals are missing/zero. Classes 1–8
+  # always use their exact counts; only the open-ended class needs an assumption.
   rooms:
-    '1': 1
-    '2': 2
-    '3': 3
-    '4': 4
-    '5': 5
-    '6': 6
-    '7': 7
-    '8': 8
-    GE9: 10
+    GE9: 10  # Assumed mean room count for dwellings with nine or more rooms.
+  # Useful m² per room for the fallback; useful_to_gross_ratio is applied afterwards.
   floor_area_per_room_m2: 20
 
-building_count:
-  sector_proxy: reference_count_share
-  sparse_tile_proxy: reference_counts_per_person
-  reference_weighting: equal
+# Building counts always use reference-country sector count shares and counts per
+# person, averaged equally across data_proxies.floor_area.countries. These fixed
+# methods have no building_count configuration section. Counts can be fractional.
 
 raster:
-  crs: auto
-  cell_size_m: 100
-  dtype: float32
-  nodata: 0.0
-  compression: deflate
-  block_size: 512
+  # Output grid is always 100 m with nodata 0; EPSG:3035 for European scopes and
+  # ESRI:54009 (Mollweide) otherwise. The following affect GeoTIFF storage.
+  dtype: float32  # float32 saves disk/memory; float64 retains more precision.
+  compression: deflate  # Lossless compression: deflate, lzw or zstd.
+  block_size: 512  # Tile width/height in pixels, multiple of 16; tunes I/O and memory.
+
 plotting:
-  max_size: 2000
+  max_size: 2000  # Maximum raster preview dimension in pixels; plots only.
   outline:
-    color: '#808080'
-    linewidth: 0.6
+    color: '#808080'  # Boundary colour accepted by Matplotlib.
+    linewidth: 0.6  # Boundary width in points.

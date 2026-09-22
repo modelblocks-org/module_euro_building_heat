@@ -64,7 +64,7 @@ resources:
     - 2025
   ghsl:
     url: https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A/{stem}/V1-0/{stem}_V1_0.zip
-    stem: GHS_POP_E{epoch}_GLOBE_R2023A_54009_{resolution}
+    stem: GHS_POP_E{epoch}_GLOBE_R2023A_54009_100
     epochs:
     - 1975
     - 1980
@@ -78,14 +78,11 @@ resources:
     - 2020
     - 2025
     - 2030
-    resolutions:
-    - 100
-    - 1000
   automatic:
-    eubucco_nuts: https://s3.eubucco.com/eubucco/v{version}/additional/NUTS-regions-2016.parquet
-    eubucco_stats: https://s3.eubucco.com/eubucco/v{version}/additional/region-stats.parquet
-    eubucco_lightweight: https://s3.eubucco.com/eubucco/v{version}/additional/eubucco_lat_lon.parquet
-    eubucco_full: https://s3.eubucco.com/eubucco/v{version}/buildings/parquet/nuts_id={nuts2}/{nuts2}.parquet
+    eubucco_nuts: https://s3.eubucco.com/eubucco/v0.2/additional/NUTS-regions-2016.parquet
+    eubucco_stats: https://s3.eubucco.com/eubucco/v0.2/additional/region-stats.parquet
+    eubucco_lightweight: https://s3.eubucco.com/eubucco/v0.2/additional/eubucco_lat_lon.parquet
+    eubucco_full: https://s3.eubucco.com/eubucco/v0.2/buildings/parquet/nuts_id={nuts2}/{nuts2}.parquet
     microsoft_index: https://bfppub.blob.core.windows.net/$web/{release}/dataset-links.csv
 scope:
   datasets:

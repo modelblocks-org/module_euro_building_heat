@@ -125,11 +125,11 @@ def points_within_scope(points, scope):
 def output_profile(bounds, settings, crs="EPSG:3035", count=3):
     """Return an equal-area raster profile aligned to the hectare grid.
 
-    Bounds are rounded outward to exact multiples of ``cell_size_m``. Every
+    Bounds are rounded outward to exact multiples of 100 metres. Every
     partial raster therefore has cell boundaries aligned with the final raster
     and can be merged by direct addition.
     """
-    cell = settings["cell_size_m"]
+    cell = 100
     left = math.floor(bounds[0] / cell) * cell
     bottom = math.floor(bounds[1] / cell) * cell
     right = math.ceil(bounds[2] / cell) * cell
@@ -142,7 +142,7 @@ def output_profile(bounds, settings, crs="EPSG:3035", count=3):
         "dtype": settings["dtype"],
         "crs": crs,
         "transform": Affine(cell, 0, left, 0, -cell, top),
-        "nodata": settings["nodata"],
+        "nodata": 0.0,
         "compress": settings["compression"],
         "tiled": True,
         "blockxsize": settings["block_size"],
@@ -150,7 +150,7 @@ def output_profile(bounds, settings, crs="EPSG:3035", count=3):
     }
 
 
-def population_grid(source, profile, geometry, resampling, total):
+def population_grid(source, profile, geometry, total):
     """Reproject counts, retain region-centred cells, and conserve its total."""
     population = np.zeros((profile["height"], profile["width"]), dtype=float)
     reproject(
@@ -159,7 +159,7 @@ def population_grid(source, profile, geometry, resampling, total):
         dst_transform=profile["transform"],
         dst_crs=profile["crs"],
         dst_nodata=0,
-        resampling=Resampling[resampling],
+        resampling=Resampling.sum,
     )
     population[population == source.nodata] = 0
     population[geometry_mask([geometry], population.shape, profile["transform"])] = 0

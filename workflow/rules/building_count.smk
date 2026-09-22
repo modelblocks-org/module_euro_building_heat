@@ -15,7 +15,6 @@ rule prepare_building_count_proxies:
         "../envs/module.yaml"
     params:
         proxies=config["data_proxies"]["floor_area"],
-        count_proxy=config["building_count"],
         country_codes=internal["country_codes"],
     script:
         "../scripts/prepare_building_count_proxies.py"
@@ -44,7 +43,6 @@ rule merge_building_count:
         plotting=config["plotting"],
         mode="counts",
         population=config["population"],
-        eubucco=config["buildings_eubucco"],
         microsoft=config["buildings_microsoft"],
         raster=raster_settings(),
     script:

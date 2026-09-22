@@ -102,24 +102,19 @@ rule download_era5_data:
 
 rule download_raw_population:
     output:
-        archive=update(
-            "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip"
-        ),
+        archive=update("<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.zip"),
     log:
-        "<logs>/automatic/download_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
+        "<logs>/automatic/download_raw_population_{ghsl_epoch}_100.log",
     conda:
         "../envs/module.yaml"
     params:
         kind="population",
-        resolution=lambda wc: int(wc.ghsl_resolution),
         member=lambda wc: internal["resources"]["ghsl"]["stem"].format(
-            epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
+            epoch=wc.ghsl_epoch
         )
         + "_V1_0.tif",
         url=lambda wc: internal["resources"]["ghsl"]["url"].format(
-            stem=internal["resources"]["ghsl"]["stem"].format(
-                epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
-            )
+            stem=internal["resources"]["ghsl"]["stem"].format(epoch=wc.ghsl_epoch)
         ),
     script:
         "../scripts/download.py"

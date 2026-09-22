@@ -99,8 +99,8 @@ rule process_useful_heat:
         "../envs/module.yaml"
     params:
         demand_years=DEMAND_YEARS,
-        heat_tech_params=config["heat"]["tech_efficiencies"],
-        useful_heat_demand=config["heat"].get("useful_heat_demand", "actual"),
+        heat_tech_params=config["tech_efficiencies"],
+        useful_heat_demand=config.get("useful_heat_demand", "actual"),
     message:
         "Calculate national annual useful heat demand."
     script:
@@ -133,7 +133,7 @@ rule rescale_annual_heat_demand_to_shapes:
         "../envs/module.yaml"
     params:
         weather_demand_years=WEATHER_DEMAND_YEARS,
-        hdd_elasticity=config["heat"].get("hdd", {}).get("elasticity", 0.5),
+        hdd_elasticity=config["spatial_weights"].get("hdd", {}).get("elasticity", 0.5),
     message:
         "Scale national annual heat demand to '{wildcards.shapes}' shapes."
     script:

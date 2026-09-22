@@ -10,7 +10,6 @@ rule download_eurostat_building_age:
         "../envs/module.yaml"
     params:
         kind="building_age",
-        year=config["eurostat"]["reference_year"],
         url=internal["resources"]["stable"]["url"].format(
             dataset="cens_21dwop_r3.tsv.gz"
         ),
@@ -31,8 +30,7 @@ rule prepare_nuts3_building_age:
         "../envs/module.yaml"
     params:
         step="nuts3_building_age",
-        year=config["eurostat"]["reference_year"],
-        settings=config["heat"]["spatial_weights"]["age"],
+        settings=config["spatial_weights"]["age"],
     script:
         "../scripts/prepare_buildings.py"
 
@@ -68,13 +66,7 @@ rule create_space_heat_weight_batch:
     resources:
         mem_mb=4096,
     params:
-        population_share=config["heat"]["spatial_weights"]["population"]["share"],
-        eubucco_support=config["heat"]["spatial_weights"]["population"][
-            "eubucco_support"
-        ],
-        microsoft_population_fallback=config["buildings_microsoft"][
-            "population_fallback"
-        ],
+        population_share=config["spatial_weights"]["population"]["share"],
         raster=raster_settings(),
     script:
         "../scripts/weighted_floor_area.py"

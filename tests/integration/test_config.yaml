@@ -10,5 +10,4 @@ module_euro_building_heat:
     aggregation: 1
   population:
     epoch: 2025
-    resolution: 100
     chunk_size: 2048

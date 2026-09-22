@@ -50,8 +50,9 @@ if TYPE_CHECKING:
     snakemake: Any
 
 sys.stderr = open(snakemake.log[0], "w")
-eubucco_settings = snakemake.params.eubucco
 microsoft_settings = snakemake.params.microsoft
+# Additive building intermediates require double precision.
+raster_settings = {**snakemake.params.raster, "dtype": "float64"}
 plan = read_plan(snakemake.input.plan)
 batch_plan = read_plan(snakemake.input.batches)
 batch_regions = batch_plan["batches"][snakemake.wildcards.batch]
@@ -117,24 +118,14 @@ for region_id, region in regions.iterrows():
     selected = eubucco.loc[
         eubucco.region_id.isin(legacy) & eubucco.geometry.within(region.geometry)
     ]
-    residential, commercial = select_building_sectors(
-        selected,
-        eubucco_settings["residential_type"],
-        eubucco_settings["commercial_subtypes"],
-    )
+    residential, commercial = select_building_sectors(selected)
     fallback = microsoft.loc[microsoft.region_id.eq(region_id)]
-    full_profile = output_profile(
-        region.geometry.bounds, snakemake.params.raster, regions.crs
-    )
+    full_profile = output_profile(region.geometry.bounds, raster_settings, regions.crs)
     region_low_quadkeys = low_quadkeys & set(
         plan["regions"][region_id]["microsoft_quadkeys"]
     )
     population = population_grid(
-        population_source,
-        full_profile,
-        region.geometry,
-        snakemake.params.population_resampling,
-        region_totals.population,
+        population_source, full_profile, region.geometry, region_totals.population
     )
 
     sources = plan["regions"][region_id]
@@ -207,7 +198,7 @@ for region_id, region in regions.iterrows():
     full_power = point_grid(full_profile, residential, residential.weighted_power)
     # Only now clip output support to the requested scope. Complete-region grids
     # remain available for normalisation; scoped grids retain the local share.
-    profile = output_profile(clipped.bounds, snakemake.params.raster, regions.crs)
+    profile = output_profile(clipped.bounds, raster_settings, regions.crs)
     inside = residential.loc[points_within_scope(residential, scope)]
     commercial_inside = commercial.loc[points_within_scope(commercial, scope)]
     floor = (
@@ -223,7 +214,6 @@ for region_id, region in regions.iterrows():
     )
     tags = {
         "region_id": region_id,
-        "microsoft_population_fallback": microsoft_settings["population_fallback"],
         "residential_source": plan["regions"][region_id]["residential_source"],
         "commercial_source": plan["regions"][region_id]["commercial_source"],
         "surface_volume_method": snakemake.params.surface_volume["method"],

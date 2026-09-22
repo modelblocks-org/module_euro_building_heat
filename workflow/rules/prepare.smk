@@ -61,12 +61,12 @@ rule unzip_raw_population:
     input:
         rules.download_raw_population.output[0],
     output:
-        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.tif",
+        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.tif",
     log:
-        "<logs>/automatic/unzip_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
+        "<logs>/automatic/unzip_raw_population_{ghsl_epoch}_100.log",
     params:
         internal_paths=lambda wc: internal["resources"]["ghsl"]["stem"].format(
-            epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
+            epoch=wc.ghsl_epoch
         )
         + "_V1_0.tif",
     message:

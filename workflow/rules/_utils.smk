@@ -71,8 +71,7 @@ def get_jrc_url(country: str, version: int | str) -> str:
 def get_configured_population_file() -> str:
     """Helper to obtain the GHSL population file from the configuration."""
     epoch = config["population"]["epoch"]
-    resolution = config["population"]["resolution"]
-    return f"<resources>/automatic/ghsl/pop_{epoch}_{resolution}.tif"
+    return f"<resources>/automatic/ghsl/pop_{epoch}_100.tif"
 
 
 def get_supported_ecuk_releases() -> list[int]:
@@ -191,10 +190,7 @@ def eubucco_download_inputs(wildcards):
 def eubucco_download_url(wildcards):
     return internal["resources"]["automatic"][
         f"eubucco_{config['buildings_eubucco']['source']}"
-    ].format(
-        version=config["buildings_eubucco"]["version"],
-        nuts2=wildcards.region,
-    )
+    ].format(nuts2=wildcards.region)
 
 
 def microsoft_download_rows(wildcards):
@@ -303,10 +299,6 @@ def selected_microsoft_totals_input(wildcards):
 
 def raster_settings():
     return config["raster"]
-
-
-def intermediate_raster_settings():
-    return {**raster_settings(), "dtype": config["processing"]["intermediate_dtype"]}
 
 
 def report_figure_inputs(wildcards):

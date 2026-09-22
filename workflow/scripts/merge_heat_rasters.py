@@ -32,7 +32,6 @@ for path in snakemake.output:
 
 if snakemake.params.mode == "counts":
     population = snakemake.params.population
-    eubucco = snakemake.params.eubucco
     with rasterio.open(snakemake.output.building_count, "w+", **profile) as counts:
         for batch, regions in batches.items():
             for region_id in regions:
@@ -44,19 +43,12 @@ if snakemake.params.mode == "counts":
         counts.set_band_unit(1, "buildings/ha")
         counts.update_tags(
             sectors="residential,commercial,public",
-            eubucco_version=eubucco["version"],
-            eubucco_source=eubucco["source"],
+            eubucco_source=plan["eubucco_source"],
             microsoft_release=plan["microsoft_release"],
-            microsoft_population_fallback=snakemake.params.microsoft[
-                "population_fallback"
-            ],
             microsoft_minimum_building_count=snakemake.params.microsoft[
                 "minimum_building_count"
             ],
             ghsl_epoch=population["epoch"],
-            building_assignment=eubucco["assignment"],
-            sector_proxy="reference_count_share",
-            sparse_tile_proxy="reference_counts_per_person",
         )
         validate_building_count_raster(counts)
 else:
@@ -91,17 +83,11 @@ else:
             population_source="GHS-POP",
             population_epoch=snakemake.params.population["epoch"],
             population_share=settings["population"]["share"],
-            eubucco_population_support=settings["population"]["eubucco_support"],
-            microsoft_population_fallback=snakemake.params.microsoft[
-                "population_fallback"
-            ],
-            population_resampling=settings["population"]["resampling"],
             microsoft_minimum_building_count=snakemake.params.microsoft[
                 "minimum_building_count"
             ],
             surface_volume_elasticity=settings["surface_volume"]["elasticity"],
             surface_volume_method=settings["surface_volume"]["method"],
-            age_source=f"Eurostat {settings['age']['dataset']}",
             age_old_factor=settings["age"]["multipliers"]["before_1991"],
             age_reference_factor=settings["age"]["multipliers"]["1991_2000"],
             age_new_factor=settings["age"]["multipliers"]["after_2000"],

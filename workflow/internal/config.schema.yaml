@@ -8,24 +8,29 @@ required:
 - threads
 - population
 - crs
-- heat
 - processing
 - buildings_microsoft
 - buildings_eubucco
 - eurostat
-- building_count
 - raster
 - plotting
 - data_proxies
+- spatial_weights
+- useful_heat_demand
+- tech_efficiencies
+- heat_pump
 properties:
   building_rasters:
     type: object
     additionalProperties: false
-    required: [source]
+    required:
+    - source
     properties:
       source:
         type: string
-        enum: [auto, rebuild]
+        enum:
+        - auto
+        - rebuild
         description: Download published grids for matching settings, or always rebuild.
   demand_years:
     description: |
@@ -78,7 +83,6 @@ properties:
     additionalProperties: false
     required:
     - epoch
-    - resolution
     - chunk_size
     properties:
       epoch:
@@ -96,9 +100,6 @@ properties:
         - 2020
         - 2025
         - 2030
-      resolution:
-        type: integer
-        const: 100
       chunk_size:
         type: integer
         minimum: 256
@@ -158,16 +159,72 @@ properties:
             $ref: '#/$defs/country_proxies'
     required:
     - floor_area
-  heat:
-    description: |
-      Controls the conversion of final energy to useful heat and the calculation of
-      heat-pump coefficient-of-performance profiles.
+  spatial_weights:
     type: object
     additionalProperties: false
     required:
-    - tech_efficiencies
-    - spatial_weights
+    - population
+    - surface_volume
+    - age
     properties:
+      population:
+        type: object
+        additionalProperties: false
+        required:
+        - share
+        properties:
+          share:
+            type: number
+            minimum: 0
+            maximum: 1
+      surface_volume:
+        type: object
+        additionalProperties: false
+        required:
+        - elasticity
+        - method
+        properties:
+          elasticity:
+            type: number
+            minimum: 0
+          method:
+            type: string
+            enum:
+            - equivalent_square
+            - footprint_perimeter
+      age:
+        type: object
+        additionalProperties: false
+        required:
+        - multipliers
+        - cutoff_spanning_bin_multipliers
+        properties:
+          multipliers:
+            type: object
+            additionalProperties: false
+            required:
+            - before_1991
+            - '1991_2000'
+            - after_2000
+            properties:
+              before_1991:
+                type: number
+                exclusiveMinimum: 0
+              '1991_2000':
+                type: number
+                exclusiveMinimum: 0
+              after_2000:
+                type: number
+                exclusiveMinimum: 0
+          cutoff_spanning_bin_multipliers:
+            type: object
+            additionalProperties: false
+            required:
+            - Y1981-2000
+            properties:
+              Y1981-2000:
+                type: number
+                exclusiveMinimum: 0
       hdd:
         description: Annual household and commercial space-heating severity correction from
           ERA5.
@@ -186,196 +243,109 @@ properties:
             type: number
             minimum: 0
             default: 0.5
-      useful_heat_demand:
+  useful_heat_demand:
+    description: |
+      Chooses whether to use published useful-heat data where available (`actual`) or
+      calculate all useful heat from final energy and `tech_efficiencies`
+      (`calculate_all`).
+    type: string
+    enum:
+    - actual
+    - calculate_all
+    default: actual
+  tech_efficiencies:
+    description: |
+      Final-to-useful energy conversion factors grouped by end use and carrier; for
+      example, 0.9 converts one unit of final energy to 0.9 units of useful heat.
+    type: object
+    additionalProperties: false
+    properties:
+      space_heat:
+        description: Conversion factors for space heating.
+        $ref: '#/$defs/technology_efficiencies'
+      hot_water:
+        description: Conversion factors for hot water.
+        $ref: '#/$defs/technology_efficiencies'
+      cooking:
+        description: Conversion factors for cooking.
+        $ref: '#/$defs/technology_efficiencies'
+  heat_pump:
+    description: |
+      Settings used to calculate the combined air-source and ground-source heat-pump
+      coefficient-of-performance profile.
+    type: object
+    additionalProperties: false
+    required:
+    - sink_temperature
+    - space_heat_sink_shares
+    - heat_pump_shares
+    - correction_factor
+    properties:
+      sink_temperature:
         description: |
-          Chooses whether to use published useful-heat data where available (`actual`) or
-          calculate all useful heat from final energy and `tech_efficiencies`
-          (`calculate_all`).
-        type: string
-        enum:
-        - actual
-        - calculate_all
-        default: actual
-      tech_efficiencies:
-        description: |
-          Final-to-useful energy conversion factors grouped by end use and carrier; for
-          example, 0.9 converts one unit of final energy to 0.9 units of useful heat.
+          Operating temperature in degrees Celsius for each heat-delivery method. Exactly
+          one method omitted from `space_heat_sink_shares` is treated as the hot-water sink.
         type: object
-        additionalProperties: false
-        properties:
-          space_heat:
-            description: Conversion factors for space heating.
-            $ref: '#/$defs/technology_efficiencies'
-          hot_water:
-            description: Conversion factors for hot water.
-            $ref: '#/$defs/technology_efficiencies'
-          cooking:
-            description: Conversion factors for cooking.
-            $ref: '#/$defs/technology_efficiencies'
-      heat_pump:
+        minProperties: 2
+        additionalProperties:
+          description: Sink operating temperature in degrees Celsius.
+          type: number
+      space_heat_sink_shares:
         description: |
-          Settings used to calculate the combined air-source and ground-source heat-pump
-          coefficient-of-performance profile.
+          Share of space heat delivered by each configured sink method. Keys must occur in
+          `sink_temperature`, and values must sum to one.
+        type: object
+        minProperties: 1
+        additionalProperties:
+          description: Fraction of space heat delivered by this sink method.
+          type: number
+          minimum: 0
+          maximum: 1
+      heat_pump_shares:
+        description: |
+          Shares of air-source and ground-source heat pumps used to form the combined COP
+          profile; the two values must sum to one.
         type: object
         additionalProperties: false
         required:
-        - sink_temperature
-        - space_heat_sink_shares
-        - heat_pump_shares
-        - correction_factor
+        - ashp
+        - gshp
         properties:
-          sink_temperature:
-            description: |
-              Operating temperature in degrees Celsius for each heat-delivery method. Exactly
-              one method omitted from `space_heat_sink_shares` is treated as the hot-water sink.
-            type: object
-            minProperties: 2
-            additionalProperties:
-              description: Sink operating temperature in degrees Celsius.
-              type: number
-          space_heat_sink_shares:
-            description: |
-              Share of space heat delivered by each configured sink method. Keys must occur in
-              `sink_temperature`, and values must sum to one.
-            type: object
-            minProperties: 1
-            additionalProperties:
-              description: Fraction of space heat delivered by this sink method.
-              type: number
-              minimum: 0
-              maximum: 1
-          heat_pump_shares:
-            description: |
-              Shares of air-source and ground-source heat pumps used to form the combined COP
-              profile; the two values must sum to one.
-            type: object
-            additionalProperties: false
-            required:
-            - ashp
-            - gshp
-            properties:
-              ashp:
-                description: Fraction of heat pumps that are air-source.
-                type: number
-                minimum: 0
-                maximum: 1
-              gshp:
-                description: Fraction of heat pumps that are ground-source.
-                type: number
-                minimum: 0
-                maximum: 1
-          correction_factor:
-            description: |
-              Positive multiplier applied to manufacturer COP curves to represent expected
-              operational performance.
+          ashp:
+            description: Fraction of heat pumps that are air-source.
             type: number
-            exclusiveMinimum: 0
-      spatial_weights:
-        type: object
-        additionalProperties: false
-        required:
-        - population
-        - surface_volume
-        - age
-        properties:
-          population:
-            type: object
-            additionalProperties: false
-            required:
-            - share
-            - resampling
-            - eubucco_support
-            properties:
-              share:
-                type: number
-                minimum: 0
-                maximum: 1
-              resampling:
-                type: string
-                const: sum
-              eubucco_support:
-                const: residential_floor_area
-          surface_volume:
-            type: object
-            additionalProperties: false
-            required:
-            - elasticity
-            - method
-            properties:
-              elasticity:
-                type: number
-                minimum: 0
-              method:
-                type: string
-                enum:
-                - equivalent_square
-                - footprint_perimeter
-          age:
-            type: object
-            additionalProperties: false
-            required:
-            - enabled
-            - dataset
-            - multipliers
-            - cutoff_spanning_bin_multipliers
-            properties:
-              enabled:
-                type: boolean
-              dataset:
-                type: string
-                const: cens_21dwop_r3
-              multipliers:
-                type: object
-                additionalProperties: false
-                required:
-                - before_1991
-                - '1991_2000'
-                - after_2000
-                properties:
-                  before_1991:
-                    type: number
-                    exclusiveMinimum: 0
-                  '1991_2000':
-                    type: number
-                    exclusiveMinimum: 0
-                  after_2000:
-                    type: number
-                    exclusiveMinimum: 0
-              cutoff_spanning_bin_multipliers:
-                type: object
-                additionalProperties: false
-                required:
-                - Y1981-2000
-                properties:
-                  Y1981-2000:
-                    type: number
-                    exclusiveMinimum: 0
+            minimum: 0
+            maximum: 1
+          gshp:
+            description: Fraction of heat pumps that are ground-source.
+            type: number
+            minimum: 0
+            maximum: 1
+      correction_factor:
+        description: |
+          Positive multiplier applied to manufacturer COP curves to represent expected
+          operational performance.
+        type: number
+        exclusiveMinimum: 0
   processing:
     type: object
     additionalProperties: false
     required:
     - nuts3_batches
-    - intermediate_dtype
     properties:
       nuts3_batches:
         type: integer
         minimum: 1
-      intermediate_dtype:
-        type: string
-        const: float64
   buildings_microsoft:
     type: object
     additionalProperties: false
     required:
     - release
     - minimum_building_count
-    - population_fallback
     properties:
       release:
         type: string
         pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
-      population_fallback:
-        const: sparse_tiles_and_empty_cells
       minimum_building_count:
         type: integer
         minimum: 0
@@ -383,32 +353,14 @@ properties:
     type: object
     additionalProperties: false
     required:
-    - version
     - source
-    - residential_type
-    - commercial_subtypes
-    - assignment
     - floor_bin_representatives
     properties:
-      version:
-        type: string
-        const: '0.2'
       source:
         type: string
         enum:
         - lightweight
         - full
-      residential_type:
-        type: string
-        const: residential
-      commercial_subtypes:
-        type: array
-        const:
-        - commercial
-        - public
-      assignment:
-        type: string
-        const: centroid
       floor_bin_representatives:
         type: object
         additionalProperties: false
@@ -434,74 +386,84 @@ properties:
     type: object
     additionalProperties: false
     required:
-    - reference_year
     - useful_to_gross_ratio
     - floor_space_m2
     - rooms
     - floor_area_per_room_m2
     properties:
-      reference_year:
-        type: integer
-        const: 2021
       useful_to_gross_ratio:
         type: number
         exclusiveMinimum: 0
       floor_space_m2:
+        description: "Representative useful floor area in m\xB2 per dwelling in each Census\
+          \ 2021 area class."
         type: object
-        additionalProperties:
-          type: number
-          exclusiveMinimum: 0
-        minProperties: 9
-        maxProperties: 9
+        additionalProperties: false
+        required:
+        - SQM_LT30
+        - SQM30-39
+        - SQM40-49
+        - SQM50-59
+        - SQM60-79
+        - SQM80-99
+        - SQM100-119
+        - SQM120-149
+        - SQM_GE150
+        properties:
+          SQM_LT30:
+            type: number
+            exclusiveMinimum: 0
+          SQM30-39:
+            type: number
+            exclusiveMinimum: 0
+          SQM40-49:
+            type: number
+            exclusiveMinimum: 0
+          SQM50-59:
+            type: number
+            exclusiveMinimum: 0
+          SQM60-79:
+            type: number
+            exclusiveMinimum: 0
+          SQM80-99:
+            type: number
+            exclusiveMinimum: 0
+          SQM100-119:
+            type: number
+            exclusiveMinimum: 0
+          SQM120-149:
+            type: number
+            exclusiveMinimum: 0
+          SQM_GE150:
+            type: number
+            exclusiveMinimum: 0
       rooms:
+        description: "Representative room count for dwellings reported as nine or more rooms;\
+          \ exact counts 1\u20138 are fixed."
         type: object
-        additionalProperties:
-          type: number
-          exclusiveMinimum: 0
-        minProperties: 9
-        maxProperties: 9
+        additionalProperties: false
+        required:
+        - GE9
+        properties:
+          GE9:
+            type: number
+            minimum: 9
       floor_area_per_room_m2:
         type: number
         exclusiveMinimum: 0
-  building_count:
-    type: object
-    additionalProperties: false
-    required:
-    - sector_proxy
-    - sparse_tile_proxy
-    - reference_weighting
-    properties:
-      sector_proxy:
-        const: reference_count_share
-      sparse_tile_proxy:
-        const: reference_counts_per_person
-      reference_weighting:
-        const: equal
   raster:
     type: object
     additionalProperties: false
     required:
-    - crs
-    - cell_size_m
     - dtype
-    - nodata
     - compression
     - block_size
     properties:
-      crs:
-        type: string
-        const: auto
-      cell_size_m:
-        type: number
-        const: 100
       dtype:
         type: string
         enum:
         - float32
         - float64
-      nodata:
-        type: number
-        const: 0
       compression:
         type: string
         enum:
@@ -590,14 +552,12 @@ $defs:
 allOf:
 - if:
     properties:
-      heat:
+      spatial_weights:
         properties:
-          spatial_weights:
+          surface_volume:
             properties:
-              surface_volume:
-                properties:
-                  method:
-                    const: footprint_perimeter
+              method:
+                const: footprint_perimeter
   then:
     properties:
       buildings_eubucco:

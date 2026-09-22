@@ -68,14 +68,12 @@ def download(job) -> None:
     if kind == "nuts3":
         validate_nuts3_source(source)
     elif kind == "floor_area":
-        validate_census(source, job.params.year)
+        validate_census(source)
     elif kind == "building_age":
-        validate_building_age_census(source, job.params.year)
+        validate_building_age_census(source)
     elif kind == "population":
         # Inspect the GeoTIFF in place; extraction remains a separate reusable job.
-        validate_population_raster(
-            f"/vsizip/{source.resolve()}/{job.params.member}", job.params.resolution
-        )
+        validate_population_raster(f"/vsizip/{source.resolve()}/{job.params.member}")
     elif kind == "microsoft_index":
         validate_microsoft_index(source)
     elif kind == "microsoft":

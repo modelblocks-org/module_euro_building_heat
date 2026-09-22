@@ -92,13 +92,9 @@ rule create_floor_area_batch:
     resources:
         mem_mb=4096,
     params:
-        eubucco=config["buildings_eubucco"],
         microsoft=config["buildings_microsoft"],
-        surface_volume=config["heat"]["spatial_weights"]["surface_volume"],
-        population_resampling=config["heat"]["spatial_weights"]["population"][
-            "resampling"
-        ],
-        raster=intermediate_raster_settings(),
+        surface_volume=config["spatial_weights"]["surface_volume"],
+        raster=raster_settings(),
     script:
         "../scripts/calculate_floor_area.py"
 
@@ -136,7 +132,11 @@ rule merge_structural_support:
         mode="support",
         population=config["population"],
         microsoft=config["buildings_microsoft"],
-        space_heat_weight=config["heat"]["spatial_weights"],
+        space_heat_weight={
+            key: value
+            for key, value in config["spatial_weights"].items()
+            if key != "hdd"
+        },
         raster=raster_settings(),
     script:
         "../scripts/merge_heat_rasters.py"

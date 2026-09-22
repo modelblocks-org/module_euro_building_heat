@@ -82,7 +82,6 @@ def building_sources(snakemake):
 
     plan = {
         "schema_version": 2,
-        "eubucco_version": snakemake.params.eubucco["version"],
         "eubucco_source": snakemake.params.eubucco["source"],
         "microsoft_release": snakemake.params.microsoft["release"],
         "crs": regions.crs.to_string(),
@@ -180,7 +179,7 @@ def floor_area_totals(snakemake):
     population = pd.read_parquet(snakemake.input.population_summaries)
     population = population.set_index(["population_kind", "region_id"]).population
     regional_population = population.loc["regions"].reindex(regions.index)
-    raw_census = census_values(snakemake.input.census, eurostat["reference_year"])
+    raw_census = census_values(snakemake.input.census)
     census_area = residential_floor_area(raw_census, eurostat)
     stats = gpd.read_parquet(snakemake.input.eubucco_stats)
     plan = read_plan(snakemake.input.plan)
@@ -375,19 +374,12 @@ def nuts3_building_age(snakemake):
     excluded. The source's combined 1981--2000 bin uses its explicit configured
     multiplier; no missing region borrows another region's age composition.
     """
+    from _floor_area import census_values
+
     settings = snakemake.params.settings
     regions = gpd.read_parquet(snakemake.input.nuts3).set_index("region_id")
     totals = pd.read_parquet(snakemake.input.floor_area).set_index("region_id")
-    raw = pd.read_csv(snakemake.input.census, sep="\t", dtype=str)
-    key = raw.columns[0]
-    dimensions = key.removesuffix("\\TIME_PERIOD").split(",")
-    year = next(
-        column for column in raw if column.strip() == str(snakemake.params.year)
-    )
-    raw[dimensions] = raw.pop(key).str.split(",", expand=True)
-    raw["value"] = pd.to_numeric(
-        raw.pop(year).str.strip().str.split().str[0], errors="coerce"
-    )
+    raw = census_values(snakemake.input.census)
     raw = raw.loc[raw.freq.eq("A") & raw.housing.eq("DW") & raw.unit.eq("NR")]
 
     multipliers = settings["multipliers"]
@@ -444,8 +436,6 @@ def nuts3_building_age(snakemake):
     )
     references = references.weighted.div(references.floor_area)
     factor = factor_raw.div(regions.country_id.map(references)).where(available, 1.0)
-    if not settings["enabled"]:
-        factor[:] = 1.0
 
     age = pd.DataFrame(
         {

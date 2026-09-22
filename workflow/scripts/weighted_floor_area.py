@@ -71,8 +71,6 @@ for region_id, row in summary.iterrows():
             "region_id": region_id,
             "method": "blended_floor_area * surface_volume * age",
             "population_share": snakemake.params.population_share,
-            "eubucco_population_support": snakemake.params.eubucco_support,
-            "microsoft_population_fallback": snakemake.params.microsoft_population_fallback,
         },
     )
 
