@@ -11,7 +11,9 @@ rule download_eurostat_building_age:
     params:
         kind="building_age",
         year=config["eurostat"]["reference_year"],
-        url=internal["resources"]["eurostat_building_age"],
+        url=internal["resources"]["stable"]["url"].format(
+            dataset="cens_21dwop_r3.tsv.gz"
+        ),
     script:
         "../scripts/download.py"
 

@@ -1,8 +1,4 @@
 resources:
-  precomputed_building_rasters:
-    # Set to an immutable published record URL before distributing the defaults.
-    # The record must contain the three GeoTIFFs named in precomputed.smk.
-    url: ""
   jrc:
     use_version: 2023
     versions:
@@ -52,6 +48,9 @@ resources:
     url: https://github.com/evansiroky/timezone-boundary-builder/releases/download/{version}/timezones.geojson.zip
     sha256: 7d3f0c5a33b6acd891335c0ad5ba767736b6914cb1a1d68c71921c17ce358948
   stable:
+    # Also supplies the published building rasters, both census tables and
+    # nuts3.geojson through their dedicated validated download rules.
+    # See config/stable-datasets.md for the publication inventory and sources.
     url: https://zenodo.org/records/22144030/files/{dataset}
     datasets:
     - CHE_energy_balance.xlsx
@@ -83,14 +82,11 @@ resources:
     - 100
     - 1000
   automatic:
-    eurostat_floor_area: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/cens_21dwbnr_r3?format=TSV&compressed=true
-    nuts3: https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_01M_2021_3035_LEVL_3.geojson
     eubucco_nuts: https://s3.eubucco.com/eubucco/v{version}/additional/NUTS-regions-2016.parquet
     eubucco_stats: https://s3.eubucco.com/eubucco/v{version}/additional/region-stats.parquet
     eubucco_lightweight: https://s3.eubucco.com/eubucco/v{version}/additional/eubucco_lat_lon.parquet
     eubucco_full: https://s3.eubucco.com/eubucco/v{version}/buildings/parquet/nuts_id={nuts2}/{nuts2}.parquet
     microsoft_index: https://bfppub.blob.core.windows.net/$web/{release}/dataset-links.csv
-  eurostat_building_age: https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/cens_21dwop_r3?format=TSV&compressed=true
 scope:
   datasets:
     annual_energy_balance:

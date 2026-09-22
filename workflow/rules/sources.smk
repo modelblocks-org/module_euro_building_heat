@@ -10,7 +10,7 @@ rule download_nuts3:
         "../envs/module.yaml"
     params:
         kind="nuts3",
-        url=internal["resources"]["automatic"]["nuts3"],
+        url=internal["resources"]["stable"]["url"].format(dataset="nuts3.geojson"),
     script:
         "../scripts/download.py"
 
@@ -25,7 +25,9 @@ rule download_eurostat_floor_area:
     params:
         kind="floor_area",
         year=config["eurostat"]["reference_year"],
-        url=internal["resources"]["automatic"]["eurostat_floor_area"],
+        url=internal["resources"]["stable"]["url"].format(
+            dataset="cens_21dwbnr_r3.tsv.gz"
+        ),
     script:
         "../scripts/download.py"
 

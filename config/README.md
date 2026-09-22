@@ -4,6 +4,10 @@ The example in `config/config.yaml` supplies all defaults. Imported workflows
 can override individual settings; `workflow/internal/config.schema.yaml`
 validates the merged configuration. Public files are listed in `INTERFACE.yaml`.
 
+All Eurostat tables and GISCO boundaries are downloaded automatically through
+`resources.stable.url`; module users do not need to download or upload them
+manually.
+
 ## Published building grids or full rebuild
 
 `building_rasters.source: auto` selects one of two branches automatically:
@@ -41,19 +45,9 @@ retains the original building-centroid clipping at scope boundaries, so boundary
 cells can differ. The download branch does not produce the rebuild branch's
 internal per-region diagnostics table.
 
-**Publication is pending:** the Zenodo URL is intentionally empty in
-`workflow/internal/settings.yaml`, at
-`resources.precomputed_building_rasters.url`. Default raster jobs fail with an
-explanatory error until it is filled in; use `source: rebuild` in the meantime.
-The publisher should set it to
-`https://zenodo.org/records/<version-specific-record-id>/files/{dataset}.tif`
-and upload the three GeoTIFFs named above. They must share the aligned 100 m
-EPSG:3035 grid, cover the advertised scope, and use the frozen settings, original
-band descriptions/units and nodata convention. Publish complete-region support
-before clipping to consumer shapes. A larger raster bounding box must not be
-used to imply coverage in areas that were never processed. Downloads are
-written to `.part` files before being renamed; cropped values are checked for
-finite, nonnegative values and grid compatibility.
+Building grids use `resources.stable.url` in `workflow/internal/settings.yaml`,
+the same Zenodo record as the other stable inputs. With `source: auto` and
+matching settings, the workflow downloads and caches these files automatically.
 
 ## Shared sources and building processing
 
