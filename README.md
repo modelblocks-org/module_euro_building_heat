@@ -101,8 +101,8 @@ the repeated autumn hour is selected twice. ERA5 analysis timestamps remain UTC.
 Please consult the configuration [README](./config/README.md) and
 [example](./config/config.yaml) for all configuration options.
 
-Earth Data Hub access requires an account and an API key from the
-[account settings](https://earthdatahub.destine.eu/account-settings#my-personal-access-tokens).
+Earth Data Hub access requires an account and an API key. Look at
+[their webpage](https://earthdatahub.destine.eu) for how to obtain one.
 Save the key by itself in `resources/user/edh_api.txt`; the file is ignored by
 Git.
 
@@ -249,8 +249,23 @@ Thanks goes to these wonderful people, sorted alphabetically ([emoji key](https:
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/brynpickering"><img src="https://avatars.githubusercontent.com/u/17178478?v=4?s=100" width="100px;" alt="Bryn Pickering"/><br /><sub><b>Bryn Pickering</b></sub></a><br /><a href="#ideas-brynpickering" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=brynpickering" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://orcid.org/0000-0003-2288-6423"><img src="https://avatars.githubusercontent.com/u/72193617?v=4?s=100" width="100px;" alt="Ivan Ruiz Manuel"/><br /><sub><b>Ivan Ruiz Manuel</b></sub></a><br /><a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=irm-codebase" title="Code">💻</a> <a href="#ideas-irm-codebase" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/jnnr"><img src="https://avatars.githubusercontent.com/u/32454596?v=4?s=100" width="100px;" alt="Jann Launer"/><br /><sub><b>Jann Launer</b></sub></a><br /><a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=jnnr" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://www.pfenninger.org"><img src="https://avatars.githubusercontent.com/u/141709?v=4?s=100" width="100px;" alt="Stefan Pfenninger-Lee"/><br /><sub><b>Stefan Pfenninger-Lee</b></sub></a><br /><a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=sjpfenninger" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Yegberink"><img src="https://avatars.githubusercontent.com/u/152057926?v=4?s=100" width="100px;" alt="Yegberink"/><br /><sub><b>Yegberink</b></sub></a><br /><a href="#ideas-Yegberink" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=Yegberink" title="Code">💻</a> <a href="#maintenance-Yegberink" title="Maintenance">🚧</a> <a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=Yegberink" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mbrmbrmbrmbr"><img src="https://avatars.githubusercontent.com/u/175977791?v=4?s=100" width="100px;" alt="Machteld van den Broek"/><br /><sub><b>Machteld van den Broek</b></sub></a><br /><a href="#projectManagement-mbrmbrmbrmbr" title="Project Management">📆</a> <a href="#mentoring-mbrmbrmbrmbr" title="Mentoring">🧑‍🏫</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/tud-mchen6"><img src="https://avatars.githubusercontent.com/u/133768452?v=4?s=100" width="100px;" alt="mchen6"/><br /><sub><b>mchen6</b></sub></a><br /><a href="https://github.com/modelblocks-org/module_euro_building_heat/commits?author=tud-mchen6" title="Code">💻</a></td>
+    </tr>
+  </tbody>
+</table>
+
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->
+
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
