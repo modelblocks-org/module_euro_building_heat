@@ -1,0 +1,109 @@
+# Frozen scientific settings for the published grids; do not derive from user defaults.
+population:
+  epoch: 2025
+  resolution: 100
+processing:
+  intermediate_dtype: float64
+buildings_eubucco:
+  version: '0.2'
+  source: full
+  residential_type: residential
+  commercial_subtypes:
+  - commercial
+  - public
+  assignment: centroid
+  floor_bin_representatives:
+    n_floors_0_2: 1
+    n_floors_2_4: 3
+    n_floors_4_7: 5.5
+    n_floors_7_inf: 9
+buildings_microsoft:
+  release: '2026-08-13'
+  population_fallback: sparse_tiles_and_empty_cells
+  minimum_building_count: 2000
+eurostat:
+  reference_year: 2021
+  useful_to_gross_ratio: 1.2
+  floor_space_m2:
+    SQM_LT30: 25
+    SQM30-39: 35
+    SQM40-49: 45
+    SQM50-59: 55
+    SQM60-79: 70
+    SQM80-99: 90
+    SQM100-119: 110
+    SQM120-149: 135
+    SQM_GE150: 180
+  rooms:
+    '1': 1
+    '2': 2
+    '3': 3
+    '4': 4
+    '5': 5
+    '6': 6
+    '7': 7
+    '8': 8
+    GE9: 10
+  floor_area_per_room_m2: 20
+building_count:
+  sector_proxy: reference_count_share
+  sparse_tile_proxy: reference_counts_per_person
+  reference_weighting: equal
+raster:
+  crs: auto
+  cell_size_m: 100
+  dtype: float32
+  nodata: 0.0
+  compression: deflate
+  block_size: 512
+heat:
+  spatial_weights:
+    population:
+      share: 0.5
+      resampling: sum
+      eubucco_support: residential_floor_area
+    surface_volume:
+      elasticity: 0.33
+      method: footprint_perimeter
+    age:
+      enabled: true
+      dataset: cens_21dwop_r3
+      multipliers:
+        before_1991: 1.25
+        '1991_2000': 1.0
+        after_2000: 0.8
+      cutoff_spanning_bin_multipliers:
+        Y1981-2000: 1.125
+data_proxies:
+  floor_area:
+    method: mean_floors
+    countries:
+      GBR:
+      - IRL
+      ALB: &id001
+      - BGR
+      - HRV
+      - HUN
+      - ROU
+      - GRC
+      AND:
+      - ESP
+      BIH: *id001
+      ISL: &id002
+      - SWE
+      - DNK
+      LIE:
+      - CHE
+      MKD: *id001
+      MCO:
+      - FRA
+      MNE: *id001
+      NOR: *id002
+      SMR:
+      - ITA
+      SRB: *id001
+      XKX: *id001
+      BRA:
+      - PRT
+      LBR:
+      - PRT

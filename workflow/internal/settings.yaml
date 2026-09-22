@@ -1,4 +1,8 @@
 resources:
+  precomputed_building_rasters:
+    # Set to an immutable published record URL before distributing the defaults.
+    # The record must contain the three GeoTIFFs named in precomputed.smk.
+    url: ""
   jrc:
     use_version: 2023
     versions:

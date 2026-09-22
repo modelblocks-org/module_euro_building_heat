@@ -4,6 +4,57 @@ The example in `config/config.yaml` supplies all defaults. Imported workflows
 can override individual settings; `workflow/internal/config.schema.yaml`
 validates the merged configuration. Public files are listed in `INTERFACE.yaml`.
 
+## Published building grids or full rebuild
+
+`building_rasters.source: auto` selects one of two branches automatically:
+
+- With the published assumptions, download `building_count.tif`,
+  `residential_space_heat_weight.tif`, and `commercial_space_heat_weight.tif`
+  from a pinned Zenodo record. These grids replace raw EUBUCCO/Microsoft
+  downloads, building processing, and structural weighting. They are cached
+  once across shape sets, cropped to each requested scope without resampling,
+  and used by the usual demand and hourly calculations. Report plots are
+  generated locally.
+- Changing any of the following selects the full building workflow:
+  `population.epoch`, `population.resolution`, `buildings_eubucco`,
+  `buildings_microsoft`, `eurostat`, `building_count`, `data_proxies.floor_area`,
+  `heat.spatial_weights`, `processing.intermediate_dtype`, or `raster`.
+  This can require large source downloads and substantially more processing.
+  For example, changing `heat.spatial_weights.population.share` from `0.5`
+  to `0.6` rebuilds the grids automatically.
+
+The comparison uses `workflow/internal/precomputed_defaults.yaml`, a frozen
+snapshot of the published assumptions. Editing `config/config.yaml` or passing
+module overrides therefore has the same effect. Restoring those assumptions
+selects downloads again. Do not update the frozen snapshot without publishing
+matching grids.
+
+Demand/weather years, `heat.hdd`, energy efficiencies, heat-pump parameters,
+other proxy groups, `crs.projected`, plotting, threads, `population.chunk_size`,
+and `processing.nuts3_batches` do not select a rebuild. Their downstream
+calculations still respond to configuration changes.
+
+Set `building_rasters.source: rebuild` to force the original workflow even
+with default assumptions. This is also needed for scopes outside the published
+grids' coverage or CRS. Cropping uses raster cell centres; a rebuild instead
+retains the original building-centroid clipping at scope boundaries, so boundary
+cells can differ. The download branch does not produce the rebuild branch's
+internal per-region diagnostics table.
+
+**Publication is pending:** the Zenodo URL is intentionally empty in
+`workflow/internal/settings.yaml`, at
+`resources.precomputed_building_rasters.url`. Default raster jobs fail with an
+explanatory error until it is filled in; use `source: rebuild` in the meantime.
+The publisher should set it to
+`https://zenodo.org/records/<version-specific-record-id>/files/{dataset}.tif`
+and upload the three GeoTIFFs named above. They must share the aligned 100 m
+EPSG:3035 grid, cover the advertised scope, and use the frozen settings, original
+band descriptions/units and nodata convention. Publish complete-region support
+before clipping to consumer shapes. A larger raster bounding box must not be
+used to imply coverage in areas that were never processed. Downloads are
+written to `.part` files before being renamed; cropped values are checked for
+finite, nonnegative values and grid compatibility.
+
 ## Shared sources and building processing
 
 - `population`: one GHSL GHS-POP source for building preparation, annual heat,

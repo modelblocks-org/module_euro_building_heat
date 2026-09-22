@@ -1,3 +1,10 @@
+# Default building assumptions use published Zenodo grids. Changing population
+# epoch/resolution, building sources/proxies, Eurostat assumptions, spatial_weights,
+# intermediate_dtype or raster settings automatically rebuilds from raw buildings.
+# See config/README.md for the complete list and publication setup.
+building_rasters:
+  source: auto  # auto: download for matching defaults; rebuild: always calculate
+
 # Minimal example configuration for the heat demand workflow.
 demand_years:
   # End year is exclusive, matching the Modelblocks module convention.

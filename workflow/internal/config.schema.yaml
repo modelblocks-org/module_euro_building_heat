@@ -18,6 +18,15 @@ required:
 - plotting
 - data_proxies
 properties:
+  building_rasters:
+    type: object
+    additionalProperties: false
+    required: [source]
+    properties:
+      source:
+        type: string
+        enum: [auto, rebuild]
+        description: Download published grids for matching settings, or always rebuild.
   demand_years:
     description: |
       Selects the annual heat-demand years. The range includes `start` and excludes

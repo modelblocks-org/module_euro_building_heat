@@ -332,3 +332,15 @@ def report_figure_inputs(wildcards):
             for path in _official_final_demand_inputs(wildcards, sector)
         ]
     return figures
+
+
+def published_grid_url(wildcards):
+    """Resolve a published building grid, rejecting an unconfigured record."""
+    url = internal["resources"]["precomputed_building_rasters"]["url"]
+    if not url:
+        raise ValueError(
+            "Precomputed building grids have no published Zenodo record configured. "
+            "Set resources.precomputed_building_rasters.url in internal/settings.yaml "
+            "after publication, or set building_rasters.source: rebuild."
+        )
+    return url.format(dataset=wildcards.dataset)
