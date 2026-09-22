@@ -12,6 +12,8 @@ rule download_precomputed_building_raster:
         "../envs/module.yaml"
     params:
         url=published_grid_url,
+    message:
+        "Download precomputed {wildcards.dataset} raster."
     shell:
         "curl --fail --silent --show-error --location --retry 5 "
         "--output {output.raster:q}.part {params.url:q} 2> {log:q} && "
@@ -39,6 +41,8 @@ rule merge_building_count:
         population=config["population"],
         datasets=["building_count"],
         source="zenodo",
+    message:
+        "Prepare precomputed building counts for '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_precomputed_rasters.py"
 
@@ -71,5 +75,7 @@ rule merge_structural_support:
         population=config["population"],
         datasets=["residential_space_heat_weight", "commercial_space_heat_weight"],
         source="zenodo",
+    message:
+        "Prepare precomputed space-heating weights for '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_precomputed_rasters.py"

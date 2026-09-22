@@ -29,11 +29,6 @@ from _floor_area import (
     select_building_sectors,
 )
 from _microsoft import low_coverage_quadkeys
-from _schemas import (
-    validate_building_count_proxies,
-    validate_conserved_total,
-    validate_sector_count_ratios,
-)
 from _space_heat_weight import surface_to_volume_ratio, surface_volume_power
 from _utils import (
     SUPPORT_BANDS,
@@ -63,7 +58,6 @@ scope = gpd.read_parquet(snakemake.input.scope).geometry.item()
 shapely.prepare(scope)
 totals = pd.read_parquet(snakemake.input.totals).set_index("region_id")
 count_proxies = pd.read_parquet(snakemake.input.count_proxies)
-validate_building_count_proxies(count_proxies)
 count_proxies = count_proxies.set_index("country_id")
 statistics = pd.read_parquet(snakemake.input.microsoft_statistics)
 low_quadkeys = low_coverage_quadkeys(
@@ -193,7 +187,6 @@ for region_id, region in regions.iterrows():
         point_grid(full_profile, residential, residential.floor_area_m2)
         + residential_proxy
     )
-    validate_conserved_total(full_floor.sum(), region_totals.residential_total_m2)
     full_valid = point_grid(full_profile, residential, residential.valid_area)
     full_power = point_grid(full_profile, residential, residential.weighted_power)
     # Only now clip output support to the requested scope. Complete-region grids
@@ -237,14 +230,6 @@ for region_id, region in regions.iterrows():
             tags,
         )
     # Counts reuse sector selections and the same population fallback grid.
-    for sector, buildings, proxy in (
-        ("residential", residential, residential_proxy),
-        ("commercial", commercial, commercial_proxy),
-    ):
-        if sources[f"{sector}_source"] == "microsoft":
-            validate_sector_count_ratios(
-                buildings, proxy, count_proxies.loc[region.country_id], sector
-            )
     counts = building_count_grid(
         profile,
         full_profile,

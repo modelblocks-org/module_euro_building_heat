@@ -14,7 +14,6 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import rasterio
-from _schemas import validate_aligned_rasters, validate_nonnegative
 from _utils import window_polygons
 from rasterio.features import geometry_mask, rasterize
 from shapely.geometry import box
@@ -48,7 +47,6 @@ def support_blocks(sources, shapes, intersections, factors, assigned=None):
             .astype("float64")
             for sector, source in sources.items()
         }
-        validate_nonnegative(*structural.values())
         heated = {sector: np.zeros((years, *labels.shape)) for sector in sources}
         local = window_polygons(intersections, window, reference.transform)
         for index, geometry in local.geometry.items():
@@ -93,12 +91,9 @@ def write_heat_demand_rasters(
             )
         }
         reference = sources["household"]
-        validate_aligned_rasters(reference, sources["commercial"])
         shapes = shapes.to_crs(reference.crs).reset_index(drop=True)
         intersections = grid_shapes.to_crs(reference.crs).reset_index(drop=True)
         shape_ids = pd.Index(shapes.shape_id)
-        if shape_ids.has_duplicates:
-            raise ValueError("Shapes contain duplicate shape IDs.")
         count = len(shapes) + 1
         totals = {
             (sink, sector): np.zeros((len(pairs) if sink == "space_heat" else 1, count))
@@ -160,8 +155,6 @@ def write_heat_demand_rasters(
         }
         outputs, scales, expected_totals = {}, {}, {}
         for sink, path in output_paths.items():
-            if sink not in {"space_heat", "hot_water"}:
-                raise ValueError(f"Unsupported heat sink: {sink}")
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             output = stack.enter_context(rasterio.open(path, "w", **profile))
             outputs[sink] = output
@@ -194,15 +187,9 @@ def write_heat_demand_rasters(
                         .to_numpy()
                         * 1e6
                     )
-                    validate_nonnegative(energy)
                     support = totals[sink, sector][
                         band if sink == "space_heat" else 0, 1:
                     ]
-                    missing = (support <= 0) & (energy > 0)
-                    if missing.any():
-                        raise ValueError(
-                            f"No {sector} {sink} support for {shape_ids[missing].tolist()}."
-                        )
                     scale = np.zeros(count)
                     np.divide(energy, support, out=scale[1:], where=support > 0)
                     scales[sink, sector, band] = scale

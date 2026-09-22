@@ -46,7 +46,6 @@ spatial_weights:
       Y1981-2000: 1.125
 data_proxies:
   floor_area:
-    method: mean_floors
     countries:
       GBR: [IRL]
       ALB: [BGR, HRV, HUN, ROU, GRC]

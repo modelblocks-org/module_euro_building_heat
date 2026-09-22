@@ -4,7 +4,7 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 import geopandas as gpd
-from _schemas import validate_shape_source
+from _schemas import ShapesSchema
 from _utils import processing_crs, scope_geometry
 
 if TYPE_CHECKING:
@@ -55,7 +55,8 @@ def check_proxied_country_scope(
 
 def main() -> None:
     """Main snakemake process."""
-    shapes = validate_shape_source(snakemake.input.shapes)
+    shapes = gpd.read_parquet(snakemake.input.shapes)
+    shapes = ShapesSchema.validate(shapes.loc[shapes.shape_class.eq("land")]).copy()
     shapes = shapes.to_crs(WGS84)
     shapes.to_parquet(snakemake.output.shapes, index=False)
     crs = processing_crs(shapes)

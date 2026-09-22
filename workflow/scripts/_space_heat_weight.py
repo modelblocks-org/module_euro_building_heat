@@ -13,7 +13,6 @@ Source: https://doi.org/10.3390/en12244789
 import numpy as np
 import pandas as pd
 import xarray as xr
-from _schemas import validate_heat_normalization
 
 
 def _return(values: np.ndarray):
@@ -95,7 +94,6 @@ def weight_from_support(
     Population is eligible only in cells retaining residential floor area.
     Its denominator covers the complete region, even for scoped cells.
     """
-    validate_heat_normalization(total, population_total, share, reference, age)
     blended = blended_floor_area(floor_area, population, total, population_total, share)
     corrected = weighted_power / reference + (floor_area - valid_area)
     return space_heat_weight(

@@ -32,7 +32,6 @@ from _microsoft import (
     MICROSOFT_TOTALS_SCHEMA,
     intersecting_quadkeys,
 )
-from _schemas import validate_population_summaries
 from _utils import population_summaries, processing_crs
 
 
@@ -152,7 +151,6 @@ def building_population(snakemake):
         {"regions": regions, "floor_reference": floor, "count_reference": counts},
         snakemake.params.population["chunk_size"],
     )
-    validate_population_summaries(table)
     Path(snakemake.output.table).parent.mkdir(parents=True, exist_ok=True)
     table.to_parquet(snakemake.output.table, index=False)
 

@@ -29,19 +29,9 @@ building acquisition and hectare-raster preparation in the same workflow.
 
 Data processing steps:
 
-```mermaid
-flowchart LR
-    S[Shapes and shared population] --> B[Cached building preparation]
-    B --> C[Buildings per hectare]
-    B --> W[Structural sector support]
-    W --> A[Annual heat allocation]
-    E[ERA5 and national heat statistics] --> A
-    W --> H[Hourly demand and heat pumps]
-    A --> H
-    C --> P[Report figures]
-    A --> P
-    H --> P
-```
+<p align="center">
+  <img src="./figures/rulegraph.png" width="100%" alt="Snakemake rule graph of the current workflow">
+</p>
 
 1. Validate the land shapes and prepare shared geography. Preserve the input shape IDs.
 2. Reuse or download pinned EUBUCCO/Microsoft buildings and one GHSL 2025 population

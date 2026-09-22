@@ -16,6 +16,8 @@ rule prepare_building_count_proxies:
     params:
         proxies=config["data_proxies"]["floor_area"],
         country_codes=internal["country_codes"],
+    message:
+        "Prepare building-count proxies for '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_building_count_proxies.py"
 
@@ -45,5 +47,7 @@ rule merge_building_count:
         population=config["population"],
         microsoft=config["buildings_microsoft"],
         raster=raster_settings(),
+    message:
+        "Merge building counts for '{wildcards.shapes}' shapes."
     script:
         "../scripts/merge_heat_rasters.py"

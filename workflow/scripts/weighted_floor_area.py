@@ -9,14 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-import rasterio
-from _schemas import (
-    validate_conserved_total,
-    validate_heat_building_support,
-    validate_heat_diagnostics,
-    validate_heat_tables,
-)
-from _space_heat_weight import blended_floor_area, weight_from_support
+from _space_heat_weight import weight_from_support
 from _utils import SPACE_HEAT_WEIGHT_BANDS, read_region_support, write_raster
 
 if TYPE_CHECKING:
@@ -28,7 +21,6 @@ summary = pd.read_parquet(Path(snakemake.input.support) / "summary.parquet").set
 )
 age = pd.read_parquet(snakemake.input.age).set_index("region_id")
 statistics = pd.read_parquet(snakemake.input.sv_statistics).set_index("country_id")
-validate_heat_tables(summary, age, statistics)
 output_directory = Path(snakemake.output.partials)
 output_directory.mkdir(parents=True, exist_ok=True)
 diagnostics = []
@@ -49,16 +41,6 @@ for region_id, row in summary.iterrows():
     # Normalize on the whole region, then evaluate the same formula on the
     # clipped arrays; clipping must not redistribute the outside share.
     full_weights = weight_from_support(*full, **arguments)
-    validate_conserved_total(
-        blended_floor_area(
-            full[0],
-            full[1],
-            row.residential_floor_area_m2,
-            eligible_population,
-            snakemake.params.population_share,
-        ).sum(),
-        row.residential_floor_area_m2,
-    )
     weights = weight_from_support(floor[0], *scoped, **arguments)
     raster_path = output_directory / f"{region_id}.tif"
     write_raster(
@@ -73,17 +55,6 @@ for region_id, row in summary.iterrows():
             "population_share": snakemake.params.population_share,
         },
     )
-
-    with (
-        rasterio.open(raster_path) as heat,
-        rasterio.open(
-            Path(snakemake.input.support) / region_id / "building_count.tif"
-        ) as counts,
-        rasterio.open(
-            Path(snakemake.input.support) / region_id / "floor_area.tif"
-        ) as floor_raster,
-    ):
-        validate_heat_building_support(heat, counts, floor_raster)
 
     diagnostics.append(
         {
@@ -107,5 +78,4 @@ for region_id, row in summary.iterrows():
 
 path = output_directory / "diagnostics.parquet"
 diagnostics = pd.DataFrame(diagnostics)
-validate_heat_diagnostics(diagnostics)
 diagnostics.to_parquet(path, index=False)

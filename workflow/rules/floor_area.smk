@@ -14,6 +14,8 @@ checkpoint prepare_floor_area_batches:
     params:
         step="floor_area_batches",
         batch_count=config["processing"]["nuts3_batches"],
+    message:
+        "Plan floor-area processing batches for '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_buildings.py"
 
@@ -37,6 +39,8 @@ rule prepare_building_population:
         population=config["population"],
         proxies=config["data_proxies"]["floor_area"],
         country_codes=internal["country_codes"],
+    message:
+        "Summarize population for building estimates in '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_buildings.py"
 
@@ -64,6 +68,8 @@ rule prepare_floor_area_totals:
         eubucco=config["buildings_eubucco"],
         proxies=config["data_proxies"]["floor_area"],
         country_codes=internal["country_codes"],
+    message:
+        "Calculate regional floor-area totals for '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_buildings.py"
 
@@ -95,6 +101,8 @@ rule create_floor_area_batch:
         microsoft=config["buildings_microsoft"],
         surface_volume=config["spatial_weights"]["surface_volume"],
         raster=raster_settings(),
+    message:
+        "Calculate floor area for batch {wildcards.batch} of '{wildcards.shapes}' shapes."
     script:
         "../scripts/calculate_floor_area.py"
 
@@ -138,5 +146,7 @@ rule merge_structural_support:
             if key != "hdd"
         },
         raster=raster_settings(),
+    message:
+        "Merge space-heating weights for '{wildcards.shapes}' shapes."
     script:
         "../scripts/merge_heat_rasters.py"

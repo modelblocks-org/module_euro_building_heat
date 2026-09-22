@@ -116,6 +116,8 @@ rule download_raw_population:
         url=lambda wc: internal["resources"]["ghsl"]["url"].format(
             stem=internal["resources"]["ghsl"]["stem"].format(epoch=wc.ghsl_epoch)
         ),
+    message:
+        "Download GHSL population data for epoch {wildcards.ghsl_epoch}."
     script:
         "../scripts/download.py"
 

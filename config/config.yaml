@@ -2,24 +2,18 @@
 # epoch/resolution, building sources/proxies, Eurostat assumptions, spatial_weights,
 # intermediate_dtype or raster settings automatically rebuilds from raw buildings.
 # See config/README.md for the complete list and publication setup.
-# Resolution and intermediate_dtype mentioned above are now fixed workflow
-# assumptions; only the remaining exposed settings can be changed.
-# Fixed invariants: 100 m population/output grids, Census 2021, EUBUCCO v0.2,
-# centroid assignment, residential and commercial/public building sectors.
+
 building_rasters:
   source: rebuild  # auto: download for matching defaults; rebuild: always calculate
 
 # Minimal example configuration for the heat demand workflow.
 demand_years:
   # End year is exclusive, matching the Modelblocks module convention.
-  # Annual statistics years; start inclusive, end exclusive (available: 2010–2023).
   start: 2023
   end: 2024
 
 weather_years:
   # Weather years used to shape hourly heat demand profiles. End year is exclusive.
-  # ERA5 years for hourly profiles and HDD; start inclusive, end exclusive.
-  # Must span as many years as demand_years; years are paired in order.
   start: 2023
   end: 2024
 
@@ -28,8 +22,7 @@ threads:
   aggregation: 8
 
 population:
-  # One GHSL source for buildings, annual demand and hourly aggregation.
-  # Shared GHSL GHS-POP snapshot; 1975–2030 in five-year steps, always at 100 m.
+  # Population epoch and resolution for gridded demand and heat-pump aggregation.
   epoch: 2025
   # Aggregation window width/height in pixels; larger windows use more memory.
   # Must be a multiple of 256, at least 256.
@@ -37,14 +30,12 @@ population:
 
 crs:
   # Projected CRS used for geometry calculations such as shape centroids.
-  # Output rasters select their equal-area CRS automatically (see raster below).
   projected: EPSG:3035
 
-# Proxy country keys and lists use ISO alpha-3 codes. floor_area.method estimates
-# mean storeys from reference countries; its countries also provide count proxies.
+# Proxy country keys and lists use ISO alpha-3 codes. floor_area reference
+# countries provide floor-area and building-count proxies.
 data_proxies:
   floor_area:
-    method: mean_floors
     countries:
       GBR: [IRL]
       ALB: [BGR, HRV, HUN, ROU, GRC]
@@ -126,8 +117,8 @@ spatial_weights:
     # equivalent_square estimates perimeter from area and also supports lightweight.
     method: footprint_perimeter
   age:
-    # Always use cens_21dwop_r3 (Census 2021). Factors are centred on the country's
-    # floor-area-weighted mean; missing age observations receive a neutral factor.
+    # Factors are centred on the country's floor-area-weighted mean; 
+    # missing age observations receive a neutral factor.
     # Set every multiplier below to 1 to make age weighting neutral.
     multipliers:
       before_1991: 1.25  # Relative heat intensity for dwellings built before 1991.
@@ -196,8 +187,7 @@ heat_pump:
   correction_factor: 0.85
 
 processing:
-  # Number of balanced region batches for building processing. Intermediate rasters
-  # always use float64 to preserve additive totals.
+  # Number of balanced region batches for building processing.
   nuts3_batches: 128
 
 buildings_microsoft:
@@ -205,6 +195,7 @@ buildings_microsoft:
   release: '2026-08-13'
   # Tiles with fewer retained buildings use population fallback. Populated cells
   # without a retained centroid also always use population fallback.
+  # This fallback exists to filter out two obviously wrong tiles in the Microsoft dataset (see README.md).
   minimum_building_count: 2000
 
 buildings_eubucco:
@@ -220,7 +211,7 @@ buildings_eubucco:
     n_floors_7_inf: 9
 
 # Census 2021 dwelling counts (cens_21dwbnr_r3) provide NUTS-3 residential
-# floor-area totals. The source dataset and year are fixed.
+# floor-area totals.
 eurostat:
   # Multiply useful dwelling area by this factor to estimate gross building area,
   # including walls and shared space.
@@ -242,10 +233,6 @@ eurostat:
     GE9: 10  # Assumed mean room count for dwellings with nine or more rooms.
   # Useful m² per room for the fallback; useful_to_gross_ratio is applied afterwards.
   floor_area_per_room_m2: 20
-
-# Building counts always use reference-country sector count shares and counts per
-# person, averaged equally across data_proxies.floor_area.countries. These fixed
-# methods have no building_count configuration section. Counts can be fractional.
 
 raster:
   # Output grid is always 100 m with nodata 0; EPSG:3035 for European scopes and

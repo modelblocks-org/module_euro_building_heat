@@ -13,6 +13,8 @@ rule download_eurostat_building_age:
         url=internal["resources"]["stable"]["url"].format(
             dataset="cens_21dwop_r3.tsv.gz"
         ),
+    message:
+        "Download Eurostat building-age census data."
     script:
         "../scripts/download.py"
 
@@ -31,6 +33,8 @@ rule prepare_nuts3_building_age:
     params:
         step="nuts3_building_age",
         settings=config["spatial_weights"]["age"],
+    message:
+        "Prepare NUTS3 building-age distributions for '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_buildings.py"
 
@@ -46,6 +50,8 @@ rule prepare_space_heat_sv_statistics:
         "../envs/module.yaml"
     params:
         step="space_heat_sv_statistics",
+    message:
+        "Calculate surface-to-volume statistics for '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_buildings.py"
 
@@ -68,5 +74,7 @@ rule create_space_heat_weight_batch:
     params:
         population_share=config["spatial_weights"]["population"]["share"],
         raster=raster_settings(),
+    message:
+        "Calculate space-heating weights for batch {wildcards.batch} of '{wildcards.shapes}' shapes."
     script:
         "../scripts/weighted_floor_area.py"

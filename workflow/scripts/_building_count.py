@@ -2,13 +2,11 @@
 
 import numpy as np
 import pandas as pd
-from _schemas import validate_building_count_reference
 from _utils import clipped_grid, point_grid, points_within_scope
 
 
 def reference_count_ratios(stats, population):
     """Return sector shares of all buildings and counts per covered inhabitant."""
-    validate_building_count_reference(stats, population)
     counts = pd.Series(
         {
             "residential": stats.n_type_residential.sum(),

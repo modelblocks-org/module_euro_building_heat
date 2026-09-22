@@ -10,5 +10,7 @@ rule report_figures:
         "<logs>/{shapes}/plots/report_manifest.log",
     conda:
         "../envs/module.yaml"
+    message:
+        "Write the report figure manifest for '{wildcards.shapes}' shapes."
     script:
         "../scripts/write_report_manifest.py"

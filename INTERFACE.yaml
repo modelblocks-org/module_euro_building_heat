@@ -22,7 +22,6 @@ pathvars:
       description: |
         Earth Data Hub API key used to download ERA5 weather data.
         The file must contain only the API key.
-        Count-only requests do not require this credential.
     shapes:
       default: <resources>/user/{shapes}/shapes.parquet
       description: |

@@ -82,6 +82,7 @@ def get_supported_ecuk_releases() -> list[int]:
 
 
 def _read_checkpoint_lines(path):
+    """Read nonempty checkpoint lines with surrounding whitespace removed."""
     with open(path) as f:
         return [line.strip() for line in f if line.strip()]
 
@@ -101,6 +102,7 @@ def _official_final_demand_inputs(wildcards, sector):
 
 
 def _annual_energy_balance_proxy_population_inputs(wildcards):
+    """Return population inputs when countries use annual energy balance proxies."""
     country_data = checkpoints.prepare_shape_country_scope.get(
         shapes=wildcards.shapes
     ).output.country_ids
@@ -147,18 +149,22 @@ def _get_ecuk_baseline_file() -> str:
 
 
 def building_source_outputs(wildcards):
+    """Return building source checkpoint outputs for the selected shapes."""
     return checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
 
 
 def building_plan_input(wildcards):
+    """Return the building source plan manifest for the selected shapes."""
     return building_source_outputs(wildcards).manifest
 
 
 def eubucco_stats_input(wildcards):
+    """Return the downloaded EUBUCCO statistics table."""
     return rules.download_eubucco_stats.output.table
 
 
 def read_building_plan(wildcards):
+    """Load the building source plan from its JSON manifest."""
     import json
 
     path = building_source_outputs(wildcards).manifest
@@ -167,6 +173,7 @@ def read_building_plan(wildcards):
 
 
 def eubucco_download_inputs(wildcards):
+    """Return EUBUCCO download paths required by the building source plan."""
     plan = read_building_plan(wildcards)
     regions = (
         ["eubucco_lat_lon"]
@@ -188,12 +195,14 @@ def eubucco_download_inputs(wildcards):
 
 
 def eubucco_download_url(wildcards):
+    """Return the configured EUBUCCO source URL for the requested region."""
     return internal["resources"]["automatic"][
         f"eubucco_{config['buildings_eubucco']['source']}"
     ].format(nuts2=wildcards.region)
 
 
 def microsoft_download_rows(wildcards):
+    """Return Microsoft index rows for planned quadkeys, sorted by quadkey and URL."""
     import csv
 
     plan = read_building_plan(wildcards)
@@ -208,6 +217,7 @@ def microsoft_download_rows(wildcards):
 
 
 def microsoft_download_inputs(wildcards):
+    """Return Microsoft download paths with numbered parts for each quadkey."""
     counts = {}
     downloads = []
     for row in microsoft_download_rows(wildcards):
@@ -222,6 +232,7 @@ def microsoft_download_inputs(wildcards):
 
 
 def selected_eubucco_input(wildcards):
+    """Return processed EUBUCCO data or an empty table when no region needs it."""
     outputs = building_source_outputs(wildcards)
     plan = read_building_plan(wildcards)
     if any(
@@ -234,6 +245,7 @@ def selected_eubucco_input(wildcards):
 
 
 def selected_microsoft_input(wildcards):
+    """Return processed Microsoft data or an empty table when no quadkeys are planned."""
     outputs = building_source_outputs(wildcards)
     plan = read_building_plan(wildcards)
     if any(region["microsoft_quadkeys"] for region in plan["regions"].values()):
@@ -242,6 +254,7 @@ def selected_microsoft_input(wildcards):
 
 
 def selected_microsoft_statistics_input(wildcards):
+    """Return Microsoft statistics or an empty table when no quadkeys are planned."""
     outputs = building_source_outputs(wildcards)
     plan = read_building_plan(wildcards)
     if any(region["microsoft_quadkeys"] for region in plan["regions"].values()):
@@ -252,6 +265,7 @@ def selected_microsoft_statistics_input(wildcards):
 
 
 def read_floor_area_batch_plan(wildcards):
+    """Load the floor area batch plan from its checkpoint JSON manifest."""
     import json
 
     path = checkpoints.prepare_floor_area_batches.get(
@@ -262,12 +276,14 @@ def read_floor_area_batch_plan(wildcards):
 
 
 def floor_area_batch_plan_input(wildcards):
+    """Return the floor area batch plan manifest for the selected shapes."""
     return checkpoints.prepare_floor_area_batches.get(
         shapes=wildcards.shapes
     ).output.manifest
 
 
 def floor_area_batch_inputs(wildcards):
+    """Return floor area partial output paths for all planned batches."""
     plan = read_floor_area_batch_plan(wildcards)
     return [
         str(rules.create_floor_area_batch.output.partials).format(
@@ -278,6 +294,7 @@ def floor_area_batch_inputs(wildcards):
 
 
 def space_heat_weight_batch_inputs(wildcards):
+    """Return space heat weight partial output paths for all planned batches."""
     plan = read_floor_area_batch_plan(wildcards)
     return [
         str(rules.create_space_heat_weight_batch.output.partials).format(
@@ -288,6 +305,7 @@ def space_heat_weight_batch_inputs(wildcards):
 
 
 def selected_microsoft_totals_input(wildcards):
+    """Return Microsoft totals or an empty table when no quadkeys are planned."""
     outputs = building_source_outputs(wildcards)
     plan = read_building_plan(wildcards)
     if any(region["microsoft_quadkeys"] for region in plan["regions"].values()):
@@ -298,6 +316,7 @@ def selected_microsoft_totals_input(wildcards):
 
 
 def raster_settings():
+    """Return the configured raster settings."""
     return config["raster"]
 
 

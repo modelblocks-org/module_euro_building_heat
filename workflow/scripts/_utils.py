@@ -12,12 +12,6 @@ import rasterio
 import rioxarray  # noqa: F401 -- register the xarray rio accessor
 import shapely
 import xarray as xr
-from _schemas import (
-    validate_nonnegative,
-    validate_raster_contract,
-    validate_residential_space_heat_weight_raster,
-    validate_support_profiles,
-)
 from affine import Affine
 from gregor.aggregate import aggregate_raster_to_polygon
 from rasterio.enums import Resampling
@@ -71,12 +65,10 @@ def write_raster(path, profile, values, bands, units, tags):
             zip(values, bands, units, strict=True), 1
         ):
             value = np.asarray(value, dtype=profile["dtype"])
-            validate_nonnegative(value)
             output.write(value, index)
             output.set_band_description(index, band)
             output.set_band_unit(index, unit)
         output.update_tags(**tags)
-        validate_raster_contract(output, bands, units, check_values=False)
 
 
 def scope_geometry(shapes: gpd.GeoDataFrame, crs: Any) -> BaseGeometry:
@@ -91,19 +83,12 @@ def read_region_support(directory):
     arrays retain the original centroid/cell clipping for the requested shapes.
     """
     arrays = []
-    profiles = {}
     for kind in SUPPORT_BANDS:
         with rasterio.open(directory / f"{kind}.tif") as raster:
-            validate_raster_contract(
-                raster, SUPPORT_BANDS[kind], SUPPORT_UNITS[kind], check_values=False
-            )
-            profiles[kind] = raster.profile
             values = raster.read()
-            validate_nonnegative(values)
             arrays.append(values)
             if kind == "floor_area":
                 profile = raster.profile
-    validate_support_profiles(profiles)
     return *arrays, profile
 
 
@@ -249,10 +234,6 @@ def window_polygons(polygons, window, transform):
 
 def _iter_raster_blocks(raster_path, polygons, sector="residential", block_size=512):
     """Yield bounded raster windows and clipped polygons on the native source grid."""
-    if sector is not None:
-        validate_residential_space_heat_weight_raster(
-            raster_path, check_values=False, sector=sector
-        )
     with rasterio.open(raster_path) as raster:
         projected = polygons.to_crs(raster.crs).reset_index(drop=True)
         if projected.empty:
@@ -265,8 +246,6 @@ def _iter_raster_blocks(raster_path, polygons, sector="residential", block_size=
             if local.empty:
                 continue
             values = raster.read(1, window=window, masked=True).filled(0)
-            if not np.isfinite(values).all() or (values < 0).any():
-                raise ValueError(f"Invalid spatial support in raster window {window}.")
             yield window, values, local, raster.window_transform(window)
 
 

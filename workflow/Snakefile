@@ -1,6 +1,6 @@
 import yaml
 
-from snakemake.utils import min_version, update_config, validate
+from snakemake.utils import min_version, validate
 
 min_version("9.19")
 
@@ -27,13 +27,8 @@ pathvars:
     heat_pump_electricity_demand="<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet",
 
 
-# Explicitly merge defaults: Snakemake skips a module's configfile directive
-# when its consumer supplies a config dictionary.
-with open(workflow.source_path("../config/config.yaml")) as stream:
-    defaults = yaml.safe_load(stream)
-update_config(defaults, config)
-config.clear()
-config.update(defaults)
+# Load the example configuration. This will be overridden by users.
+configfile: workflow.source_path("../config/config.yaml")
 
 
 # Validate the configuration using the schema file.
@@ -52,7 +47,7 @@ wildcard_constraints:
 include: "rules/_utils.smk"
 include: "rules/automatic.smk"
 include: "rules/prepare.smk"
-include: "rules/sources.smk"
+include: "rules/download_buildings.smk"
 include: "rules/building_rasters.smk"
 include: "rules/baseline.smk"
 include: "rules/annual_heat_demand.smk"

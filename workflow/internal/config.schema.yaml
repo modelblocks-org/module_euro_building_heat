@@ -21,6 +21,7 @@ required:
 - heat_pump
 properties:
   building_rasters:
+    description: "Settings controlling whether building grids are downloaded or rebuilt."
     type: object
     additionalProperties: false
     required:
@@ -43,10 +44,12 @@ properties:
     - end
     properties:
       start:
+        description: "First annual heat-demand year, included in the range."
         type: integer
         minimum: 2010
         maximum: 2023
       end:
+        description: "End of the annual heat-demand year range, excluded from the range."
         type: integer
         minimum: 2011
         maximum: 2024
@@ -62,8 +65,10 @@ properties:
     - end
     properties:
       start:
+        description: "First ERA5 weather year, included in the range."
         type: integer
       end:
+        description: "End of the ERA5 weather year range, excluded from the range."
         type: integer
   threads:
     description: Settings controlling parallel execution of aggregation tasks.
@@ -79,6 +84,7 @@ properties:
         type: integer
         minimum: 1
   population:
+    description: "Population dataset and processing settings for gridded aggregation."
     type: object
     additionalProperties: false
     required:
@@ -86,6 +92,7 @@ properties:
     - chunk_size
     properties:
       epoch:
+        description: "Reference year of the gridded population dataset."
         type: integer
         enum:
         - 1975
@@ -101,6 +108,7 @@ properties:
         - 2025
         - 2030
       chunk_size:
+        description: "Aggregation window width and height in pixels; larger windows use more memory."
         type: integer
         minimum: 256
         multipleOf: 256
@@ -146,20 +154,19 @@ properties:
           carrier-level services end-use shares should be averaged.
         $ref: '#/$defs/country_proxy_map'
       floor_area:
+        description: "Reference-country settings for missing floor-area and building-count data."
         type: object
         additionalProperties: false
         required:
-        - method
         - countries
         properties:
-          method:
-            type: string
-            const: mean_floors
           countries:
+            description: "Maps target countries to reference countries for floor-area and building-count proxies."
             $ref: '#/$defs/country_proxies'
     required:
     - floor_area
   spatial_weights:
+    description: "Settings for spatial allocation of annual space-heating demand."
     type: object
     additionalProperties: false
     required:
@@ -168,16 +175,19 @@ properties:
     - age
     properties:
       population:
+        description: "Population contribution to residential structural heat-demand weights."
         type: object
         additionalProperties: false
         required:
         - share
         properties:
           share:
+            description: "Population fraction of the residential blend; zero uses floor area and one uses population."
             type: number
             minimum: 0
             maximum: 1
       surface_volume:
+        description: "Building compactness correction for residential space-heating weights."
         type: object
         additionalProperties: false
         required:
@@ -185,14 +195,17 @@ properties:
         - method
         properties:
           elasticity:
+            description: "Exponent applied to the surface-to-volume ratio before country centring; zero is neutral."
             type: number
             minimum: 0
           method:
+            description: "Perimeter estimation method; footprint_perimeter uses observed geometry and requires full EUBUCCO."
             type: string
             enum:
             - equivalent_square
             - footprint_perimeter
       age:
+        description: "Building-age corrections centred on each country's floor-area-weighted mean."
         type: object
         additionalProperties: false
         required:
@@ -200,6 +213,7 @@ properties:
         - cutoff_spanning_bin_multipliers
         properties:
           multipliers:
+            description: "Relative heat intensities by construction period; setting all factors to one is neutral."
             type: object
             additionalProperties: false
             required:
@@ -208,21 +222,26 @@ properties:
             - after_2000
             properties:
               before_1991:
+                description: "Relative heat intensity for dwellings built before 1991."
                 type: number
                 exclusiveMinimum: 0
               '1991_2000':
+                description: "Relative heat intensity for dwellings built from 1991 through 2000."
                 type: number
                 exclusiveMinimum: 0
               after_2000:
+                description: "Relative heat intensity for dwellings built after 2000."
                 type: number
                 exclusiveMinimum: 0
           cutoff_spanning_bin_multipliers:
+            description: "Separate heat-intensity factors for census bins spanning the 1991 cutoff."
             type: object
             additionalProperties: false
             required:
             - Y1981-2000
             properties:
               Y1981-2000:
+                description: "Relative heat intensity for dwellings reported in the combined 1981-2000 census bin."
                 type: number
                 exclusiveMinimum: 0
       hdd:
@@ -328,15 +347,18 @@ properties:
         type: number
         exclusiveMinimum: 0
   processing:
+    description: "Batching settings for building-data processing."
     type: object
     additionalProperties: false
     required:
     - nuts3_batches
     properties:
       nuts3_batches:
+        description: "Number of balanced regional batches used to process buildings."
         type: integer
         minimum: 1
   buildings_microsoft:
+    description: "Microsoft building-footprint release and population-fallback settings."
     type: object
     additionalProperties: false
     required:
@@ -344,12 +366,15 @@ properties:
     - minimum_building_count
     properties:
       release:
+        description: "Dated Microsoft building-footprint release to download and cache, in YYYY-MM-DD format."
         type: string
         pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
       minimum_building_count:
+        description: "Tiles with fewer retained buildings use population-based fallback."
         type: integer
         minimum: 0
   buildings_eubucco:
+    description: "EUBUCCO building source and representative storey-count assumptions."
     type: object
     additionalProperties: false
     required:
@@ -357,11 +382,13 @@ properties:
     - floor_bin_representatives
     properties:
       source:
+        description: "Building dataset variant; full includes observed perimeters and lightweight requires equivalent_square."
         type: string
         enum:
         - lightweight
         - full
       floor_bin_representatives:
+        description: "Representative storey counts used to estimate mean storeys and missing floor-area totals."
         type: object
         additionalProperties: false
         required:
@@ -371,18 +398,23 @@ properties:
         - n_floors_7_inf
         properties:
           n_floors_0_2:
+            description: "Representative storey count for the 0-2 floor bin."
             type: number
             exclusiveMinimum: 0
           n_floors_2_4:
+            description: "Representative storey count for the 2-4 floor bin."
             type: number
             exclusiveMinimum: 0
           n_floors_4_7:
+            description: "Representative storey count for the 4-7 floor bin."
             type: number
             exclusiveMinimum: 0
           n_floors_7_inf:
+            description: "Representative storey count for the 7 or more floor bin."
             type: number
             exclusiveMinimum: 0
   eurostat:
+    description: "Census dwelling-area and room-count assumptions used to estimate residential floor area."
     type: object
     additionalProperties: false
     required:
@@ -392,6 +424,7 @@ properties:
     - floor_area_per_room_m2
     properties:
       useful_to_gross_ratio:
+        description: "Multiplier converting useful dwelling floor area to gross building area, including walls and shared space."
         type: number
         exclusiveMinimum: 0
       floor_space_m2:
@@ -411,30 +444,39 @@ properties:
         - SQM_GE150
         properties:
           SQM_LT30:
+            description: "Representative useful floor area in square metres for dwellings in the less than 30 square metre class."
             type: number
             exclusiveMinimum: 0
           SQM30-39:
+            description: "Representative useful floor area in square metres for dwellings in the 30-39 square metre class."
             type: number
             exclusiveMinimum: 0
           SQM40-49:
+            description: "Representative useful floor area in square metres for dwellings in the 40-49 square metre class."
             type: number
             exclusiveMinimum: 0
           SQM50-59:
+            description: "Representative useful floor area in square metres for dwellings in the 50-59 square metre class."
             type: number
             exclusiveMinimum: 0
           SQM60-79:
+            description: "Representative useful floor area in square metres for dwellings in the 60-79 square metre class."
             type: number
             exclusiveMinimum: 0
           SQM80-99:
+            description: "Representative useful floor area in square metres for dwellings in the 80-99 square metre class."
             type: number
             exclusiveMinimum: 0
           SQM100-119:
+            description: "Representative useful floor area in square metres for dwellings in the 100-119 square metre class."
             type: number
             exclusiveMinimum: 0
           SQM120-149:
+            description: "Representative useful floor area in square metres for dwellings in the 120-149 square metre class."
             type: number
             exclusiveMinimum: 0
           SQM_GE150:
+            description: "Representative useful floor area in square metres for dwellings in the 150 or more square metre class."
             type: number
             exclusiveMinimum: 0
       rooms:
@@ -446,12 +488,15 @@ properties:
         - GE9
         properties:
           GE9:
+            description: "Representative room count for dwellings with nine or more rooms."
             type: number
             minimum: 9
       floor_area_per_room_m2:
+        description: "Useful floor area in square metres per room when dwelling floor-space totals are missing or zero."
         type: number
         exclusiveMinimum: 0
   raster:
+    description: "GeoTIFF storage settings for output grids."
     type: object
     additionalProperties: false
     required:
@@ -460,21 +505,25 @@ properties:
     - block_size
     properties:
       dtype:
+        description: "Raster numeric data type; float32 reduces storage and float64 retains more precision."
         type: string
         enum:
         - float32
         - float64
       compression:
+        description: "Lossless compression algorithm used for output GeoTIFFs."
         type: string
         enum:
         - deflate
         - lzw
         - zstd
       block_size:
+        description: "GeoTIFF tile width and height in pixels; must be a multiple of 16."
         type: integer
         minimum: 16
         multipleOf: 16
   plotting:
+    description: "Raster preview and boundary styling settings."
     type: object
     additionalProperties: false
     required:
@@ -482,9 +531,11 @@ properties:
     - outline
     properties:
       max_size:
+        description: "Maximum raster preview dimension in pixels."
         type: integer
         minimum: 1
       outline:
+        description: "Boundary outline styling for plots."
         type: object
         additionalProperties: false
         required:
@@ -492,12 +543,15 @@ properties:
         - linewidth
         properties:
           color:
+            description: "Boundary colour accepted by Matplotlib."
             type: string
           linewidth:
+            description: "Boundary line width in points."
             type: number
             exclusiveMinimum: 0
 $defs:
   technology_efficiencies:
+    description: "Final-to-useful energy conversion factors by energy carrier."
     type: object
     additionalProperties: false
     properties:
@@ -539,14 +593,18 @@ $defs:
         type: string
         pattern: ^[A-Za-z]{3}$
   country_proxies:
+    description: "Maps uppercase target ISO alpha-3 country codes to reference-country lists."
     type: object
     propertyNames:
+      description: "Target-country ISO 3166-1 alpha-3 code in uppercase."
       pattern: ^[A-Z]{3}$
     additionalProperties:
+      description: "Reference countries used for one target country."
       type: array
       minItems: 1
       uniqueItems: true
       items:
+        description: "Reference-country ISO 3166-1 alpha-3 code in uppercase."
         type: string
         pattern: ^[A-Z]{3}$
 allOf:

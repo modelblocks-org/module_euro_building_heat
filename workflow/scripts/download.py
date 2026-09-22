@@ -1,7 +1,7 @@
-"""Download and validate each external source before publishing its cache file.
+"""Download external sources and validate building and population inputs.
 
-Building transfers can resume from a partial file. Validation happens before
-renaming that file, so downstream rules only see an accepted source. Existing
+Building transfers can resume from a partial file. Where enabled, validation
+happens before renaming that file to its cache destination. Existing
 pinned building downloads are checked when their download job is rerun.
 
 Sources:
@@ -17,16 +17,14 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import geopandas as gpd
 import pandas as pd
 from _schemas import (
-    validate_building_age_census,
-    validate_census,
-    validate_eubucco_nuts,
+    EubuccoRegionsSchema,
+    EubuccoStatsSchema,
+    MicrosoftIndexSchema,
     validate_eubucco_source,
-    validate_eubucco_stats,
     validate_microsoft_feature,
-    validate_microsoft_index,
-    validate_nuts3_source,
     validate_population_raster,
 )
 
@@ -64,30 +62,29 @@ def download(job) -> None:
             check=True,
             stderr=sys.stderr,
         )
-
-    if kind == "nuts3":
-        validate_nuts3_source(source)
-    elif kind == "floor_area":
-        validate_census(source)
-    elif kind == "building_age":
-        validate_building_age_census(source)
-    elif kind == "population":
+    if kind == "population":
         # Inspect the GeoTIFF in place; extraction remains a separate reusable job.
         validate_population_raster(f"/vsizip/{source.resolve()}/{job.params.member}")
     elif kind == "microsoft_index":
-        validate_microsoft_index(source)
+        MicrosoftIndexSchema.validate(pd.read_csv(source, dtype={"QuadKey": str}))
     elif kind == "microsoft":
         # Stream the source once; no full tile is held in memory during validation.
         with gzip.open(source, "rt") as stream:
             for line in stream:
                 validate_microsoft_feature(json.loads(line))
     elif kind == "eubucco_nuts":
-        validate_eubucco_nuts(source)
+        EubuccoRegionsSchema.validate(
+            gpd.read_parquet(source, columns=["region_id", "geometry"])
+        )
     elif kind == "eubucco_stats":
-        validate_eubucco_stats(source)
+        EubuccoStatsSchema.validate(
+            gpd.read_parquet(
+                source, columns=list(EubuccoStatsSchema.to_schema().columns)
+            )
+        )
     elif kind == "eubucco":
         validate_eubucco_source(source, job.params.source)
-    else:
+    elif kind not in {"nuts3", "floor_area", "building_age"}:
         raise ValueError(f"Unknown download source: {kind}")
 
     if source == partial:

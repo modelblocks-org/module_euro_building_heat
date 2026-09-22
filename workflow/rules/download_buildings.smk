@@ -11,6 +11,8 @@ rule download_nuts3:
     params:
         kind="nuts3",
         url=internal["resources"]["stable"]["url"].format(dataset="nuts3.geojson"),
+    message:
+        "Download NUTS3 region boundaries."
     script:
         "../scripts/download.py"
 
@@ -27,6 +29,8 @@ rule download_eurostat_floor_area:
         url=internal["resources"]["stable"]["url"].format(
             dataset="cens_21dwbnr_r3.tsv.gz"
         ),
+    message:
+        "Download Eurostat dwelling census data for floor-area estimates."
     script:
         "../scripts/download.py"
 
@@ -43,6 +47,8 @@ rule download_eubucco_nuts:
     params:
         kind="eubucco_nuts",
         url=internal["resources"]["automatic"]["eubucco_nuts"],
+    message:
+        "Download EUBUCCO NUTS region metadata."
     script:
         "../scripts/download.py"
 
@@ -57,6 +63,8 @@ rule download_eubucco_stats:
     params:
         kind="eubucco_stats",
         url=internal["resources"]["automatic"]["eubucco_stats"],
+    message:
+        "Download EUBUCCO regional building statistics."
     script:
         "../scripts/download.py"
 
@@ -74,6 +82,8 @@ rule prepare_nuts3:
     params:
         step="nuts3",
         country_codes=internal["country_codes"],
+    message:
+        "Prepare NUTS3 regions for '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_buildings.py"
 
@@ -99,6 +109,8 @@ checkpoint prepare_building_sources:
         eubucco=config["buildings_eubucco"],
         microsoft=config["buildings_microsoft"],
         proxies=config["data_proxies"]["floor_area"],
+    message:
+        "Plan building-data sources for '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_buildings.py"
 
@@ -116,6 +128,8 @@ rule download_eubucco:
         kind="eubucco",
         source=config["buildings_eubucco"]["source"],
         url=eubucco_download_url,
+    message:
+        "Download EUBUCCO building data for {wildcards.region}."
     script:
         "../scripts/download.py"
 
@@ -133,6 +147,8 @@ rule process_eubucco:
         "../envs/module.yaml"
     resources:
         mem_mb=4096,
+    message:
+        "Process EUBUCCO buildings for '{wildcards.shapes}' shapes."
     script:
         "../scripts/process_eubucco.py"
 
@@ -151,6 +167,8 @@ rule download_microsoft_index:
         url=internal["resources"]["automatic"]["microsoft_index"].format(
             release=config["buildings_microsoft"]["release"]
         ),
+    message:
+        "Download the Microsoft building dataset index."
     script:
         "../scripts/download.py"
 
@@ -171,6 +189,8 @@ rule download_microsoft:
         "../envs/module.yaml"
     params:
         kind="microsoft",
+    message:
+        "Download Microsoft buildings for tile {wildcards.quadkey}, part {wildcards.part}."
     script:
         "../scripts/download.py"
 
@@ -190,5 +210,7 @@ rule process_microsoft:
         "../envs/module.yaml"
     resources:
         mem_mb=4096,
+    message:
+        "Process Microsoft buildings for '{wildcards.shapes}' shapes."
     script:
         "../scripts/process_microsoft.py"

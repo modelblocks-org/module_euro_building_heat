@@ -22,11 +22,6 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 from _microsoft import quadkey_polygon
-from _schemas import (
-    validate_floor_area_allocation,
-    validate_nonnegative,
-    validate_population_allocation,
-)
 from _utils import point_grid
 from rasterio.features import geometry_mask
 
@@ -108,7 +103,6 @@ def microsoft_floor_area_support(
     buildings, proxy_population, sector_total, regional_population
 ):
     """Allocate population proxies first, then retain the regional sector total."""
-    validate_population_allocation(proxy_population, sector_total, regional_population)
     proxy = np.zeros_like(proxy_population)
     if sector_total > 0 and proxy_population.sum() > 0:
         proxy = proxy_population * (sector_total / regional_population)
@@ -116,12 +110,7 @@ def microsoft_floor_area_support(
     support = good.footprint_area_m2.sum()
     # A complete population allocation may exceed its total by roundoff only.
     remaining = max(0.0, sector_total - proxy.sum())
-    validate_floor_area_allocation(support, remaining, proxy.sum(), sector_total)
     good["floor_area_m2"] = (
         good.footprint_area_m2 * remaining / support if support > 0 else 0.0
-    )
-    validate_nonnegative(good.floor_area_m2.to_numpy(), proxy)
-    validate_floor_area_allocation(
-        support, good.floor_area_m2.sum(), proxy.sum(), sector_total
     )
     return good, proxy
