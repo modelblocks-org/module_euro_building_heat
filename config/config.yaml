@@ -3,7 +3,7 @@
 # intermediate_dtype or raster settings automatically rebuilds from raw buildings.
 # See config/README.md for the complete list and publication setup.
 building_rasters:
-  source: auto  # auto: download for matching defaults; rebuild: always calculate
+  source: rebuild  # auto: download for matching defaults; rebuild: always calculate
 
 # Minimal example configuration for the heat demand workflow.
 demand_years:
@@ -33,35 +33,21 @@ data_proxies:
   floor_area:
     method: mean_floors
     countries:
-      GBR:
-      - IRL
-      ALB: &id001
-      - BGR
-      - HRV
-      - HUN
-      - ROU
-      - GRC
-      AND:
-      - ESP
-      BIH: *id001
-      ISL: &id002
-      - SWE
-      - DNK
-      LIE:
-      - CHE
-      MKD: *id001
-      MCO:
-      - FRA
-      MNE: *id001
-      NOR: *id002
-      SMR:
-      - ITA
-      SRB: *id001
-      XKX: *id001
-      BRA:
-      - PRT
-      LBR:
-      - PRT
+      GBR: [IRL]
+      ALB: [BGR, HRV, HUN, ROU, GRC]
+      AND: [ESP]
+      BIH: [BGR, HRV, HUN, ROU, GRC]
+      ISL: [SWE, DNK]
+      LIE: [CHE]
+      MKD: [BGR, HRV, HUN, ROU, GRC]
+      MCO: [FRA]
+      MNE: [BGR, HRV, HUN, ROU, GRC]
+      NOR: [SWE, DNK]
+      SMR: [ITA]
+      SRB: [BGR, HRV, HUN, ROU, GRC]
+      XKX: [BGR, HRV, HUN, ROU, GRC]
+      BRA: [PRT]
+      LBR: [PRT]
 # Use proxies to fill missing data for countries with no or incomplete data.
 # Multiple proxy countries can be specified for a single country, in which case the data from the proxy countries will be averaged.
   # sfh_mfh_shares uses the mean dwelling shares of the proxy countries.
