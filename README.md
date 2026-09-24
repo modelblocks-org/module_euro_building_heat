@@ -142,8 +142,13 @@ The report includes annual heat maps, hourly demand, COP and electricity
 profiles, applicable JRC/Swiss/UK baselines, and building-count and structural
 support maps. Request
 `<resources>/automatic/shapes/{shapes}/plots/report_manifest.txt` to explicitly
-build all report figures, or request individual figure paths. Figures are
-co-outputs of data-processing jobs, so rebuilding them can rerun those jobs.
+build all report figures, or request individual figure paths. The manifest also
+includes `space_heat_demand_density.png` under **Heat demand**, showing annual
+space-heating demand in MWh/cell (1 ha cells) for the first raster band, labelled
+with its demand and weather years. It uses the same maximum-coarsened preview
+as the other raster figures, without converting the raster values.
+Figures are co-outputs of data-processing jobs, so rebuilding them can rerun
+those jobs.
 
 The [import example](tests/integration/Snakefile) requests all nine data outputs
 and the optional report manifest. From its directory, build the outputs and an

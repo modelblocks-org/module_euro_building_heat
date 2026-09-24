@@ -268,6 +268,9 @@ def read_floor_area_batch_plan(wildcards):
     """Load the floor area batch plan from its checkpoint JSON manifest."""
     import json
 
+    # Resolve the upstream checkpoint first so Snakemake discovers these nested
+    # checkpoints in order, including when resuming with existing manifests.
+    building_source_outputs(wildcards)
     path = checkpoints.prepare_floor_area_batches.get(
         shapes=wildcards.shapes
     ).output.manifest
@@ -277,6 +280,7 @@ def read_floor_area_batch_plan(wildcards):
 
 def floor_area_batch_plan_input(wildcards):
     """Return the floor area batch plan manifest for the selected shapes."""
+    building_source_outputs(wildcards)
     return checkpoints.prepare_floor_area_batches.get(
         shapes=wildcards.shapes
     ).output.manifest
@@ -323,7 +327,10 @@ def raster_settings():
 def report_figure_inputs(wildcards):
     """Include heat, building and applicable baseline figures in one report DAG."""
     root = "<resources>/automatic/shapes/{shapes}/plots"
-    figures = [root + "/annual_heat_demand.png"]
+    figures = [
+        root + "/annual_heat_demand.png",
+        root + "/space_heat_demand_density.png",
+    ]
     figures += [
         root + f"/{dataset}_timeseries.pdf"
         for dataset in ("heat_demand", "heat_pump_cop", "heat_pump_electricity_demand")

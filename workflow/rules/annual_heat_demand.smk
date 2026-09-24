@@ -122,6 +122,11 @@ rule rescale_annual_heat_demand_to_shapes:
         annual_demand="<annual_heat_demand>",
         space_heat="<space_heat_demand>",
         hot_water="<hot_water_demand>",
+        density=report(
+            "<resources>/automatic/shapes/{shapes}/plots/space_heat_demand_density.png",
+            category="European Building Heat",
+            subcategory="Heat demand",
+        ),
         choropleth=report(
             "<resources>/automatic/shapes/{shapes}/plots/annual_heat_demand.png",
             category="European Building Heat",
@@ -133,6 +138,8 @@ rule rescale_annual_heat_demand_to_shapes:
         "../envs/module.yaml"
     params:
         weather_demand_years=WEATHER_DEMAND_YEARS,
+        plotting=config["plotting"],
+        chunk_size=config["population"]["chunk_size"],
         hdd_elasticity=config["spatial_weights"].get("hdd", {}).get("elasticity", 0.5),
     message:
         "Scale national annual heat demand to '{wildcards.shapes}' shapes."

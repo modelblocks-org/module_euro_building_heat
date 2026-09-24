@@ -340,6 +340,18 @@ def main() -> None:
     _plots.plot_annual_heat_demand_choropleth(
         shapes, validated, snakemake.output.choropleth
     )
+    weather_year, demand_year = next(iter(weather_demand_years.items()))
+    _plots.plot_floor_area(
+        snakemake.output.space_heat,
+        1,
+        f"Space-heating demand — {demand_year}\nWeather year: {weather_year}",
+        snakemake.output.density,
+        snakemake.params.chunk_size,
+        snakemake.params.plotting["max_size"],
+        shapes,
+        snakemake.params.plotting["outline"],
+        colorbar_label="Annual space-heating demand (MWh/cell; 1 ha cells)",
+    )
 
 
 if __name__ == "__main__":

@@ -6,9 +6,11 @@ shape totals. This preserves boundary corrections without intermediate
 household/commercial demand rasters or reprojection.
 """
 
+import logging
 from collections.abc import Iterator
 from contextlib import ExitStack
 from pathlib import Path
+from time import perf_counter
 
 import geopandas as gpd
 import numpy as np
@@ -18,17 +20,26 @@ from _utils import window_polygons
 from rasterio.features import geometry_mask, rasterize
 from shapely.geometry import box
 
+logger = logging.getLogger(__name__)
+
 
 def shape_blocks(reference, shapes: gpd.GeoDataFrame) -> Iterator:
     """Assign output cells to shapes by the existing pixel-centre convention."""
-    spatial_index = shapes.sindex
+    # Index polygon parts so distant islands do not enlarge candidate bounds.
+    # Keep original row IDs and ordering: later shapes win overlapping pixels.
+    geometries = shapes.geometry.reset_index(drop=True).explode(index_parts=False)
+    spatial_index = geometries.sindex
     for _, window in reference.block_windows(1):
-        bounds = box(*rasterio.windows.bounds(window, reference.transform))
-        indices = np.sort(spatial_index.query(bounds, predicate="intersects"))
+        left, bottom, right, top = reference.window_bounds(window)
+        margin = max(abs(reference.transform.a), abs(reference.transform.e))
+        bounds = box(left - margin, bottom - margin, right + margin, top + margin)
+        local = geometries.iloc[spatial_index.query(bounds)].sort_index(kind="stable")
+        local = local.intersection(bounds)
+        local = local[~local.is_empty]
         labels = np.zeros((int(window.height), int(window.width)), dtype="int32")
-        if len(indices):
+        if len(local):
             rasterize(
-                [(shapes.geometry.iloc[i], int(i + 1)) for i in indices],
+                [(geometry, int(i + 1)) for i, geometry in local.items()],
                 out=labels,
                 transform=reference.window_transform(window),
                 all_touched=False,
@@ -47,6 +58,10 @@ def support_blocks(sources, shapes, intersections, factors, assigned=None):
             .astype("float64")
             for sector, source in sources.items()
         }
+        # These tiles contribute neither support nor energy in either pass.
+        # Unwritten output tiles read as the output profile's nodata value (0).
+        if not any(np.any(values) for values in structural.values()):
+            continue
         heated = {sector: np.zeros((years, *labels.shape)) for sector in sources}
         local = window_polygons(intersections, window, reference.transform)
         for index, geometry in local.geometry.items():
@@ -101,6 +116,8 @@ def write_heat_demand_rasters(
             for sector in sectors
         }
         assigned = {sector: np.zeros_like(grid_factors[sector]) for sector in sectors}
+        started = perf_counter()
+        logger.info("Measuring raster allocation support (pass 1 of 2).")
         for _, labels, structural, heated in support_blocks(
             sources, shapes, intersections, grid_factors, assigned
         ):
@@ -112,6 +129,7 @@ def write_heat_demand_rasters(
                     total[band] += np.bincount(
                         labels.ravel(), weights=value.ravel(), minlength=count
                     )
+        logger.info("Measured raster support in %.1fs.", perf_counter() - started)
 
         # Check the original weather-intersection country allocation before the
         # final shape correction, which can redistribute boundary-cell energy.
@@ -150,6 +168,8 @@ def write_heat_demand_rasters(
             "blockxsize": 512,
             "blockysize": 512,
             "compress": "deflate",
+            # Prefer faster lossless writes over the default compression level.
+            "zlevel": 1,
             "predictor": 3,
             "BIGTIFF": "IF_SAFER",
         }
@@ -203,6 +223,8 @@ def write_heat_demand_rasters(
                 )
 
         actual_totals = {key: np.zeros(count) for key in expected_totals}
+        started = perf_counter()
+        logger.info("Writing normalized demand rasters (pass 2 of 2).")
         for window, labels, structural, heated in support_blocks(
             sources, shapes, intersections, grid_factors
         ):
@@ -221,6 +243,7 @@ def write_heat_demand_rasters(
                         labels.ravel(), weights=energy.ravel(), minlength=count
                     )
                     output.write(energy, band + 1, window=window)
+        logger.info("Wrote demand rasters in %.1fs.", perf_counter() - started)
         for key, expected in expected_totals.items():
             if not np.allclose(actual_totals[key], expected, rtol=1e-6, atol=1e-3):
                 raise ValueError(

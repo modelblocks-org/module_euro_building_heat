@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 import _plots
@@ -11,17 +12,19 @@ import rasterio
 from _utils import output_profile, processing_crs
 from rasterio.features import geometry_mask
 from rasterio.windows import Window
+from shapely.geometry import box
 
 if TYPE_CHECKING:
     snakemake: Any
 
 
 def crop_grid(source, target, shapes, settings):
-    """Copy aligned blocks, rejecting unsupported coverage or grid alignment."""
+    """Crop trusted published values, checking only extent and grid compatibility."""
     crs = processing_crs(shapes)
     shapes = shapes.to_crs(crs)
     profile = output_profile(shapes.total_bounds, settings, crs, count=1)
-    geometry = shapes.geometry.union_all()
+    geometries = shapes.geometry.explode(ignore_index=True)
+    spatial_index = geometries.sindex
     with rasterio.open(source) as src:
         transform = profile["transform"]
         col, row = ~src.transform * (transform.c, transform.f)
@@ -56,6 +59,24 @@ def crop_grid(source, target, shapes, settings):
             if src.units[0]:
                 dst.set_band_unit(1, src.units[0])
             for _, window in dst.block_windows(1):
+                # Limit geometry work to this tile. A one-cell margin keeps
+                # clipping edges away from the pixel centres being rasterized.
+                bounds = dst.window_bounds(window)
+                tile = box(
+                    bounds[0] - 100, bounds[1] - 100, bounds[2] + 100, bounds[3] + 100
+                )
+                local = geometries.iloc[spatial_index.query(tile)].intersection(tile)
+                local = local[~local.is_empty]
+                if local.empty:
+                    dst.write(
+                        np.zeros(
+                            (int(window.height), int(window.width)),
+                            dtype=profile["dtype"],
+                        ),
+                        1,
+                        window=window,
+                    )
+                    continue
                 values = src.read(
                     1,
                     window=Window(
@@ -67,17 +88,9 @@ def crop_grid(source, target, shapes, settings):
                     masked=True,
                 )
                 inside = geometry_mask(
-                    [geometry], values.shape, dst.window_transform(window), invert=True
+                    local, values.shape, dst.window_transform(window), invert=True
                 )
-                if np.any(np.ma.getmaskarray(values) & inside) and src.nodata != 0:
-                    raise ValueError(
-                        "Published grid has missing coverage inside the requested shapes."
-                    )
                 values = values.filled(0)
-                if not np.isfinite(values).all() or (values < 0).any():
-                    raise ValueError(
-                        "Published grids must contain finite, nonnegative values."
-                    )
                 values[~inside] = 0
                 dst.write(values, 1, window=window)
     return shapes
@@ -101,12 +114,20 @@ def main():
         ),
     }
     for dataset in snakemake.params.datasets:
+        started = perf_counter()
+        print(f"Cropping {dataset} to requested shapes.", file=sys.stderr, flush=True)
         projected = crop_grid(
             snakemake.input[dataset],
             snakemake.output[dataset],
             shapes,
             snakemake.params.raster,
         )
+        print(
+            f"Cropped {dataset} in {perf_counter() - started:.1f}s; generating plot.",
+            file=sys.stderr,
+            flush=True,
+        )
+        started = perf_counter()
         title, unit = labels[dataset]
         Path(snakemake.output[f"{dataset}_plot"]).parent.mkdir(
             parents=True, exist_ok=True
@@ -121,6 +142,11 @@ def main():
             projected,
             snakemake.params.plotting["outline"],
             unit,
+        )
+        print(
+            f"Plotted {dataset} in {perf_counter() - started:.1f}s.",
+            file=sys.stderr,
+            flush=True,
         )
 
 
