@@ -51,24 +51,6 @@ Data processing steps:
 8. Produce report figures alongside their data outputs, making them available
    automatically when reporting on those data targets.
 
-### Reusing building downloads
-
-The raw caches are persistent and shared across shape cases. `eubucco_cache` and
-`microsoft_cache` path variables default to `resources/automatic/eubucco` and
-`resources/automatic/microsoft`. Override them in the importing module to point
-at existing caches, including those from `module_heat_rasters`. See the
-[integration example](tests/integration/Snakefile).
-
-The EUBUCCO v0.2 source layout and Microsoft 2026-08-13 release layout are
-unchanged. Completed files are validated without another download, even if a
-rule is forced to rerun. Partial transfers resume; only missing partitions or
-bytes are fetched. Invalid completed files fail validation without being replaced.
-EUBUCCO metadata are also versioned and cached independently of source planning.
-
-For this local integration, the existing large cache directories are linked in
-place; they were not copied or moved. Retain the original directories while
-those links are in use. The code itself has no dependency on the other repository.
-
 ### Timezone handling
 
 Timezone assignment is geometry-based and independent of `country_id`, which
