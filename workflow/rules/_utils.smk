@@ -341,15 +341,15 @@ def report_figure_inputs(wildcards):
     """Include heat, building and applicable baseline figures in one report DAG."""
     root = "<resources>/automatic/shapes/{shapes}/plots"
     figures = [
-        root + "/annual_heat_demand.png",
-        root + "/space_heat_demand_density.png",
+        f"{root}/annual_heat_demand.png",
+        f"{root}/space_heat_demand_density.png",
     ]
     figures += [
-        root + f"/{dataset}_timeseries.pdf"
+        f"{root}/{dataset}_timeseries.pdf"
         for dataset in ("heat_demand", "heat_pump_cop", "heat_pump_electricity_demand")
     ]
     figures += [
-        root + f"/{dataset}.png"
+        f"{root}/{dataset}.png"
         for dataset in (
             "building_count",
             "residential_space_heat_weight",
