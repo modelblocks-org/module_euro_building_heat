@@ -40,7 +40,7 @@ spatial_weights:
   age:
     multipliers:
       before_1981: 1.25
-      '1981_2000': 1.125
+      '1981_2000': 1.0
       after_2000: 0.8
 data_proxies:
   floor_area:
