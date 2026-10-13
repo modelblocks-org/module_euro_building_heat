@@ -33,23 +33,25 @@ Data processing steps:
   <img src="./figures/rulegraph.png" width="100%" alt="Snakemake rule graph of the current workflow">
 </p>
 
-1. Validate the land shapes and prepare shared geography. Preserve the input shape IDs.
-2. Reuse or download pinned EUBUCCO/Microsoft buildings and one GHSL 2025 population
-   raster at 100 m. Prepare complete NUTS-region floor-area totals and count proxies.
-3. Process balanced building batches once, retaining floor area, population,
-   compactness statistics, and counts. Export residential/commercial/public
-   buildings per hectare independently of the weather and heat-demand branches.
-4. Build residential structural support from the floor-area/population blend,
-   compactness, and age. Commercial support uses commercial/public floor area.
-5. Combine national Eurostat, JRC-IDEES, ECUK, and Swiss statistics into useful heat.
-   Reuse ERA5 temperatures to calculate annual HDD and weather-driven hourly profiles.
-6. Allocate national space heat with structural support times HDD; hot water uses
-   structural support without HDD and cooking uses population. Write both final
-   annual demand rasters directly, preserving country and shape totals.
-7. Aggregate When2Heat profiles, align local behaviour to UTC, and scale to annual
-   demand. Calculate heat-pump COP and electricity demand with the existing methods.
-8. Produce report figures alongside their data outputs, making them available
-   automatically when reporting on those data targets.
+1. Validate the user-provided regions, retaining land shapes and their input IDs.
+2. Download published building grids for matching settings, or rebuild them from
+   EUBUCCO/Microsoft buildings, census floor area, and GHSL population at 100 m.
+3. Combine Eurostat, JRC-IDEES, ECUK, and Swiss statistics into national useful
+   heat demand. Calculate heating degree days (HDD) from ERA5 temperatures.
+4. Allocate space heat using sector building support times HDD^elasticity,
+   hot water using building support, and cooking using population.
+
+<p align="center">
+  <img src="./figures/annual_heat_demand.png" width="50%">
+</p>
+
+5. Derive building-type shares and timezones, then combine ERA5 weather with
+   When2Heat profiles for space heat and hot water.
+6. Aggregate profiles to shapes, align local behaviour to UTC, and scale each
+   profile to its annual demand total.
+7. Calculate air-source and ground-source heat-pump COP and electricity demand.
+8. Export annual demand tables and rasters, hourly demand and normalized sink
+   profiles, building counts, and diagnostic figures for Snakemake reports.
 
 ### Timezone handling
 
@@ -83,62 +85,13 @@ Git.
 
 Please consult the [interface file](./INTERFACE.yaml) for more information.
 
-The module also exports heat demand separately for space heating and hot water:
+Outputs include annual and hourly heat demand, heat-pump electricity/COP, building
+counts, annual 100 m space-heat/hot-water rasters, and normalized hourly sink profiles.
+See the interface for units, schemas, and year-pair metadata.
 
-- `annual/space_heat_demand_mwh.tif` and `annual/hot_water_demand_mwh.tif`:
-  annual useful heat demand in MWh per 100 m cell, combining households and
-  commercial buildings. Each band identifies its demand and weather years.
-- `hourly/space_heat_profile.parquet` and `hourly/hot_water_profile.parquet`:
-  normalized hourly shares with a UTC `timesteps` index and one column per shape.
-  Each shape and weather year sums to 1 (or 0 for zero demand). Multiply these
-  shares by the matching annual sink demand in MWh to obtain hourly MWh.
-
-These paths are relative to `<results>/{shapes}/`. Existing public paths,
-annual year-pair metadata, and UTC profile schemas are retained. The additional
-`rasters/building_count.tif` output contains one `building_count` band in
-`buildings/ha`, excluding other building uses; proxy counts can be fractional.
-All three public rasters use the same aligned 100 m grid, with nodata 0.
-
-Both sectors retain their own structural weights, with HDD applied only to
-annual space heat. The final raster allocation corrects weather-intersection
-boundary differences to preserve each shape's annual demand. The structural
-support rasters are generated internally; they are no longer user inputs.
-
-The shared population source defaults to 2025 at 100 m. This intentionally
-replaces the previous heat branch's nearest-demand-year, 1 km population source
-and can change population-based demand and profile aggregation.
-
-Diagnostic figures are produced by the data-processing scripts and declared as
-Snakemake `report(...)` outputs of the same rules. Reporting on a completed data
-target therefore includes its figures and those from upstream processing rules:
-
-```shell
-snakemake results/working_EU/hourly/heat_pump_cop_pu.parquet --report report_working_EU.html
-```
-
-To build missing outputs before creating the report, add `--cores 4 --report-after-run`.
-Existing runs created before plots were restored to the processing rules need
-one normal workflow run to generate missing figures.
-
-The report includes annual heat maps, hourly demand, COP and electricity
-profiles, applicable JRC/Swiss/UK baselines, and building-count and structural
-support maps. Request
-`<resources>/automatic/shapes/{shapes}/plots/report_manifest.txt` to explicitly
-build all report figures, or request individual figure paths. The manifest also
-includes `space_heat_demand_density.png` under **Heat demand**, showing annual
-space-heating demand in MWh/cell (1 ha cells) for the first raster band, labelled
-with its demand and weather years. It uses the same maximum-coarsened preview
-as the other raster figures, without converting the raster values.
-Figures are co-outputs of data-processing jobs, so rebuilding them can rerun
-those jobs.
-
-The [import example](tests/integration/Snakefile) requests all nine data outputs
-and the optional report manifest. From its directory, build the outputs and an
-HTML report with:
-
-```shell
-snakemake --use-conda --cores 2 --report report.html --report-after-run
-```
+Figures accompany data outputs. Request
+`<resources>/automatic/shapes/{shapes}/plots/report_manifest.txt` for all report figures.
+Building counts do not require an ERA5 key.
 
 
 ## Development
@@ -168,14 +121,8 @@ pixi run export-snakemake-env module
 ## Testing
 <!-- Please do not modify this templated section -->
 
-Run focused checks without downloads or an ERA5 key:
-
-```shell
-pixi run pytest tests/test_*.py
-```
-
-The full integration run below downloads any missing sources and calculates the
-configured case; it is intended for production validation:
+The integration tests download missing sources and run the configured case;
+an ERA5 API key is required:
 
 ```shell
 pixi run test-integration

@@ -49,8 +49,7 @@ resources:
     sha256: 7d3f0c5a33b6acd891335c0ad5ba767736b6914cb1a1d68c71921c17ce358948
   stable:
     # Also supplies the published building rasters, both census tables and
-    # nuts3.geojson through their dedicated validated download rules.
-    # See config/stable-datasets.md for the publication inventory and sources.
+    # nuts3.geojson through their dedicated download rules.
     url: https://zenodo.org/records/23320641/files/{dataset}
     datasets:
     - CHE_energy_balance.xlsx

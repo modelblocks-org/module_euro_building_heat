@@ -97,7 +97,7 @@ rule prepare_spatial_weights:
         lat_name="lat",
         lon_name="lon",
     message:
-        "Calculate population weights per weather gridbox for '{wildcards.shapes}'."
+        "Calculate population and building-support weights per weather gridbox for '{wildcards.shapes}'."
     script:
         "../scripts/prepare_spatial_weights.py"
 

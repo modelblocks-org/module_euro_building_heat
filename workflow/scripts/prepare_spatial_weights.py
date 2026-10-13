@@ -1,4 +1,4 @@
-"""Calculate population weights per weather gridbox and shape."""
+"""Calculate population, building-support and HDD-adjusted weights per shape."""
 
 import logging
 import math
@@ -57,7 +57,7 @@ def population_on_weather_grid(
     elasticity: float,
     block_size: int = 2048,
 ) -> None:
-    """Uses population as a proxy to regionalise heat demand."""
+    """Aggregate population and structural support over weather/shape intersections."""
     # We need the coordinates. This can be any file with gridded data across Europe
     # with WGS84 projection which will be used to generate which the grid
     # At minimum, the dataset must contain the `site` coordinate and latitude and
@@ -118,7 +118,7 @@ def population_on_weather_grid(
             units="m2" if sector == "commercial" else "weighted_m2",
             allocator="A_floor"
             if sector == "commercial"
-            else "A_floor * f(S/V) * f(age)",
+            else "blended_floor_area * f(S/V) * f(age)",
             coverage="Gregor pixel-centre assignment; no HDD applied",
         )
         structural_weights.to_netcdf(output_path)

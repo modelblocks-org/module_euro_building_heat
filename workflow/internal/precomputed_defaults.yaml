@@ -39,11 +39,9 @@ spatial_weights:
     method: footprint_perimeter
   age:
     multipliers:
-      before_1991: 1.25
-      '1991_2000': 1.0
+      before_1981: 1.25
+      '1981_2000': 1.125
       after_2000: 0.8
-    cutoff_spanning_bin_multipliers:
-      Y1981-2000: 1.125
 data_proxies:
   floor_area:
     countries:

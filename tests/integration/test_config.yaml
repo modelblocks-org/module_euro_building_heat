@@ -1,9 +1,9 @@
 # Complete consumer configuration for the integration workflow.
 module_euro_building_heat:
   # Default building assumptions use published Zenodo grids. Changing population
-  # epoch/resolution, building sources/proxies, Eurostat assumptions, spatial_weights,
-  # intermediate_dtype or raster settings automatically rebuilds from raw buildings.
-  # See config/README.md for the complete list and publication setup.
+  # epoch, building sources/proxies, Eurostat assumptions, structural spatial weights,
+  # or raster settings triggers a rebuild in auto mode. HDD settings do not.
+  # See config/README.md for the complete list of settings.
 
   building_rasters:
     source: rebuild  # auto: download for matching defaults; rebuild: always calculate
@@ -24,7 +24,7 @@ module_euro_building_heat:
     aggregation: 1
 
   population:
-    # Population epoch and resolution for gridded demand and heat-pump aggregation.
+    # Population epoch for the fixed 100 m GHSL grid.
     epoch: 2025
     # Aggregation window width/height in pixels; larger windows use more memory.
     # Must be a multiple of 256, at least 256.
@@ -123,12 +123,9 @@ module_euro_building_heat:
       # missing age observations receive a neutral factor.
       # Set every multiplier below to 1 to make age weighting neutral.
       multipliers:
-        before_1991: 1.25  # Relative heat intensity for dwellings built before 1991.
-        '1991_2000': 1.0  # Dwellings built in 1991–2000.
-        after_2000: 0.8  # Dwellings built after 2000.
-      cutoff_spanning_bin_multipliers:
-        # Separate factor for countries reporting one bin across the 1991 cutoff.
-        Y1981-2000: 1.125
+        before_1981: 1.25
+        '1981_2000': 1.0
+        after_2000: 0.8
     hdd:
       # HDD = sum over days of max(base_temperature - daily mean ERA5 °C, 0).
       base_temperature: 15.5  # Base temperature in °C.
@@ -195,9 +192,8 @@ module_euro_building_heat:
   buildings_microsoft:
     # Dated footprint release to download and cache (YYYY-MM-DD).
     release: '2026-08-13'
-    # Tiles with fewer retained buildings use population fallback. Populated cells
+    # Tiles with fewer source buildings use population fallback. Populated cells
     # without a retained centroid also always use population fallback.
-    # This fallback exists to filter out two obviously wrong tiles in the Microsoft dataset (see README.md).
     minimum_building_count: 2000
 
   buildings_eubucco:
@@ -238,7 +234,8 @@ module_euro_building_heat:
 
   raster:
     # Output grid is always 100 m with nodata 0; EPSG:3035 for European scopes and
-    # ESRI:54009 (Mollweide) otherwise. The following affect GeoTIFF storage.
+    # ESRI:54009 (Mollweide) otherwise. Storage settings apply to building grids.
+    # Demand rasters use float64, Deflate compression and 512-pixel tiles.
     dtype: float32  # float32 saves disk/memory; float64 retains more precision.
     compression: deflate  # Lossless compression: deflate, lzw or zstd.
     block_size: 512  # Tile width/height in pixels, multiple of 16; tunes I/O and memory.

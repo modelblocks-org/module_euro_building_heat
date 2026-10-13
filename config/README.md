@@ -15,7 +15,8 @@ Consult the configuration example and the schema for additional information.
 - `building_rasters`: selects published building grids or processing from raw building data.
   - `source`: `auto` downloads the published Zenodo grids when the configuration matches
     `workflow/internal/precomputed_defaults.yaml`; otherwise it rebuilds them.
-    `rebuild` always processes the raw sources and is selected in the example configuration.
+    The example configuration selects `auto`; the integration example selects
+    `rebuild`, which always processes the raw sources.
     Changes to the population epoch, building sources, Eurostat assumptions,
     floor-area proxies, structural spatial weights, or raster settings trigger a rebuild
     in `auto` mode. Demand/weather years and HDD settings do not trigger a rebuild.
@@ -56,7 +57,7 @@ Consult the configuration example and the schema for additional information.
     used to estimate reference-country mean storeys and missing floor area.
 - `buildings_microsoft`: Microsoft building footprints used alongside EUBUCCO.
   - `release`: dated source release in `YYYY-MM-DD` format; the example uses `2026-08-13`.
-  - `minimum_building_count`: tiles with fewer retained buildings use population-based
+  - `minimum_building_count`: tiles with fewer source buildings use population-based
     floor-area and count estimates. Populated cells without a retained building centroid
     also use this fallback.
 - `eurostat`: Census 2021 dwelling data used to estimate residential floor area.
@@ -77,8 +78,8 @@ Consult the configuration example and the schema for additional information.
     - `method`: `footprint_perimeter` uses measured geometry and requires full EUBUCCO;
       `equivalent_square` estimates perimeter from footprint area.
   - `age`: residential age correction using Census 2021 dwelling-age data.
-    - `multipliers`: relative heat-intensity factors for `before_1991`, `1991_2000`, and `after_2000`.
-    - `cutoff_spanning_bin_multipliers`: separate factor for the combined `Y1981-2000` census bin.
+    - `multipliers`: relative heat-intensity factors for `before_1981`, `1981_2000`,
+      and `after_2000`, matching the census construction-period groups.
       Set all age factors to `1` for neutral weighting.
   - `hdd`: annual heating-degree-day correction for residential and commercial space heat,
     normalized within each country. It is not applied again to hourly profiles.
@@ -98,7 +99,8 @@ Consult the configuration example and the schema for additional information.
   - `correction_factor`: positive multiplier applied to the COP curves.
 - `processing`: controls building-processing parallelism.
   - `nuts3_batches`: number of balanced regional processing batches, with a minimum of `1`.
-- `raster`: storage settings for the output GeoTIFFs.
+- `raster`: storage settings for building-count and structural-support GeoTIFFs.
+  Demand rasters always use float64, Deflate compression, and 512-pixel tiles.
   All outputs use an aligned 100 m grid with nodata `0` and an automatically selected
   equal-area CRS: EPSG:3035 for European scopes and Mollweide otherwise.
   - `dtype`: `float32` or `float64` output precision.

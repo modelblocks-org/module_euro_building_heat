@@ -3,6 +3,7 @@ description: Schema for user-provided heat demand configuration.
 type: object
 additionalProperties: false
 required:
+- building_rasters
 - demand_years
 - weather_years
 - threads
@@ -210,38 +211,26 @@ properties:
         additionalProperties: false
         required:
         - multipliers
-        - cutoff_spanning_bin_multipliers
         properties:
           multipliers:
             description: "Relative heat intensities by construction period; setting all factors to one is neutral."
             type: object
             additionalProperties: false
             required:
-            - before_1991
-            - '1991_2000'
+            - before_1981
+            - '1981_2000'
             - after_2000
             properties:
-              before_1991:
-                description: "Relative heat intensity for dwellings built before 1991."
+              before_1981:
+                description: "Relative heat intensity for dwellings built before 1981."
                 type: number
                 exclusiveMinimum: 0
-              '1991_2000':
-                description: "Relative heat intensity for dwellings built from 1991 through 2000."
+              '1981_2000':
+                description: "Relative heat intensity for dwellings built from 1981 through 2000."
                 type: number
                 exclusiveMinimum: 0
               after_2000:
                 description: "Relative heat intensity for dwellings built after 2000."
-                type: number
-                exclusiveMinimum: 0
-          cutoff_spanning_bin_multipliers:
-            description: "Separate heat-intensity factors for census bins spanning the 1991 cutoff."
-            type: object
-            additionalProperties: false
-            required:
-            - Y1981-2000
-            properties:
-              Y1981-2000:
-                description: "Relative heat intensity for dwellings reported in the combined 1981-2000 census bin."
                 type: number
                 exclusiveMinimum: 0
       hdd:
@@ -370,7 +359,7 @@ properties:
         type: string
         pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
       minimum_building_count:
-        description: "Tiles with fewer retained buildings use population-based fallback."
+        description: "Tiles with fewer source buildings use population-based fallback."
         type: integer
         minimum: 0
   buildings_eubucco:
@@ -496,7 +485,7 @@ properties:
         type: number
         exclusiveMinimum: 0
   raster:
-    description: "GeoTIFF storage settings for output grids."
+    description: "GeoTIFF storage settings for building grids; demand rasters use fixed float64, Deflate and 512-pixel tiles."
     type: object
     additionalProperties: false
     required:

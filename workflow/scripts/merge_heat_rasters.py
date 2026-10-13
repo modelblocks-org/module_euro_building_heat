@@ -103,12 +103,9 @@ else:
             ],
             surface_volume_elasticity=settings["surface_volume"]["elasticity"],
             surface_volume_method=settings["surface_volume"]["method"],
-            age_old_factor=settings["age"]["multipliers"]["before_1991"],
-            age_reference_factor=settings["age"]["multipliers"]["1991_2000"],
+            age_old_factor=settings["age"]["multipliers"]["before_1981"],
             age_new_factor=settings["age"]["multipliers"]["after_2000"],
-            age_1981_2000_factor=settings["age"]["cutoff_spanning_bin_multipliers"][
-                "Y1981-2000"
-            ],
+            age_1981_2000_factor=settings["age"]["multipliers"]["1981_2000"],
         )
 
         commercial.set_band_description(1, "commercial_space_heat_weight")

@@ -382,11 +382,11 @@ def nuts3_building_age(snakemake):
 
     multipliers = settings["multipliers"]
     period_multipliers = {
-        "Y_LT1919": multipliers["before_1991"],
-        "Y1919-1945": multipliers["before_1991"],
-        "Y1946-1960": multipliers["before_1991"],
-        "Y1961-1980": multipliers["before_1991"],
-        "Y1981-2000": settings["cutoff_spanning_bin_multipliers"]["Y1981-2000"],
+        "Y_LT1919": multipliers["before_1981"],
+        "Y1919-1945": multipliers["before_1981"],
+        "Y1946-1960": multipliers["before_1981"],
+        "Y1961-1980": multipliers["before_1981"],
+        "Y1981-2000": multipliers["1981_2000"],
         "Y2001-2010": multipliers["after_2000"],
         "Y2011-2015": multipliers["after_2000"],
         "Y_GE2016": multipliers["after_2000"],
