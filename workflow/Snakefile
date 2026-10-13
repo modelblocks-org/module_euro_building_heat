@@ -47,7 +47,7 @@ wildcard_constraints:
 include: "rules/_utils.smk"
 include: "rules/automatic.smk"
 include: "rules/prepare.smk"
-include: "rules/download_buildings.smk"
+include: "rules/building_sources.smk"
 include: "rules/building_rasters.smk"
 include: "rules/baseline.smk"
 include: "rules/annual_heat_demand.smk"

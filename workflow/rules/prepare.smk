@@ -107,3 +107,117 @@ rule prepare_shape_timezones:
         "Assign geometry-derived IANA timezones to '{wildcards.shapes}' shapes."
     script:
         "../scripts/prepare_shape_timezones.py"
+
+
+rule prepare_nuts3:
+    input:
+        shapes=rules.prepare_shapes.output.shapes,
+        nuts3=rules.download_nuts3.output.geojson,
+    output:
+        regions="<resources>/automatic/{shapes}/nuts3.parquet",
+    log:
+        "<logs>/{shapes}/prepare_nuts3.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        step="nuts3",
+        country_codes=internal["country_codes"],
+    message:
+        "Prepare NUTS3 regions for '{wildcards.shapes}' shapes."
+    script:
+        "../scripts/prepare_buildings.py"
+
+
+rule prepare_building_population:
+    input:
+        regions=rules.prepare_nuts3.output.regions,
+        nuts3_source=rules.download_nuts3.output.geojson,
+        stats=eubucco_stats_input,
+        population=get_configured_population_file(),
+    output:
+        table="<resources>/automatic/{shapes}/building_population.parquet",
+    log:
+        "<logs>/{shapes}/prepare_building_population.log",
+    conda:
+        "../envs/module.yaml"
+    resources:
+        mem_mb=4096,
+    params:
+        step="building_population",
+        population=config["population"],
+        proxies=config["data_proxies"]["floor_area"],
+        country_codes=internal["country_codes"],
+    message:
+        "Summarize population for building estimates in '{wildcards.shapes}' shapes."
+    script:
+        "../scripts/prepare_buildings.py"
+
+
+rule prepare_floor_area_totals:
+    input:
+        nuts3=rules.prepare_nuts3.output.regions,
+        nuts3_source=rules.download_nuts3.output.geojson,
+        census=rules.download_eurostat_floor_area.output.table,
+        population_summaries=rules.prepare_building_population.output.table,
+        eubucco_stats=eubucco_stats_input,
+        plan=building_plan_input,
+        microsoft_totals=selected_microsoft_totals_input,
+    output:
+        table="<resources>/automatic/{shapes}/floor_area_totals.parquet",
+    log:
+        "<logs>/{shapes}/prepare_floor_area_totals.log",
+    conda:
+        "../envs/module.yaml"
+    resources:
+        mem_mb=4096,
+    params:
+        step="floor_area_totals",
+        eurostat=config["eurostat"],
+        eubucco=config["buildings_eubucco"],
+        proxies=config["data_proxies"]["floor_area"],
+        country_codes=internal["country_codes"],
+    message:
+        "Calculate regional floor-area totals for '{wildcards.shapes}' shapes."
+    script:
+        "../scripts/prepare_buildings.py"
+
+
+rule prepare_building_count_proxies:
+    input:
+        plan=building_plan_input,
+        regions=rules.prepare_nuts3.output.regions,
+        stats=eubucco_stats_input,
+        population_summaries="<resources>/automatic/{shapes}/building_population.parquet",
+    output:
+        table="<resources>/automatic/{shapes}/building_count_proxies.parquet",
+    log:
+        "<logs>/{shapes}/prepare_building_count_proxies.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        proxies=config["data_proxies"]["floor_area"],
+        country_codes=internal["country_codes"],
+    message:
+        "Prepare building-count proxies for '{wildcards.shapes}' shapes."
+    script:
+        "../scripts/prepare_building_count_proxies.py"
+
+
+rule prepare_nuts3_building_age:
+    input:
+        nuts3=rules.prepare_nuts3.output.regions,
+        floor_area=rules.prepare_floor_area_totals.output.table,
+        census=rules.download_eurostat_building_age.output.table,
+    output:
+        table="<resources>/automatic/{shapes}/nuts3_building_age.parquet",
+    log:
+        "<logs>/{shapes}/prepare_nuts3_building_age.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        step="nuts3_building_age",
+        settings=config["spatial_weights"]["age"],
+    message:
+        "Prepare NUTS3 building-age distributions for '{wildcards.shapes}' shapes."
+    script:
+        "../scripts/prepare_buildings.py"

@@ -3,6 +3,19 @@
 CURL_ARGS = "--fail --silent --show-error --location --retry 5 --retry-delay 5 --retry-all-errors --continue-at -"
 
 
+with open(workflow.source_path("../internal/precomputed_defaults.yaml")) as stream:
+    precomputed_defaults = yaml.safe_load(stream)
+
+
+# Execute in a separate namespace; source_path supports imported/remote modules.
+precomputed_helpers = {}
+with open(workflow.source_path("../scripts/_precomputed.py")) as stream:
+    exec(stream.read(), precomputed_helpers)
+USE_PRECOMPUTED = config["building_rasters"][
+    "source"
+] == "auto" and precomputed_helpers["matches_precomputed"](config, precomputed_defaults)
+
+
 def _get_year_range(group: str) -> list[int]:
     """Get ordered year range (lower->higher)."""
     if group not in ["demand_years", "weather_years"]:
