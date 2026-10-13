@@ -51,7 +51,7 @@ resources:
     # Also supplies the published building rasters, both census tables and
     # nuts3.geojson through their dedicated validated download rules.
     # See config/stable-datasets.md for the publication inventory and sources.
-    url: https://zenodo.org/records/22144030/files/{dataset}
+    url: https://zenodo.org/records/23320641/files/{dataset}
     datasets:
     - CHE_energy_balance.xlsx
     - CHE_energy_consumption_households.xlsx
