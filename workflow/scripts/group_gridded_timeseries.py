@@ -43,8 +43,7 @@ def group_gridcells(
             join="outer",
             fill_value=0,
         )
-        # As for households, a zero-support shape can use a population profile;
-        # its annual structural allocation remains zero.
+        # Population supplies a temporal profile when structural support is zero.
         profiles = group_gridcells(
             gridded_data,
             population.where(population.sum("site") > 0, commercial),
@@ -81,8 +80,7 @@ def group_gridcells(
             join="outer",
             fill_value=0,
         )
-        # Retain zero-demand shapes in both categories. A fallback profile only
-        # supplies a temporal shape; annual zero demand remains zero.
+        # Retain zero-demand shapes. Fallback profiles do not change annual demand.
         population_weights = grid_weight.where(
             grid_weight.sum("site") > 0, residential_weight
         )
@@ -139,8 +137,7 @@ def group_gridcells(
     if len(weighted_ids) == 0:
         raise ValueError("No shapes have positive population weights.")
 
-    # Construct every shape reduction in one Dask graph. Source chunks shared by
-    # multiple shapes are then loaded and calculated once instead of once per process.
+    # One Dask graph lets shape reductions reuse shared source chunks.
     per_id_averages = [
         _site_weighted_ave(id, gridded_data, grid_weight) for id in weighted_ids
     ]
@@ -173,7 +170,9 @@ def main() -> None:
     """Main Snakemake process."""
     with (
         xr.open_dataset(
-            snakemake.input.gridded_timeseries_data, decode_timedelta=True, chunks={}
+            snakemake.input.gridded_timeseries_data,
+            decode_timedelta=True,
+            chunks="auto",
         ) as gridded_data,
         xr.open_dataarray(
             snakemake.input.grid_weights, decode_timedelta=True

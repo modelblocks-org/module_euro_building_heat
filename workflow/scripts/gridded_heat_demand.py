@@ -1,9 +1,8 @@
 """Export both annual heat sinks directly from aligned structural support.
 
-The first pass measures each shape's sector support after the original
-weather-intersection allocation. The second pass normalises to the annual
-shape totals. This preserves boundary corrections without intermediate
-household/commercial demand rasters or reprojection.
+The first pass measures each shape's sector support after weather-intersection
+allocation. The second pass normalises to annual shape totals to account for
+raster boundary effects.
 """
 
 import logging
@@ -16,7 +15,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import rasterio
-from _utils import window_polygons
+from _utils import project_raster_polygons, window_polygons
 from rasterio.features import geometry_mask, rasterize
 from shapely.geometry import box
 
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def shape_blocks(reference, shapes: gpd.GeoDataFrame) -> Iterator:
-    """Assign output cells to shapes by the existing pixel-centre convention."""
+    """Assign output cells to shapes by pixel-centre containment."""
     # Index polygon parts so distant islands do not enlarge candidate bounds.
     # Keep original row IDs and ordering: later shapes win overlapping pixels.
     geometries = shapes.geometry.reset_index(drop=True).explode(index_parts=False)
@@ -90,8 +89,8 @@ def write_heat_demand_rasters(
     weather_demand_years: dict[int, int],
     output_paths: dict[str, str],
     *,
-    hdd_elasticity: float = 0.5,
-    hdd_base_temperature: float = 15.5,
+    hdd_elasticity: float,
+    hdd_base_temperature: float,
 ) -> None:
     """Preserve annual sector/shape totals and write combined MWh per 100 m cell."""
     pairs = list(weather_demand_years.items())
@@ -106,8 +105,8 @@ def write_heat_demand_rasters(
             )
         }
         reference = sources["household"]
-        shapes = shapes.to_crs(reference.crs).reset_index(drop=True)
-        intersections = grid_shapes.to_crs(reference.crs).reset_index(drop=True)
+        shapes = project_raster_polygons(shapes, reference.crs)
+        intersections = project_raster_polygons(grid_shapes, reference.crs)
         shape_ids = pd.Index(shapes.shape_id)
         count = len(shapes) + 1
         totals = {
@@ -131,7 +130,7 @@ def write_heat_demand_rasters(
                     )
         logger.info("Measured raster support in %.1fs.", perf_counter() - started)
 
-        # Check the original weather-intersection country allocation before the
+        # Check the weather-intersection country allocation before the
         # final shape correction, which can redistribute boundary-cell energy.
         mapping = shapes.set_index("shape_id").country_id
         countries = grid_shapes.id.map(mapping).reset_index(drop=True)
@@ -168,7 +167,6 @@ def write_heat_demand_rasters(
             "blockxsize": 512,
             "blockysize": 512,
             "compress": "deflate",
-            # Prefer faster lossless writes over the default compression level.
             "zlevel": 1,
             "predictor": 3,
             "BIGTIFF": "IF_SAFER",

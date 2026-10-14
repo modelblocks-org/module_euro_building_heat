@@ -25,12 +25,19 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from _eubucco import EUBUCCO_SCHEMA, assign_region_batches, map_regions, read_plan
+from _eubucco import assign_region_batches, map_regions, read_plan
 from _microsoft import (
     MICROSOFT_SCHEMA,
     MICROSOFT_TILE_STATISTICS_SCHEMA,
     MICROSOFT_TOTALS_SCHEMA,
     intersecting_quadkeys,
+)
+from _schemas import (
+    EUBUCCO_PROCESSED_SCHEMA,
+    EubuccoRegionsSchema,
+    EubuccoStatsSchema,
+    MicrosoftIndexSchema,
+    validate_population_raster,
 )
 from _utils import population_summaries, processing_crs
 
@@ -44,11 +51,15 @@ def building_sources(snakemake):
     source manifest and empty tables for branches that do not need a source.
     """
     regions = gpd.read_parquet(snakemake.input.regions)
-    links = pd.read_csv(snakemake.input.microsoft_index, dtype={"QuadKey": str})
+    links = MicrosoftIndexSchema.validate(
+        pd.read_csv(snakemake.input.microsoft_index, dtype={"QuadKey": str})
+    )
     available_quadkeys = set(links.QuadKey)
-    # Metadata are cached and validated by independent download rules.
-    eubucco_regions = gpd.read_parquet(snakemake.input.eubucco_nuts).to_crs(regions.crs)
-    stats = gpd.read_parquet(snakemake.input.eubucco_stats)
+    # Validate source metadata before reprojection and source selection.
+    eubucco_regions = EubuccoRegionsSchema.validate(
+        gpd.read_parquet(snakemake.input.eubucco_nuts)
+    ).to_crs(regions.crs)
+    stats = EubuccoStatsSchema.validate(gpd.read_parquet(snakemake.input.eubucco_stats))
     mapping = map_regions(regions, eubucco_regions, stats.region_id)
 
     stats = stats.set_index("region_id")
@@ -81,7 +92,6 @@ def building_sources(snakemake):
 
     plan = {
         "schema_version": 2,
-        "eubucco_source": snakemake.params.eubucco["source"],
         "microsoft_release": snakemake.params.microsoft["release"],
         "crs": regions.crs.to_string(),
         "regions": region_plan,
@@ -91,7 +101,8 @@ def building_sources(snakemake):
         json.dump(plan, stream, indent=2)
     # Downstream rules can read a consistent schema even for an unused source.
     pq.write_table(
-        pa.Table.from_batches([], schema=EUBUCCO_SCHEMA), snakemake.output.empty_eubucco
+        pa.Table.from_batches([], schema=EUBUCCO_PROCESSED_SCHEMA),
+        snakemake.output.empty_eubucco,
     )
     pq.write_table(
         pa.Table.from_batches([], schema=MICROSOFT_SCHEMA),
@@ -115,7 +126,7 @@ def floor_area_batches(snakemake):
     Batch entries contain complete control regions, including shape fallbacks.
     """
     eubucco = read_plan(snakemake.input.plan)
-    stats = gpd.read_parquet(snakemake.input.stats)
+    stats = EubuccoStatsSchema.validate(gpd.read_parquet(snakemake.input.stats))
     plan = {
         "schema_version": 1,
         "batches": assign_region_batches(
@@ -143,13 +154,13 @@ def building_population(snakemake):
     floor = floor.loc[floor.country_id.isin(references)].rename(
         columns={"NUTS_ID": "region_id"}
     )
-    counts = gpd.read_parquet(snakemake.input.stats)
+    counts = EubuccoStatsSchema.validate(gpd.read_parquet(snakemake.input.stats))
     counts["country_id"] = counts.country.map(reverse)
     counts = counts.loc[counts.country_id.isin(references)]
+    validate_population_raster(snakemake.input.population)
     table = population_summaries(
         snakemake.input.population,
         {"regions": regions, "floor_reference": floor, "count_reference": counts},
-        snakemake.params.population["chunk_size"],
     )
     Path(snakemake.output.table).parent.mkdir(parents=True, exist_ok=True)
     table.to_parquet(snakemake.output.table, index=False)
@@ -179,7 +190,7 @@ def floor_area_totals(snakemake):
     regional_population = population.loc["regions"].reindex(regions.index)
     raw_census = census_values(snakemake.input.census)
     census_area = residential_floor_area(raw_census, eurostat)
-    stats = gpd.read_parquet(snakemake.input.eubucco_stats)
+    stats = EubuccoStatsSchema.validate(gpd.read_parquet(snakemake.input.eubucco_stats))
     plan = read_plan(snakemake.input.plan)
     microsoft_area = (
         pd.read_parquet(snakemake.input.microsoft_totals)

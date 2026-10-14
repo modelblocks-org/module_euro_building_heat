@@ -12,9 +12,6 @@ pathvars:
     # User resources
     shapes="<resources>/user/{shapes}/shapes.parquet",
     edh_api="<resources>/user/edh_api.txt",
-    # Persistent building caches can be shared with other workflows.
-    eubucco_cache="<resources>/automatic/eubucco",
-    microsoft_cache="<resources>/automatic/microsoft",
     # Module results
     building_count="<results>/{shapes}/rasters/building_count.tif",
     annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
@@ -47,13 +44,18 @@ wildcard_constraints:
 include: "rules/_utils.smk"
 include: "rules/automatic.smk"
 include: "rules/prepare.smk"
-include: "rules/building_sources.smk"
+
+
+if not USE_PREBUILT:
+
+    include: "rules/building_sources.smk"
+
+
 include: "rules/building_rasters.smk"
 include: "rules/baseline.smk"
 include: "rules/annual_heat_demand.smk"
 include: "rules/heat_timeseries.smk"
 include: "rules/heat_pump_cop.smk"
-include: "rules/plots.smk"
 
 
 # Add additional files to be delivered alongside the workflow here.

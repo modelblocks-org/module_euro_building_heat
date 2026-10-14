@@ -1,9 +1,9 @@
 """Shared EUBUCCO region-mapping and canonical-table operations.
 
 Map legacy NUTS 2016 regions to the workflow's current NUTS-3 geography and
-convert both building distributions to a shared Arrow schema. Building region
-IDs remain in the legacy geography; downstream allocation assigns centroids
-to current control regions.
+convert building footprints to a canonical Arrow schema. Building region
+IDs use the source geography. Downstream allocation assigns centroids to
+current control regions.
 
 Sources:
     EUBUCCO data and schema: https://docs.eubucco.com/v0.2/
@@ -18,71 +18,15 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset as ds
 import shapely
-
-# Both distributions use metric building measures and centroid coordinates in
-# the workflow's processing CRS. Lightweight data have no observed perimeter.
-EUBUCCO_COLUMNS = [
-    "id",
-    "region_id",
-    "type",
-    "subtype",
-    "floors",
-    "footprint_area_m2",
-    "footprint_perimeter_m",
-    "height_m",
-    "x",
-    "y",
-]
-EUBUCCO_SCHEMA = pa.schema(
-    [
-        ("id", pa.string()),
-        ("region_id", pa.string()),
-        ("type", pa.string()),
-        ("subtype", pa.string()),
-        ("floors", pa.float64()),
-        ("footprint_area_m2", pa.float64()),
-        ("footprint_perimeter_m", pa.float64()),
-        ("height_m", pa.float64()),
-        ("x", pa.float64()),
-        ("y", pa.float64()),
-    ]
-)
+from _schemas import EUBUCCO_PROCESSED_SCHEMA
 
 
-def canonical_from_lightweight(batch: pa.RecordBatch, transformer) -> pa.Table:
-    """Convert lightweight building attributes to the shared output schema.
-
-    The transformer must map WGS84 longitude/latitude to the processing CRS
-    with x/y axis order. Retain the source footprint area and height in square
-    metres and metres; leave perimeter null because footprints are unavailable.
-    """
-    x, y = transformer.transform(
-        batch.column("lon").to_numpy(zero_copy_only=False),
-        batch.column("lat").to_numpy(zero_copy_only=False),
-    )
-    return pa.Table.from_arrays(
-        [
-            pc.cast(batch.column("id"), pa.string()),
-            pc.cast(batch.column("region_id"), pa.string()),
-            pc.cast(batch.column("type"), pa.string()),
-            pc.cast(batch.column("subtype"), pa.string()),
-            pc.cast(batch.column("floors"), pa.float64()),
-            pc.cast(batch.column("footprint_area"), pa.float64()),
-            pa.nulls(batch.num_rows, pa.float64()),
-            pc.cast(batch.column("height"), pa.float64()),
-            pa.array(x),
-            pa.array(y),
-        ],
-        schema=EUBUCCO_SCHEMA,
-    )
-
-
-def canonical_from_full(batch: pa.RecordBatch, transformer) -> pa.Table:
-    """Reduce full-distribution footprints to building measures and centroids.
+def canonical_from_footprints(batch: pa.RecordBatch, transformer) -> pa.Table:
+    """Reduce building footprints to building measures and centroids.
 
     Decode WKB geometry in EPSG:3035, where area and perimeter are measured in
     square metres and metres. The transformer maps these centroids to the
-    processing CRS with x/y axis order; polygon geometry is not retained.
+    processing CRS with x/y axis order.
     """
     geometry = shapely.from_wkb(
         pc.cast(batch.column("geometry"), pa.binary()).to_numpy(zero_copy_only=False)
@@ -102,7 +46,7 @@ def canonical_from_full(batch: pa.RecordBatch, transformer) -> pa.Table:
             pa.array(x),
             pa.array(y),
         ],
-        schema=EUBUCCO_SCHEMA,
+        schema=EUBUCCO_PROCESSED_SCHEMA,
     )
 
 
@@ -110,8 +54,8 @@ def eubucco_batch_filter(region_ids, bounds):
     """Build an Arrow filter for legacy IDs and processing-CRS centroid bounds.
 
     Bounds are (left, bottom, right, top) for complete current control regions.
-    This coarse selection limits reads; callers must still test centroids
-    against individual region polygons before allocating regional totals.
+    Callers must test the selected centroids against individual region polygons
+    before allocating regional totals.
     """
     left, bottom, right, top = bounds
     return (
@@ -138,7 +82,7 @@ def assign_region_batches(mapping, stats, batch_count: int) -> dict[str, list[st
     counts = stats.set_index("region_id").n
     groups: dict[str, list[str]] = {}
     for region in mapping:
-        # Five-character NUTS-3 IDs share a NUTS-2 prefix; shape fallbacks stand alone.
+        # Group NUTS-3 IDs by NUTS-2 prefix and keep shape-based regions separate.
         group = region[:4] if len(region) == 5 else region
         groups.setdefault(group, []).append(region)
     # Count each legacy region once per group, even when current regions share it.

@@ -18,11 +18,11 @@ if TYPE_CHECKING:
     snakemake: Any
 
 
-def crop_grid(source, target, shapes, settings):
-    """Crop trusted published values, checking only extent and grid compatibility."""
+def crop_grid(source, target, shapes):
+    """Crop published values after checking extent and grid compatibility."""
     crs = processing_crs(shapes)
     shapes = shapes.to_crs(crs)
-    profile = output_profile(shapes.total_bounds, settings, crs, count=1)
+    profile = output_profile(shapes.total_bounds, crs, count=1)
     geometries = shapes.geometry.explode(ignore_index=True)
     spatial_index = geometries.sindex
     with rasterio.open(source) as src:
@@ -97,7 +97,7 @@ def crop_grid(source, target, shapes, settings):
 
 
 def main():
-    """Prepare the same raster and report interfaces as the building branch."""
+    """Crop published building rasters and plot the results."""
     shapes = gpd.read_parquet(snakemake.input.shapes)
     labels = {
         "building_count": (
@@ -117,10 +117,7 @@ def main():
         started = perf_counter()
         print(f"Cropping {dataset} to requested shapes.", file=sys.stderr, flush=True)
         projected = crop_grid(
-            snakemake.input[dataset],
-            snakemake.output[dataset],
-            shapes,
-            snakemake.params.raster,
+            snakemake.input[dataset], snakemake.output[dataset], shapes
         )
         print(
             f"Cropped {dataset} in {perf_counter() - started:.1f}s; generating plot.",
@@ -137,10 +134,7 @@ def main():
             1,
             title,
             snakemake.output[f"{dataset}_plot"],
-            snakemake.params.population["chunk_size"],
-            snakemake.params.plotting["max_size"],
             projected,
-            snakemake.params.plotting["outline"],
             unit,
         )
         print(

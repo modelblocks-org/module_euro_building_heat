@@ -3,27 +3,20 @@
 CURL_ARGS = "--fail --silent --show-error --location --retry 5 --retry-delay 5 --retry-all-errors --continue-at -"
 
 
-with open(workflow.source_path("../internal/precomputed_defaults.yaml")) as stream:
-    precomputed_defaults = yaml.safe_load(stream)
+USE_PREBUILT = config["building_rasters"]["source"] == "prebuilt"
+POPULATION_FILE = (
+    f"<resources>/automatic/ghsl/pop_{config['population']['epoch']}_100.tif"
+)
+# The stable-data release range includes both endpoints.
+ECUK_RELEASES = range(
+    internal["resources"]["stable"]["ECUK_releases"][0],
+    internal["resources"]["stable"]["ECUK_releases"][-1] + 1,
+)
 
 
-# Execute in a separate namespace; source_path supports imported/remote modules.
-precomputed_helpers = {}
-with open(workflow.source_path("../scripts/_precomputed.py")) as stream:
-    exec(stream.read(), precomputed_helpers)
-USE_PRECOMPUTED = config["building_rasters"][
-    "source"
-] == "auto" and precomputed_helpers["matches_precomputed"](config, precomputed_defaults)
-
-
-def _get_year_range(group: str) -> list[int]:
-    """Get ordered year range (lower->higher)."""
-    if group not in ["demand_years", "weather_years"]:
-        raise ValueError(f"Invalid year range requested: '{group}''.")
-    return list(range(config[group]["start"], config[group]["end"]))
-
-
-DEMAND_YEARS = _get_year_range("demand_years")
+DEMAND_YEARS = list(
+    range(config["demand_years"]["start"], config["demand_years"]["end"])
+)
 JRC_IDEES_VERSION = internal["resources"]["jrc"]["use_version"]
 JRC_IDEES_VERSIONS = [str(i) for i in internal["resources"]["jrc"]["versions"]]
 JRC_IDEES_SPATIAL_SCOPE = [
@@ -31,7 +24,9 @@ JRC_IDEES_SPATIAL_SCOPE = [
     for country in internal["resources"]["jrc"]["spatial_scope"]
     if not (JRC_IDEES_VERSION > 2015 and country == "UK")
 ]
-WEATHER_YEARS = _get_year_range("weather_years")
+WEATHER_YEARS = list(
+    range(config["weather_years"]["start"], config["weather_years"]["end"])
+)
 WEATHER_DEMAND_YEARS = dict(zip(WEATHER_YEARS, DEMAND_YEARS))
 LOCAL_UNSCALED_HEAT_PROFILES = expand(
     "<resources>/automatic/shapes/{{shapes}}/hourly_unscaled_heat_demand_local/{weather_year}.nc",
@@ -81,19 +76,6 @@ def get_jrc_url(country: str, version: int | str) -> str:
     return internal["resources"]["jrc"]["url"].format(folder=folder, file=file)
 
 
-def get_configured_population_file() -> str:
-    """Helper to obtain the GHSL population file from the configuration."""
-    epoch = config["population"]["epoch"]
-    return f"<resources>/automatic/ghsl/pop_{epoch}_100.tif"
-
-
-def get_supported_ecuk_releases() -> list[int]:
-    """Helper for supported ECUK releases in the stable repo."""
-    release_range = internal["resources"]["stable"]["ECUK_releases"]
-    # the internal range is inclusive, so extend by one
-    return list(range(release_range[0], release_range[-1] + 1))
-
-
 def _read_checkpoint_lines(path):
     """Read nonempty checkpoint lines with surrounding whitespace removed."""
     with open(path) as f:
@@ -120,9 +102,7 @@ def _annual_energy_balance_proxy_population_inputs(wildcards):
         shapes=wildcards.shapes
     ).output.country_ids
     countries = set(_read_checkpoint_lines(country_data))
-    proxy_countries = set(
-        config.get("data_proxies", {}).get("annual_energy_balance", {})
-    )
+    proxy_countries = set(config["data_proxies"]["annual_energy_balance"])
     if countries & proxy_countries:
         return expand(
             "<resources>/automatic/shapes/{shapes}/population.nc",
@@ -154,33 +134,18 @@ def _get_jrc_baseline_files(sector: str) -> list[str]:
 def _get_ecuk_baseline_file() -> str:
     """Select the first ECUK release covering the configured model period."""
     release = min(
-        year
-        for year in get_supported_ecuk_releases()
-        if year > config["demand_years"]["end"] - 1
+        year for year in ECUK_RELEASES if year > config["demand_years"]["end"] - 1
     )
     return f"<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"
-
-
-def building_source_outputs(wildcards):
-    """Return building source checkpoint outputs for the selected shapes."""
-    return checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
-
-
-def building_plan_input(wildcards):
-    """Return the building source plan manifest for the selected shapes."""
-    return building_source_outputs(wildcards).manifest
-
-
-def eubucco_stats_input(wildcards):
-    """Return the downloaded EUBUCCO statistics table."""
-    return rules.download_eubucco_stats.output.table
 
 
 def read_building_plan(wildcards):
     """Load the building source plan from its JSON manifest."""
     import json
 
-    path = building_source_outputs(wildcards).manifest
+    path = checkpoints.prepare_building_sources.get(
+        shapes=wildcards.shapes
+    ).output.manifest
     with open(path) as stream:
         return json.load(stream)
 
@@ -188,30 +153,18 @@ def read_building_plan(wildcards):
 def eubucco_download_inputs(wildcards):
     """Return EUBUCCO download paths required by the building source plan."""
     plan = read_building_plan(wildcards)
-    regions = (
-        ["eubucco_lat_lon"]
-        if plan["eubucco_source"] == "lightweight"
-        else sorted(
-            {
-                nuts2
-                for region in plan["regions"].values()
-                for nuts2 in region["eubucco_nuts2_ids"]
-                if "eubucco"
-                in {region["residential_source"], region["commercial_source"]}
-            }
-        )
+    regions = sorted(
+        {
+            nuts2
+            for region in plan["regions"].values()
+            for nuts2 in region["eubucco_nuts2_ids"]
+            if "eubucco" in {region["residential_source"], region["commercial_source"]}
+        }
     )
     return [
         str(rules.download_eubucco.output.table).format(region=region)
         for region in regions
     ]
-
-
-def eubucco_download_url(wildcards):
-    """Return the configured EUBUCCO source URL for the requested region."""
-    return internal["resources"]["automatic"][
-        f"eubucco_{config['buildings_eubucco']['source']}"
-    ].format(nuts2=wildcards.region)
 
 
 def microsoft_download_rows(wildcards):
@@ -246,7 +199,7 @@ def microsoft_download_inputs(wildcards):
 
 def selected_eubucco_input(wildcards):
     """Return processed EUBUCCO data or an empty table when no region needs it."""
-    outputs = building_source_outputs(wildcards)
+    outputs = checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
     plan = read_building_plan(wildcards)
     if any(
         region["eubucco_nuts2_ids"]
@@ -259,7 +212,7 @@ def selected_eubucco_input(wildcards):
 
 def selected_microsoft_input(wildcards):
     """Return processed Microsoft data or an empty table when no quadkeys are planned."""
-    outputs = building_source_outputs(wildcards)
+    outputs = checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
     plan = read_building_plan(wildcards)
     if any(region["microsoft_quadkeys"] for region in plan["regions"].values()):
         return str(rules.process_microsoft.output.table).format(shapes=wildcards.shapes)
@@ -268,7 +221,7 @@ def selected_microsoft_input(wildcards):
 
 def selected_microsoft_statistics_input(wildcards):
     """Return Microsoft statistics or an empty table when no quadkeys are planned."""
-    outputs = building_source_outputs(wildcards)
+    outputs = checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
     plan = read_building_plan(wildcards)
     if any(region["microsoft_quadkeys"] for region in plan["regions"].values()):
         return str(rules.process_microsoft.output.statistics).format(
@@ -281,19 +234,15 @@ def read_floor_area_batch_plan(wildcards):
     """Load the floor area batch plan from its checkpoint JSON manifest."""
     import json
 
-    # Resolve the upstream checkpoint first so Snakemake discovers these nested
-    # checkpoints in order, including when resuming with existing manifests.
-    building_source_outputs(wildcards)
-    path = checkpoints.prepare_floor_area_batches.get(
-        shapes=wildcards.shapes
-    ).output.manifest
+    path = floor_area_batch_plan_input(wildcards)
     with open(path) as stream:
         return json.load(stream)
 
 
 def floor_area_batch_plan_input(wildcards):
-    """Return the floor area batch plan manifest for the selected shapes."""
-    building_source_outputs(wildcards)
+    """Resolve source planning before the dependent floor-area batch checkpoint."""
+    # Discover nested checkpoints in order, including when manifests already exist.
+    checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
     return checkpoints.prepare_floor_area_batches.get(
         shapes=wildcards.shapes
     ).output.manifest
@@ -323,50 +272,10 @@ def space_heat_weight_batch_inputs(wildcards):
 
 def selected_microsoft_totals_input(wildcards):
     """Return Microsoft totals or an empty table when no quadkeys are planned."""
-    outputs = building_source_outputs(wildcards)
+    outputs = checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
     plan = read_building_plan(wildcards)
     if any(region["microsoft_quadkeys"] for region in plan["regions"].values()):
         return str(rules.process_microsoft.output.totals).format(
             shapes=wildcards.shapes
         )
     return outputs.empty_microsoft_totals
-
-
-def raster_settings():
-    """Return the configured raster settings."""
-    return config["raster"]
-
-
-def report_figure_inputs(wildcards):
-    """Include heat, building and applicable baseline figures in one report DAG."""
-    root = "<resources>/automatic/shapes/{shapes}/plots"
-    figures = [
-        f"{root}/annual_heat_demand.png",
-        f"{root}/space_heat_demand_density.png",
-    ]
-    figures += [
-        f"{root}/{dataset}_timeseries.pdf"
-        for dataset in ("heat_demand", "heat_pump_cop", "heat_pump_electricity_demand")
-    ]
-    figures += [
-        f"{root}/{dataset}.png"
-        for dataset in (
-            "building_count",
-            "residential_space_heat_weight",
-            "commercial_space_heat_weight",
-        )
-    ]
-    for sector in ["residential", "services"]:
-        figures.append(f"<resources>/automatic/baseline/jrc_idees/{sector}.pdf")
-        figures += [
-            path.removesuffix("_final.parquet") + ".pdf"
-            for path in _official_final_demand_inputs(wildcards, sector)
-        ]
-    return figures
-
-
-def published_grid_url(wildcards):
-    """Download building grids from the shared stable Zenodo record."""
-    return internal["resources"]["stable"]["url"].format(
-        dataset=f"{wildcards.dataset}.tif"
-    )

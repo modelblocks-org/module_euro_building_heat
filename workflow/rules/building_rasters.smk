@@ -1,6 +1,6 @@
 """Prepare published building rasters or calculate them from building records."""
 
-if USE_PRECOMPUTED:
+if USE_PREBUILT:
 
     rule merge_building_count:
         input:
@@ -18,9 +18,6 @@ if USE_PRECOMPUTED:
         conda:
             "../envs/module.yaml"
         params:
-            raster=raster_settings(),
-            plotting=config["plotting"],
-            population=config["population"],
             datasets=["building_count"],
             source="zenodo",
         message:
@@ -51,9 +48,6 @@ if USE_PRECOMPUTED:
         conda:
             "../envs/module.yaml"
         params:
-            raster=raster_settings(),
-            plotting=config["plotting"],
-            population=config["population"],
             datasets=["residential_space_heat_weight", "commercial_space_heat_weight"],
             source="zenodo",
         message:
@@ -65,8 +59,10 @@ else:
 
     checkpoint prepare_floor_area_batches:
         input:
-            plan=building_plan_input,
-            stats=eubucco_stats_input,
+            plan=lambda wc: checkpoints.prepare_building_sources.get(
+                shapes=wc.shapes
+            ).output.manifest,
+            stats=rules.download_eubucco_stats.output.table,
         output:
             manifest="<resources>/automatic/{shapes}/heat_rasters/batches.json",
         log:
@@ -75,7 +71,7 @@ else:
             "../envs/module.yaml"
         params:
             step="floor_area_batches",
-            batch_count=config["processing"]["nuts3_batches"],
+            batch_count=config["building_rasters"]["processing"]["nuts3_batches"],
         message:
             "Plan floor-area processing batches for '{wildcards.shapes}' shapes."
         script:
@@ -87,12 +83,14 @@ else:
             nuts3=rules.prepare_nuts3.output.regions,
             totals=rules.prepare_floor_area_totals.output.table,
             count_proxies=rules.prepare_building_count_proxies.output.table,
-            plan=building_plan_input,
+            plan=lambda wc: checkpoints.prepare_building_sources.get(
+                shapes=wc.shapes
+            ).output.manifest,
             batches=floor_area_batch_plan_input,
             eubucco=selected_eubucco_input,
             microsoft=selected_microsoft_input,
             microsoft_statistics=selected_microsoft_statistics_input,
-            population=get_configured_population_file(),
+            population=POPULATION_FILE,
         output:
             partials=directory(
                 "<resources>/automatic/{shapes}/heat_rasters/batches/{batch}"
@@ -105,9 +103,8 @@ else:
         resources:
             mem_mb=4096,
         params:
-            microsoft=config["buildings_microsoft"],
+            microsoft=config["building_rasters"]["buildings_microsoft"],
             surface_volume=config["spatial_weights"]["surface_volume"],
-            raster=raster_settings(),
         message:
             "Calculate floor area for batch {wildcards.batch} of '{wildcards.shapes}' shapes."
         script:
@@ -146,7 +143,6 @@ else:
             mem_mb=4096,
         params:
             population_share=config["spatial_weights"]["population"]["share"],
-            raster=raster_settings(),
         message:
             "Calculate space-heating weights for batch {wildcards.batch} of '{wildcards.shapes}' shapes."
         script:
@@ -155,7 +151,9 @@ else:
     rule merge_building_count:
         input:
             shapes=rules.prepare_shapes.output.shapes,
-            plan=building_plan_input,
+            plan=lambda wc: checkpoints.prepare_building_sources.get(
+                shapes=wc.shapes
+            ).output.manifest,
             batches=floor_area_batch_plan_input,
             support=floor_area_batch_inputs,
         output:
@@ -172,11 +170,9 @@ else:
         resources:
             mem_mb=4096,
         params:
-            plotting=config["plotting"],
             mode="counts",
             population=config["population"],
-            microsoft=config["buildings_microsoft"],
-            raster=raster_settings(),
+            microsoft=config["building_rasters"]["buildings_microsoft"],
         message:
             "Merge building counts for '{wildcards.shapes}' shapes."
         script:
@@ -185,11 +181,12 @@ else:
     rule merge_structural_support:
         input:
             shapes=rules.prepare_shapes.output.shapes,
-            plan=building_plan_input,
+            plan=lambda wc: checkpoints.prepare_building_sources.get(
+                shapes=wc.shapes
+            ).output.manifest,
             batches=floor_area_batch_plan_input,
             support=floor_area_batch_inputs,
             weights=space_heat_weight_batch_inputs,
-            building_count="<building_count>",
         output:
             residential_space_heat_weight="<resources>/automatic/shapes/{shapes}/support/residential_space_heat_weight.tif",
             commercial_space_heat_weight="<resources>/automatic/shapes/{shapes}/support/commercial_space_heat_weight.tif",
@@ -211,16 +208,13 @@ else:
         resources:
             mem_mb=4096,
         params:
-            plotting=config["plotting"],
             mode="support",
             population=config["population"],
-            microsoft=config["buildings_microsoft"],
+            microsoft=config["building_rasters"]["buildings_microsoft"],
             space_heat_weight={
-                key: value
-                for key, value in config["spatial_weights"].items()
-                if key != "hdd"
+                key: config["spatial_weights"][key]
+                for key in ("population", "surface_volume", "age")
             },
-            raster=raster_settings(),
         message:
             "Merge space-heating weights for '{wildcards.shapes}' shapes."
         script:

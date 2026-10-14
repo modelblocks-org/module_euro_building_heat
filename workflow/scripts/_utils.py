@@ -2,7 +2,6 @@
 
 import math
 from pathlib import Path
-from typing import Any
 
 import geopandas as gpd
 import numpy as np
@@ -19,7 +18,6 @@ from rasterio.features import geometry_mask
 from rasterio.warp import reproject
 from rasterio.windows import Window
 from shapely.geometry import box
-from shapely.geometry.base import BaseGeometry
 
 EUROSTAT_TO_ALPHA3 = {"EL": "GRC", "UK": "GBR"}
 
@@ -71,16 +69,11 @@ def write_raster(path, profile, values, bands, units, tags):
         output.update_tags(**tags)
 
 
-def scope_geometry(shapes: gpd.GeoDataFrame, crs: Any) -> BaseGeometry:
-    """Return the union of land shapes in the requested CRS."""
-    return shapes.to_crs(crs).geometry.union_all()
-
-
 def read_region_support(directory):
-    """Load the three cached arrays; use the scoped floor grid for output.
+    """Load complete-region and scoped floor-area support arrays.
 
     Complete-region support supplies normalization totals. The two scoped
-    arrays retain the original centroid/cell clipping for the requested shapes.
+    arrays retain centroid/cell clipping for the requested shapes.
     """
     arrays = []
     for kind in SUPPORT_BANDS:
@@ -102,12 +95,7 @@ def processing_crs(shapes: gpd.GeoDataFrame) -> str:
     )
 
 
-def points_within_scope(points, scope):
-    """Test centroid coordinates against a prepared scope with strict containment."""
-    return shapely.contains_xy(scope, points.x, points.y)
-
-
-def output_profile(bounds, settings, crs="EPSG:3035", count=3):
+def output_profile(bounds, crs="EPSG:3035", count=3, dtype="float32"):
     """Return an equal-area raster profile aligned to the hectare grid.
 
     Bounds are rounded outward to exact multiples of 100 metres. Every
@@ -124,14 +112,14 @@ def output_profile(bounds, settings, crs="EPSG:3035", count=3):
         "width": round((right - left) / cell),
         "height": round((top - bottom) / cell),
         "count": count,
-        "dtype": settings["dtype"],
+        "dtype": dtype,
         "crs": crs,
         "transform": Affine(cell, 0, left, 0, -cell, top),
         "nodata": 0.0,
-        "compress": settings["compression"],
+        "compress": "deflate",
         "tiled": True,
-        "blockxsize": settings["block_size"],
-        "blockysize": settings["block_size"],
+        "blockxsize": 512,
+        "blockysize": 512,
     }
 
 
@@ -199,7 +187,11 @@ def add_partial(output, partial, bands=(1, 2), source_bands=None) -> None:
 
 
 def intersecting_windows(raster, polygons, block_size=512):
-    """Visit bounded blocks inside the polygon extent, including untiled GHSL files."""
+    """Visit bounded blocks inside the polygon extent, including untiled GHSL files.
+
+    Bounded windows limit both raster-read and polygon-intersection memory,
+    including when source strips span the full raster width.
+    """
     extent = rasterio.windows.from_bounds(
         *polygons.total_bounds, transform=raster.transform
     )
@@ -232,10 +224,22 @@ def window_polygons(polygons, window, transform):
     return local.loc[local.area > 0]
 
 
+def project_raster_polygons(polygons, crs):
+    """Project polygons for raster clipping, retaining positional row identifiers."""
+    projected = polygons.to_crs(crs).reset_index(drop=True)
+    # Reprojection can collapse tiny rings or introduce self-intersections.
+    # Repair once on the raster grid before clipping individual blocks.
+    invalid = ~projected.geometry.is_valid
+    projected.loc[invalid, "geometry"] = shapely.make_valid(
+        projected.loc[invalid, "geometry"], method="structure", keep_collapsed=False
+    )
+    return projected
+
+
 def _iter_raster_blocks(raster_path, polygons, sector="residential", block_size=512):
     """Yield bounded raster windows and clipped polygons on the native source grid."""
     with rasterio.open(raster_path) as raster:
-        projected = polygons.to_crs(raster.crs).reset_index(drop=True)
+        projected = project_raster_polygons(polygons, raster.crs)
         if projected.empty:
             return
         transform = raster.transform

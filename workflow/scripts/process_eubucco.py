@@ -1,9 +1,9 @@
-"""Create canonical points from the configured pinned EUBUCCO distribution.
+"""Create canonical points from the pinned EUBUCCO footprints.
 
 Only buildings assigned to legacy NUTS-3 regions intersecting the requested
-case are retained. Lightweight centroids are projected from WGS84; full
-EPSG:3035 footprints are reduced to centroids, areas, and perimeters. Batch
-processing bounds memory, and every partition uses the strict canonical schema.
+case are retained. EPSG:3035 footprints are reduced to centroids, areas, and
+perimeters. Batch processing bounds memory, and every partition uses the strict
+canonical schema.
 The output Parquet table retains legacy region IDs and is sorted by region ID
 and building ID. Current-region assignment happens during floor-area allocation.
 
@@ -23,13 +23,8 @@ import geopandas as gpd
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
-from _eubucco import (
-    EUBUCCO_COLUMNS,
-    EUBUCCO_SCHEMA,
-    canonical_from_full,
-    canonical_from_lightweight,
-    read_plan,
-)
+from _eubucco import canonical_from_footprints, read_plan
+from _schemas import EUBUCCO_PROCESSED_SCHEMA, validate_eubucco_footprints
 from pyproj import Transformer
 
 if TYPE_CHECKING:
@@ -53,39 +48,21 @@ with TemporaryDirectory(prefix="heat_buildings_") as temporary:
         }
     )
     selected = pa.array(region_ids)
-    # Lightweight downloads provide coordinates and area; full downloads provide
-    # polygons. Both converters produce the same columns in the processing CRS.
-    if plan["eubucco_source"] == "lightweight":
-        sources = [Path(source) for source in snakemake.input.downloads]
-        columns = [
-            "id",
-            "region_id",
-            "type",
-            "subtype",
-            "floors",
-            "footprint_area",
-            "height",
-            "lon",
-            "lat",
-        ]
-        transformer = Transformer.from_crs(4326, regions.crs, always_xy=True)
-        convert = canonical_from_lightweight
-    else:
-        sources = sorted(Path(source) for source in snakemake.input.downloads)
-        columns = ["id", "region_id", "type", "subtype", "floors", "height", "geometry"]
-        transformer = Transformer.from_crs(3035, regions.crs, always_xy=True)
-        convert = canonical_from_full
+    sources = sorted(Path(source) for source in snakemake.input.downloads)
+    columns = ["id", "region_id", "type", "subtype", "floors", "height", "geometry"]
+    transformer = Transformer.from_crs(3035, regions.crs, always_xy=True)
 
     # Filter before geometry conversion and partition by legacy region so the
     # final sort can process one region at a time within the job's memory limit.
     for source in sources:
+        validate_eubucco_footprints(source)
         for index, batch in enumerate(
             pq.ParquetFile(source).iter_batches(batch_size=250_000, columns=columns)
         ):
             filtered = batch.filter(pc.is_in(batch.column("region_id"), selected))
             if not filtered.num_rows:
                 continue
-            table = convert(filtered, transformer)
+            table = canonical_from_footprints(filtered, transformer)
             for region in pc.unique(table["region_id"]).to_pylist():
                 # Numeric directory names avoid interpreting region IDs as paths.
                 partition = output / str(region_ids.index(region))
@@ -103,10 +80,10 @@ with TemporaryDirectory(prefix="heat_buildings_") as temporary:
     with (
         duckdb.connect() as connection,
         pq.ParquetWriter(
-            snakemake.output.table, EUBUCCO_SCHEMA, compression="zstd"
+            snakemake.output.table, EUBUCCO_PROCESSED_SCHEMA, compression="zstd"
         ) as writer,
     ):
-        columns = ", ".join(EUBUCCO_COLUMNS)
+        columns = ", ".join(EUBUCCO_PROCESSED_SCHEMA.names)
         connection.execute("SET threads=1")
         connection.execute("SET preserve_insertion_order=false")
         # Leave room in the job's memory allocation for Arrow and Python.

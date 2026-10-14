@@ -116,11 +116,11 @@ def process_gridded_weather_data(
     path_to_era5: str | Path,
     output_paths: dict[str, str],
     weather_years: list[int],
-    hdd_base_temperature: float = 15.5,
+    hdd_base_temperature: float,
 ) -> None:
     """Convert a local ERA5 file to the weather files used by the workflow."""
     start, end = weather_time_range(weather_years)
-    with xr.open_dataset(path_to_era5, chunks={}) as era5:
+    with xr.open_dataset(path_to_era5, chunks="auto") as era5:
         outputs = convert_era5_to_module_datasets(era5)
         outputs["hdd"] = heating_degree_days(
             outputs["temperature"].temperature, weather_years, hdd_base_temperature

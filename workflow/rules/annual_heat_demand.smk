@@ -13,11 +13,11 @@ checkpoint prepare_shape_country_scope:
         "../envs/module.yaml"
     params:
         dataset_scopes=internal["scope"]["datasets"],
-        data_proxies=config.get("data_proxies", {}),
+        data_proxies=config["data_proxies"],
         commercial_end_use_scope=internal["scope"]["datasets"]["commercial_end_use"][
             "countries"
         ],
-        jrc_idees_proxies=config.get("data_proxies", {}).get("jrc_idees", {}),
+        jrc_idees_proxies=config["data_proxies"]["jrc_idees"],
     message:
         "Determine heat-demand country scope for '{wildcards.shapes}' shapes."
     script:
@@ -77,7 +77,7 @@ rule process_final_heat_demand:
     params:
         demand_years=DEMAND_YEARS,
         countries=lambda wildcards, input: _read_checkpoint_lines(input.country_ids),
-        data_proxies=config.get("data_proxies", {}),
+        data_proxies=config["data_proxies"],
     message:
         "Prepare national annual final heat demand for household and commercial sectors."
     script:
@@ -100,7 +100,7 @@ rule process_useful_heat:
     params:
         demand_years=DEMAND_YEARS,
         heat_tech_params=config["tech_efficiencies"],
-        useful_heat_demand=config.get("useful_heat_demand", "actual"),
+        useful_heat_demand=config["useful_heat_demand"],
     message:
         "Calculate national annual useful heat demand."
     script:
@@ -138,9 +138,7 @@ rule rescale_annual_heat_demand_to_shapes:
         "../envs/module.yaml"
     params:
         weather_demand_years=WEATHER_DEMAND_YEARS,
-        plotting=config["plotting"],
-        chunk_size=config["population"]["chunk_size"],
-        hdd_elasticity=config["spatial_weights"].get("hdd", {}).get("elasticity", 0.5),
+        hdd_elasticity=config["spatial_weights"]["hdd"]["elasticity"],
     message:
         "Scale national annual heat demand to '{wildcards.shapes}' shapes."
     script:

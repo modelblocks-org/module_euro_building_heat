@@ -18,9 +18,7 @@ rule process_gridded_weather_data:
         "../envs/module.yaml"
     params:
         weather_years=WEATHER_YEARS,
-        hdd_base_temperature=config["spatial_weights"]
-        .get("hdd", {})
-        .get("base_temperature", 15.5),
+        hdd_base_temperature=config["spatial_weights"]["hdd"]["base_temperature"],
     message:
         "Process ERA5 weather data for '{wildcards.shapes}'."
     script:
@@ -76,7 +74,7 @@ rule prepare_spatial_weights:
     input:
         weather_grid=rules.process_gridded_weather_data.output.grid,
         hdd=rules.process_gridded_weather_data.output.hdd,
-        population=get_configured_population_file(),
+        population=POPULATION_FILE,
         locations=rules.prepare_shapes.output[0],
         residential_raster=rules.merge_structural_support.output.residential_space_heat_weight,
         commercial_raster=rules.merge_structural_support.output.commercial_space_heat_weight,
@@ -93,7 +91,6 @@ rule prepare_spatial_weights:
     params:
         weather_demand_years=WEATHER_DEMAND_YEARS,
         hdd_elasticity=config["spatial_weights"]["hdd"]["elasticity"],
-        chunk_size=config["population"]["chunk_size"],
         lat_name="lat",
         lon_name="lon",
     message:

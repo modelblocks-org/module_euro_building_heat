@@ -1,16 +1,8 @@
 """Merge regional building counts or space-heating support into final rasters.
 
-Run by Snakemake with ``params.mode`` selecting the outputs: ``"counts"``
-produces building counts for residential, commercial and public buildings;
-the other branch produces residential heat weights and commercial/public
-floor area, plus a combined diagnostics table. Heat weights are spatial
-support for allocating demand, not energy demand itself.
-
-The batch plan maps batch directory names to region IDs. Regional rasters
-must already share the plan CRS and aligned 100 m (one hectare) grid;
-this script adds their values without reprojection or resampling. Each output
-is a single-band GeoTIFF covering the rounded-outward bounds of the requested
-shapes, accompanied by a preview plot.
+``params.mode`` selects building counts or structural support. The batch plan
+maps directories to region IDs. Input rasters must share the plan CRS and
+grid alignment because merging adds their values without reprojection.
 """
 
 import sys
@@ -33,9 +25,7 @@ batches = read_plan(snakemake.input.batches)["batches"]
 shapes = gpd.read_parquet(snakemake.input.shapes).to_crs(plan["crs"])
 # Use the same grid alignment as the regional inputs so they can be added
 # directly into windows of the final raster.
-profile = output_profile(
-    shapes.total_bounds, snakemake.params.raster, plan["crs"], count=1
-)
+profile = output_profile(shapes.total_bounds, plan["crs"], count=1)
 # Resolve inputs by batch ID rather than relying on Snakemake input ordering.
 support = {Path(path).name: Path(path) for path in snakemake.input.support}
 for path in snakemake.output:
@@ -56,7 +46,6 @@ if snakemake.params.mode == "counts":
         counts.set_band_unit(1, "buildings/ha")
         counts.update_tags(
             sectors="residential,commercial,public",
-            eubucco_source=plan["eubucco_source"],
             microsoft_release=plan["microsoft_release"],
             microsoft_minimum_building_count=snakemake.params.microsoft[
                 "minimum_building_count"
@@ -87,14 +76,12 @@ else:
                     # Residential weights already include the population blend,
                     # surface-to-volume adjustment and building-age factors.
                     add_partial(heat, partial, (1,))
-                    # Floor-area band 2 combines commercial and public buildings;
-                    # copy its contributions into band 1 without heat weighting.
+                    # Commercial/public support uses unweighted floor area.
                     add_partial(commercial, floor, (1,), source_bands=(2,))
         heat.set_band_description(1, SPACE_HEAT_WEIGHT_BANDS[0])
         heat.set_band_unit(1, "weighted_m2/ha")
         heat.update_tags(
             method="blended_floor_area * surface_volume * age",
-            eubucco_source=plan["eubucco_source"],
             population_source="GHS-POP",
             population_epoch=snakemake.params.population["epoch"],
             population_share=settings["population"]["share"],
@@ -102,7 +89,6 @@ else:
                 "minimum_building_count"
             ],
             surface_volume_elasticity=settings["surface_volume"]["elasticity"],
-            surface_volume_method=settings["surface_volume"]["method"],
             age_old_factor=settings["age"]["multipliers"]["before_1981"],
             age_new_factor=settings["age"]["multipliers"]["after_2000"],
             age_1981_2000_factor=settings["age"]["multipliers"]["1981_2000"],
@@ -111,15 +97,13 @@ else:
         commercial.set_band_description(1, "commercial_space_heat_weight")
         commercial.set_band_unit(1, "m2/ha")
         commercial.update_tags(method="floor_area", sectors="commercial,public")
-    # Preserve upstream diagnostics, with a stable geographic ordering across
-    # batches; no statistics are recalculated during the merge.
+    # Sort diagnostics geographically for consistent output across batch layouts.
     diagnostics = pd.concat(diagnostics, ignore_index=True).sort_values(
         ["country_id", "region_id"]
     )
     diagnostics.to_parquet(snakemake.output.diagnostics, index=False)
 
 
-# Plot the completed rasters with labels matching each output's units.
 plots = (
     [
         (
@@ -148,9 +132,6 @@ for dataset, title, unit in plots:
         1,
         title,
         snakemake.output[f"{dataset}_plot"],
-        snakemake.params.population["chunk_size"],
-        snakemake.params.plotting["max_size"],
         shapes,
-        snakemake.params.plotting["outline"],
         unit,
     )

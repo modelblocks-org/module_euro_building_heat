@@ -1,4 +1,4 @@
-"""Schema validation generics."""
+"""Input validation and output table format definitions."""
 
 import json
 from collections.abc import Iterable
@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pyarrow
 import pyarrow.parquet as pq
 import rasterio
 import shapely
@@ -14,6 +15,24 @@ from pandera import pandas as pa
 from pandera.typing.geopandas import GeoSeries
 from pandera.typing.pandas import Series
 from shapely.geometry import MultiPolygon, Polygon
+
+# Processed footprints use metric area/perimeter and processing-CRS centroids.
+# The schema preserves column types for empty tables.
+EUBUCCO_PROCESSED_SCHEMA = pyarrow.schema(
+    [
+        ("id", pyarrow.string()),
+        ("region_id", pyarrow.string()),
+        ("type", pyarrow.string()),
+        ("subtype", pyarrow.string()),
+        ("floors", pyarrow.float64()),
+        ("footprint_area_m2", pyarrow.float64()),
+        ("footprint_perimeter_m", pyarrow.float64()),
+        ("height_m", pyarrow.float64()),
+        ("x", pyarrow.float64()),
+        ("y", pyarrow.float64()),
+    ]
+)
+
 
 ENERGY_TYPES: tuple[str, ...] = ("useful_energy", "final_energy")
 
@@ -105,7 +124,6 @@ class BaselineSchema(pa.DataFrameModel):
     "Country code."
     unit: Series[str] = pa.Field(eq="twh")
     "Unit of the value."
-    # FIXME: needs better name
     energy: Series[str] = pa.Field(isin=ENERGY_TYPES)
     "Type of energy measurement."
     year: Series[int] = pa.Field(ge=2000)
@@ -125,11 +143,6 @@ class BaselineSchema(pa.DataFrameModel):
             raise ValueError(f"Found countries outside scope: {mismatch}")
 
         return validated
-
-    @classmethod
-    def get_column_names(cls) -> list[str]:
-        """Get the schema column names."""
-        return list(cls.to_schema().columns.keys())
 
 
 class AnnualHeatDemandSchema(pa.DataFrameModel):
@@ -153,8 +166,7 @@ class AnnualHeatDemandSchema(pa.DataFrameModel):
     "Annual useful heat demand in TWh."
 
 
-# Source tables retain their reader dtypes; Series[Any] validates values without
-# imposing a new dtype or coercing columns.
+# Series[Any] checks source values while preserving reader dtypes.
 
 
 class EubuccoRegionsSchema(pa.DataFrameModel):
@@ -265,23 +277,17 @@ def validate_microsoft_feature(feature: dict):
     return geometry
 
 
-def validate_eubucco_source(path: str | Path, source: str) -> None:
-    """Validate fields consumed from an EUBUCCO distribution."""
+def validate_eubucco_footprints(path: str | Path) -> None:
+    """Validate EUBUCCO footprints and their EPSG:3035 geometry metadata."""
     schema = pq.read_schema(path)
-    common = {"id", "region_id", "type", "subtype", "floors", "height"}
-    required = (
-        common | {"footprint_area", "lon", "lat"}
-        if source == "lightweight"
-        else common | {"geometry"}
-    )
+    required = {"id", "region_id", "type", "subtype", "floors", "height", "geometry"}
     assert required <= set(schema.names)
-    if source == "full":
-        geo = json.loads(schema.metadata[b"geo"])
-        assert geo["primary_column"] == "geometry"
-        assert geo["columns"]["geometry"]["crs"]["id"] == {
-            "authority": "EPSG",
-            "code": 3035,
-        }
+    geo = json.loads(schema.metadata[b"geo"])
+    assert geo["primary_column"] == "geometry"
+    assert geo["columns"]["geometry"]["crs"]["id"] == {
+        "authority": "EPSG",
+        "code": 3035,
+    }
 
 
 def validate_population_raster(path: str | Path) -> None:

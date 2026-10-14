@@ -2,7 +2,6 @@
 
 This module prepares time series of heat demand and heat supply technologies for buildings in European countries.
 
-<!-- Example module output -->
 <p align="center">
   <img src="./figures/yearly_heat_demand_profile.png" width="80%">
   <br>
@@ -20,12 +19,10 @@ the [integration example](./tests/integration/Snakefile),
 and the `snakemake` [documentation](https://snakemake.readthedocs.io/en/stable/snakefiles/modularization.html).
 
 ## Overview
-<!-- Please describe the processing stages of this module here -->
 
 This module combines national annual heat-demand statistics with weather-driven
 hourly profiles and scales them to user-provided European regions using
-building floor area, population, and heating degree days (HDD). It includes
-building acquisition and hectare-raster preparation in the same workflow.
+building floor area, population, and heating degree days (HDD).
 
 Data processing steps:
 
@@ -34,8 +31,9 @@ Data processing steps:
 </p>
 
 1. Validate the user-provided regions, retaining land shapes and their input IDs.
-2. Download published building grids for matching settings, or rebuild them from
-   EUBUCCO/Microsoft buildings, census floor area, and GHSL population at 100 m.
+2. Download published building grids or generate them from EUBUCCO/Microsoft
+   buildings, census floor area, and GHSL population, according to
+   [`building_rasters.source`](config/README.md#building-rasters).
 3. Combine Eurostat, JRC-IDEES, ECUK, and Swiss statistics into national useful
    heat demand. Calculate heating degree days (HDD) from ERA5 temperatures.
 4. Allocate space heat using sector building support times HDD^elasticity,
@@ -55,44 +53,29 @@ Data processing steps:
 
 ### Timezone handling
 
-Timezone assignment is geometry-based and independent of `country_id`, which
-is used only to match shapes to national heat statistics. The workflow computes
-each shape centroid in the configured projected CRS, transforms the centroid to
-EPSG:4326, and intersects it with the pinned, land-only timezone-boundary dataset.
-
-Each centroid must intersect exactly one valid IANA timezone. Assignment fails
-with the affected shape IDs and centroid coordinates if no timezone or multiple
-timezones match. There is no country-code, representative-point, ocean-zone,
-or nearest-zone fallback.
+Timezone assignment uses each shape's centroid in the configured projected CRS,
+or an interior point if the centroid falls outside the shape. The point is
+transformed to EPSG:4326 and intersected with the land-only timezone boundaries.
+It must match exactly one valid IANA timezone. Assignment failures identify the
+affected shapes and point coordinates.
 
 When2Heat hourly factors are interpreted in local civil time and selected onto
 a canonical UTC hourly index. The spring daylight-saving gap is skipped and
 the repeated autumn hour is selected twice. ERA5 analysis timestamps remain UTC.
 
 ## Configuration
-<!-- Please describe how to configure this module below -->
 
 Please consult the configuration [README](./config/README.md) and
 [example](./config/config.yaml) for all configuration options.
 
 Earth Data Hub access requires an account and an API key. Look at
 [their webpage](https://earthdatahub.destine.eu) for how to obtain one.
-Save the key by itself in `resources/user/edh_api.txt`; the file is ignored by
-Git.
+Save the key by itself in the `edh_api` input file defined in
+[INTERFACE.yaml](./INTERFACE.yaml).
 
 ## Input / output structure
-<!-- Please describe input / output file placement below -->
 
 Please consult the [interface file](./INTERFACE.yaml) for more information.
-
-Outputs include annual and hourly heat demand, heat-pump electricity/COP, building
-counts, annual 100 m space-heat/hot-water rasters, and normalized hourly sink profiles.
-See the interface for units, schemas, and year-pair metadata.
-
-Figures accompany data outputs. Request
-`<resources>/automatic/shapes/{shapes}/plots/report_manifest.txt` for all report figures.
-Building counts do not require an ERA5 key.
-
 
 ## Development
 <!-- Please do not modify this templated section -->
@@ -121,8 +104,7 @@ pixi run export-snakemake-env module
 ## Testing
 <!-- Please do not modify this templated section -->
 
-The integration tests download missing sources and run the configured case;
-an ERA5 API key is required:
+To run the integration tests:
 
 ```shell
 pixi run test-integration
@@ -131,13 +113,23 @@ pixi run test-integration
 To test a minimal example of a workflow using this module:
 
 ```shell
-pixi shell    # activate this project's environment
-cd tests/integration/  # navigate to the integration example
-snakemake --use-conda --cores 2  # run the workflow!
+pixi shell
+cd tests/integration/
+snakemake --use-conda --cores 2
 ```
 
+To run a more comprehensive test and generate a Snakemake report with figures, use the following command:
+
+```shell
+pixi run pytest tests/local_test.py -k test_report_figures
+```
+
+This runs the scopes configured in [tests/local_test.py](tests/local_test.py).
+
+Source files are cached separately from processing. If input validation rejects a
+cached download, remove or replace that file before retrying.
+
 ## References
-<!-- Please provide thorough referencing below -->
 
 This module is based on the following research and datasets:
 
@@ -155,8 +147,7 @@ This module is based on the following research and datasets:
   <https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2023_v1>
 - GHSL GHS-POP R2023A gridded population data:
   <https://human-settlement.emergency.copernicus.eu/ghs_pop2023.php>
-- Timezone Boundary Builder release 2026c, whose comprehensive land-only
-  boundary data is derived from OpenStreetMap and distributed under the Open
+- Timezone Boundary Builder, whose land-only boundary data is derived from OpenStreetMap and distributed under the Open
   Data Commons Open Database License (ODbL):
   <https://github.com/evansiroky/timezone-boundary-builder/>
 - Eurostat household end-use and energy-balance datasets, distributed here via

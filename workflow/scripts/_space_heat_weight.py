@@ -3,9 +3,7 @@
 The support blends gross residential floor-area and population shares before
 multiplying by independently centred compactness and construction-age factors.
 
-The equivalent-square method supports lightweight EUBUCCO, while full EUBUCCO
-provides observed footprint perimeter. Hotmaps elasticities and age multipliers
-follow Müller et al. (2019); the exact values used are configured assumptions.
+The compactness and age adjustments follow Müller et al. (2019).
 
 Source: https://doi.org/10.3390/en12244789
 """
@@ -20,27 +18,13 @@ def _return(values: np.ndarray):
     return values.item() if values.ndim == 0 else values
 
 
-def surface_to_volume_ratio(
-    footprint_area_m2, height_m, footprint_perimeter_m=None, method="equivalent_square"
-):
-    """Return ``P/A + 2/H`` for valid extruded buildings, otherwise NaN.
-
-    ``equivalent_square`` approximates perimeter as ``4 * sqrt(A)``.
-    ``footprint_perimeter`` uses observed perimeter supplied by the caller.
-    """
-    area, height = np.broadcast_arrays(
-        np.asarray(footprint_area_m2, dtype=float), np.asarray(height_m, dtype=float)
+def surface_to_volume_ratio(footprint_area_m2, height_m, footprint_perimeter_m):
+    """Return ``P/A + 2/H`` using measured perimeter, or NaN for invalid buildings."""
+    area, height, perimeter = np.broadcast_arrays(
+        np.asarray(footprint_area_m2, dtype=float),
+        np.asarray(height_m, dtype=float),
+        np.asarray(footprint_perimeter_m, dtype=float),
     )
-    if method == "equivalent_square":
-        perimeter = 4 * np.sqrt(np.where(area > 0, area, np.nan))
-    elif method == "footprint_perimeter":
-        if footprint_perimeter_m is None:
-            raise ValueError("footprint_perimeter_m is required")
-        area, height, perimeter = np.broadcast_arrays(
-            area, height, np.asarray(footprint_perimeter_m, dtype=float)
-        )
-    else:
-        raise ValueError(f"Unknown surface-volume method: {method}")
     valid = (
         np.isfinite(area)
         & np.isfinite(height)
@@ -88,7 +72,7 @@ def weight_from_support(
     share,
     age,
 ):
-    """Apply the original heat formula to cached additive building statistics.
+    """Calculate heat weights from cached additive building statistics.
 
     F - V retains neutral support from missing compactness and Microsoft.
     Population is eligible only in cells retaining residential floor area.

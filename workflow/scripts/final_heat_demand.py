@@ -27,12 +27,11 @@ def prepare_final_heat_demand(
 ) -> None:
     """Match years, scale end-use shares, and proxy missing annual demand."""
     demand_years = [int(year) for year in demand_years]
-    data_proxies = data_proxies or {}
     energy_balances = _read_energy_balances(
         path_to_energy_balance, path_to_carrier_names
     )
 
-    balance_proxies = data_proxies.get("annual_energy_balance", {})
+    balance_proxies = data_proxies["annual_energy_balance"]
     if set(country_codes) & set(balance_proxies):
         if len(paths_to_population) != 1:
             raise ValueError(
@@ -82,7 +81,7 @@ def prepare_final_heat_demand(
         demand = proxy_end_use_demand(
             demand,
             sector_balances[sector],
-            data_proxies.get(proxy_names[sector], {}),
+            data_proxies[proxy_names[sector]],
             country_codes,
             sector,
         )

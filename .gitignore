@@ -29,5 +29,5 @@ gurobi.log
 **/temp/*
 **/tmp/*
 
-# Ignore reports
-report*
+# ignore agents.md
+agents.md

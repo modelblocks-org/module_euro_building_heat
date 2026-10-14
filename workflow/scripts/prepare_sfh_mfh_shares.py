@@ -55,7 +55,7 @@ def prepare_country_shares(
     for country_id in country_ids:
         if country_id in shares.index:
             continue
-        references = proxies.get(country_id)
+        references = proxies[country_id]
 
         additions[country_id] = shares.loc[references].mean()
 

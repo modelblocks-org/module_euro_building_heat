@@ -35,6 +35,8 @@ MAP_BASE_COLOR = "#e6e2d9"
 
 
 MAP_BASE_EDGE_COLOR = "#7a858d"
+RASTER_PREVIEW_MAX_SIZE = 2000
+RASTER_OUTLINE_STYLE = {"color": "#808080", "linewidth": 0.6}
 
 
 def save_figure(figure: Figure, output_path: str | Path, **kwargs) -> None:
@@ -375,19 +377,14 @@ def plot_floor_area(
     band: int,
     title: str,
     output_path: str,
-    chunk_size: int,
-    max_size: int,
     shapes: gpd.GeoDataFrame,
-    outline: dict[str, Any],
     colorbar_label: str = "Floor area (m²/ha)",
 ) -> None:
     """Plot a Dask-coarsened density band without loading the full raster."""
-    opened: Any = rioxarray.open_rasterio(
-        raster_path, chunks={"x": chunk_size, "y": chunk_size}
-    )
+    opened: Any = rioxarray.open_rasterio(raster_path, chunks="auto")
     with opened as raster:
         values = raster.sel(band=band)
-        factor = max(1, int(np.ceil(max(values.shape) / max_size)))
+        factor = max(1, int(np.ceil(max(values.shape) / RASTER_PREVIEW_MAX_SIZE)))
         values = (
             values.coarsen(x=factor, y=factor, boundary="pad")
             .max()
@@ -410,7 +407,7 @@ def plot_floor_area(
         values, extent=extent, cmap=MAP_CMAP, norm=PowerNorm(0.35, vmin=0, vmax=vmax)
     )
     # Preserve each user-provided boundary, including internal borders and holes.
-    plot_outlines(shapes, axis, outline)
+    plot_outlines(shapes, axis, RASTER_OUTLINE_STYLE)
     axis.set_xlim(extent[:2])
     axis.set_ylim(extent[2:])
     axis.set(title=title, xlabel="Easting (m)", ylabel="Northing (m)")

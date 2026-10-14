@@ -22,13 +22,14 @@ import pyarrow.dataset as ds
 import rasterio
 import shapely
 from _building_count import building_count_grid
-from _eubucco import EUBUCCO_COLUMNS, eubucco_batch_filter, read_plan
+from _eubucco import eubucco_batch_filter, read_plan
 from _floor_area import (
     microsoft_floor_area_support,
     microsoft_population_support,
     select_building_sectors,
 )
 from _microsoft import low_coverage_quadkeys
+from _schemas import EUBUCCO_PROCESSED_SCHEMA, validate_population_raster
 from _space_heat_weight import surface_to_volume_ratio, surface_volume_power
 from _utils import (
     SUPPORT_BANDS,
@@ -36,7 +37,6 @@ from _utils import (
     clipped_grid,
     output_profile,
     point_grid,
-    points_within_scope,
     population_grid,
     write_raster,
 )
@@ -46,8 +46,6 @@ if TYPE_CHECKING:
 
 sys.stderr = open(snakemake.log[0], "w")
 microsoft_settings = snakemake.params.microsoft
-# Additive building intermediates require double precision.
-raster_settings = {**snakemake.params.raster, "dtype": "float64"}
 plan = read_plan(snakemake.input.plan)
 batch_plan = read_plan(snakemake.input.batches)
 batch_regions = batch_plan["batches"][snakemake.wildcards.batch]
@@ -64,6 +62,7 @@ low_quadkeys = low_coverage_quadkeys(
     statistics, microsoft_settings["minimum_building_count"]
 )
 
+validate_population_raster(snakemake.input.population)
 population_source = rasterio.open(snakemake.input.population)
 
 # Read overlapping legacy regions within the complete batch bounds. Clipping to
@@ -78,7 +77,7 @@ legacy_ids = sorted(
 eubucco = (
     ds.dataset(snakemake.input.eubucco, format="parquet")
     .to_table(
-        columns=EUBUCCO_COLUMNS[1:],
+        columns=EUBUCCO_PROCESSED_SCHEMA.names[1:],
         filter=eubucco_batch_filter(legacy_ids, regions.total_bounds),
     )
     .to_pandas(categories=["region_id", "type", "subtype"])
@@ -107,14 +106,14 @@ for region_id, region in regions.iterrows():
     clipped = region.geometry.intersection(scope)
     region_totals = totals.loc[region_id]
     legacy = plan["regions"][region_id]["eubucco_region_ids"]
-    # Legacy IDs identify candidates; centroid containment assigns buildings to
-    # the current region after any administrative boundary changes.
+    # Centroid containment maps candidate buildings from source region IDs to
+    # the current administrative boundaries.
     selected = eubucco.loc[
         eubucco.region_id.isin(legacy) & eubucco.geometry.within(region.geometry)
     ]
     residential, commercial = select_building_sectors(selected)
     fallback = microsoft.loc[microsoft.region_id.eq(region_id)]
-    full_profile = output_profile(region.geometry.bounds, raster_settings, regions.crs)
+    full_profile = output_profile(region.geometry.bounds, regions.crs, dtype="float64")
     region_low_quadkeys = low_quadkeys & set(
         plan["regions"][region_id]["microsoft_quadkeys"]
     )
@@ -171,7 +170,6 @@ for region_id, region in regions.iterrows():
             residential.footprint_area_m2,
             residential.height_m,
             residential.footprint_perimeter_m,
-            method=settings["method"],
         )
         power = surface_volume_power(ratio, settings["elasticity"])
         valid = np.isfinite(power)
@@ -189,11 +187,12 @@ for region_id, region in regions.iterrows():
     )
     full_valid = point_grid(full_profile, residential, residential.valid_area)
     full_power = point_grid(full_profile, residential, residential.weighted_power)
-    # Only now clip output support to the requested scope. Complete-region grids
-    # remain available for normalisation; scoped grids retain the local share.
-    profile = output_profile(clipped.bounds, raster_settings, regions.crs)
-    inside = residential.loc[points_within_scope(residential, scope)]
-    commercial_inside = commercial.loc[points_within_scope(commercial, scope)]
+    # Clip after allocation so scoped cells retain their share of regional totals.
+    profile = output_profile(clipped.bounds, regions.crs, dtype="float64")
+    inside = residential.loc[shapely.contains_xy(scope, residential.x, residential.y)]
+    commercial_inside = commercial.loc[
+        shapely.contains_xy(scope, commercial.x, commercial.y)
+    ]
     floor = (
         point_grid(profile, inside, inside.floor_area_m2)
         + clipped_grid(residential_proxy, full_profile, profile, clipped),
@@ -209,7 +208,6 @@ for region_id, region in regions.iterrows():
         "region_id": region_id,
         "residential_source": plan["regions"][region_id]["residential_source"],
         "commercial_source": plan["regions"][region_id]["commercial_source"],
-        "surface_volume_method": snakemake.params.surface_volume["method"],
         "surface_volume_elasticity": snakemake.params.surface_volume["elasticity"],
     }
     for kind, values, grid in (

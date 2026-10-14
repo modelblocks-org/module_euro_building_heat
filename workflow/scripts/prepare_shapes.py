@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import geopandas as gpd
 from _schemas import ShapesSchema
-from _utils import processing_crs, scope_geometry
+from _utils import processing_crs
 
 if TYPE_CHECKING:
     snakemake: Any
@@ -23,9 +23,9 @@ def check_proxied_country_scope(
         dataset_country_ids = set(scope["countries"])
         proxies = {
             country_id: set(proxy_country_ids)
-            for country_id, proxy_country_ids in data_proxies.get(
-                scope["proxy_config"], {}
-            ).items()
+            for country_id, proxy_country_ids in data_proxies[
+                scope["proxy_config"]
+            ].items()
         }
 
         for country_id in sorted(shape_country_ids - dataset_country_ids):
@@ -60,7 +60,9 @@ def main() -> None:
     shapes = shapes.to_crs(WGS84)
     shapes.to_parquet(snakemake.output.shapes, index=False)
     crs = processing_crs(shapes)
-    scope = gpd.GeoDataFrame(geometry=[scope_geometry(shapes, crs)], crs=crs)
+    scope = gpd.GeoDataFrame(
+        geometry=[shapes.to_crs(crs).geometry.union_all()], crs=crs
+    )
     scope.to_parquet(snakemake.output.scope, index=False)
 
 

@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import rasterio
 import xarray as xr
+from _schemas import validate_population_raster
 from _space_heat_weight import climate_adjusted_weights
 from _utils import aggregate_support
 from shapely.geometry import box
@@ -19,7 +20,6 @@ if TYPE_CHECKING:
     snakemake: Any
 
 WGS84 = "EPSG:4326"
-DEFAULT_GRID_DEGREES = 0.25
 
 
 def _prepare_locations(locations: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -58,15 +58,11 @@ def population_on_weather_grid(
     block_size: int = 2048,
 ) -> None:
     """Aggregate population and structural support over weather/shape intersections."""
-    # We need the coordinates. This can be any file with gridded data across Europe
-    # with WGS84 projection which will be used to generate which the grid
-    # At minimum, the dataset must contain the `site` coordinate and latitude and
-    # longitude variables
     coordinate_ds = xr.open_dataset(path_to_coordinates, decode_timedelta=True)
 
-    # Locations are parquet shape files at the resolution of interest.
     locations = _prepare_locations(gpd.read_parquet(path_to_locations))
 
+    validate_population_raster(path_to_population)
     with rasterio.open(path_to_population) as source:
         population_crs = source.crs
     gridbox = _weather_gridbox_polygons(coordinate_ds, lat_name, lon_name).to_crs(
@@ -78,8 +74,7 @@ def population_on_weather_grid(
     if gridbox.empty:
         raise ValueError("No weather gridboxes overlap the provided shapes.")
 
-    # Create new shapes that are either complete gridboxes or partial ones that
-    # sit inside a specific location.
+    # Intersections associate weather-grid support with individual shapes.
     gridboxes_mapped_to_locations = gpd.overlay(gridbox, locations)
     if gridboxes_mapped_to_locations.empty:
         raise ValueError("No weather gridbox polygons intersect the provided shapes.")
@@ -166,11 +161,15 @@ def _weather_gridbox_polygons(
     coordinate_ds: xr.Dataset, lat_name: str, lon_name: str
 ) -> gpd.GeoDataFrame:
     """Build weather grid-cell polygons from grid point coordinates."""
-    fallback_step = float(coordinate_ds.attrs.get("grid_degrees", DEFAULT_GRID_DEGREES))
+    if "grid_degrees" not in coordinate_ds.attrs:
+        raise ValueError("Weather grid is missing required 'grid_degrees' metadata.")
+    grid_degrees = float(coordinate_ds.attrs["grid_degrees"])
+    if not np.isfinite(grid_degrees) or grid_degrees <= 0:
+        raise ValueError("Weather grid 'grid_degrees' must be finite and positive.")
     lat_values = np.asarray(coordinate_ds[lat_name].values, dtype=float)
     lon_values = np.asarray(coordinate_ds[lon_name].values, dtype=float)
-    lat_bounds = _coordinate_bounds(lat_values, fallback_step)
-    lon_bounds = _coordinate_bounds(lon_values, fallback_step)
+    lat_bounds = _coordinate_bounds(lat_values, grid_degrees)
+    lon_bounds = _coordinate_bounds(lon_values, grid_degrees)
 
     geometries = []
     for lat, lon in zip(lat_values, lon_values, strict=True):
@@ -184,12 +183,12 @@ def _weather_gridbox_polygons(
 
 
 def _coordinate_bounds(
-    values: np.ndarray, fallback_step: float
+    values: np.ndarray, grid_degrees: float
 ) -> dict[float, tuple[float, float]]:
     """Infer grid-cell lower and upper bounds for each coordinate value."""
     unique_values = np.sort(np.unique(values.astype(float)))
     if len(unique_values) == 1:
-        half_step = fallback_step / 2
+        half_step = grid_degrees / 2
         value = unique_values[0]
         return {value: (value - half_step, value + half_step)}
 
@@ -274,5 +273,4 @@ if __name__ == "__main__":
         annual_weights_path=snakemake.output.annual_weights,
         weather_demand_years=snakemake.params.weather_demand_years,
         elasticity=snakemake.params.hdd_elasticity,
-        block_size=snakemake.params.chunk_size,
     )

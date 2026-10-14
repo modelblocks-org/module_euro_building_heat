@@ -38,14 +38,13 @@ for region_id, row in summary.iterrows():
         share=snakemake.params.population_share,
         age=age_row.age_factor,
     )
-    # Normalize on the whole region, then evaluate the same formula on the
-    # clipped arrays; clipping must not redistribute the outside share.
+    # Use complete-region denominators so clipping preserves allocation shares.
     full_weights = weight_from_support(*full, **arguments)
     weights = weight_from_support(floor[0], *scoped, **arguments)
     raster_path = output_directory / f"{region_id}.tif"
     write_raster(
         raster_path,
-        {**profile, "dtype": snakemake.params.raster["dtype"]},
+        {**profile, "dtype": "float32"},
         (weights,),
         SPACE_HEAT_WEIGHT_BANDS,
         ("weighted_m2/ha",),

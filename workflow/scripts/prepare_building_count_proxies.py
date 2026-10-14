@@ -57,8 +57,7 @@ for country in references:
     # Translate workflow country IDs to the codes used in EUBUCCO statistics.
     selected = stats.loc[stats.country.eq(snakemake.params.country_codes[country])]
     inhabitants = population.loc[population.country_id.eq(country), "population"].sum()
-    # Shares use all buildings as the denominator, so the two sectors need
-    # not sum to one; the commercial numerator also includes public buildings.
+    # Sector shares use all buildings as the denominator, including other uses.
     reference_ratios[country] = reference_count_ratios(selected, inhabitants)
 
 # Keep the output schema even when the plan has no countries needing proxies.
@@ -68,8 +67,7 @@ columns = [
     "residential_per_person",
     "commercial_per_person",
 ]
-# Average ratios across references, not pooled building/population totals;
-# larger reference countries therefore do not receive greater weight.
+# Equal reference-country weights prevent larger building stocks from dominating.
 table = pd.DataFrame(
     [
         {

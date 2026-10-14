@@ -241,7 +241,7 @@ def country_allocation_factors(
     weather_demand_years,
     category="household",
 ):
-    """Return the original country-normalised factors per weather/shape intersection."""
+    """Return country-normalised factors per weather/shape intersection."""
     mask = (national_demand.index.get_level_values("cat_name") == category) & (
         national_demand.index.get_level_values("end_use") == "space_heat"
     )
@@ -346,10 +346,7 @@ def main() -> None:
         1,
         f"Space-heating demand — {demand_year}\nWeather year: {weather_year}",
         snakemake.output.density,
-        snakemake.params.chunk_size,
-        snakemake.params.plotting["max_size"],
         shapes,
-        snakemake.params.plotting["outline"],
         colorbar_label="Annual space-heating demand (MWh/cell; 1 ha cells)",
     )
 

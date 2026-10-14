@@ -1,6 +1,6 @@
 """Assign Microsoft footprints to control regions and combine their partitions.
 
-Input tiles have already passed download validation. Geometry normalization is
+Input features are validated as they are read. Geometry normalization is
 part of conversion: project WGS84 footprints, measure their area, and assign
 centroids to regions. Shape-based fallback regions take precedence if control
 regions overlap. Raw tile counts are retained for the sparse-coverage policy.
@@ -27,6 +27,7 @@ from _microsoft import (
     MICROSOFT_TILE_STATISTICS_SCHEMA,
     tile_statistics,
 )
+from _schemas import validate_microsoft_feature
 
 if TYPE_CHECKING:
     snakemake: Any
@@ -92,6 +93,7 @@ for source in sorted(Path(source) for source in snakemake.input.downloads):
         for line_number, line in enumerate(stream):
             raw_count += 1
             feature = json.loads(line)
+            validate_microsoft_feature(feature)
             ids.append(f"{source.stem}:{line_number}")
             geometries.append(
                 shapely.make_valid(
@@ -132,7 +134,7 @@ else:
     )
 
 
-# Aggregate in the source stage; allocation only needs this small regional table.
+# Cache regional footprint totals for floor-area allocation.
 pq.write_table(
     duckdb.connect()
     .execute(

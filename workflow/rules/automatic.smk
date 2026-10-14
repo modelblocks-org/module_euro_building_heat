@@ -108,11 +108,6 @@ rule download_raw_population:
     conda:
         "../envs/module.yaml"
     params:
-        kind="population",
-        member=lambda wc: internal["resources"]["ghsl"]["stem"].format(
-            epoch=wc.ghsl_epoch
-        )
-        + "_V1_0.tif",
         url=lambda wc: internal["resources"]["ghsl"]["url"].format(
             stem=internal["resources"]["ghsl"]["stem"].format(epoch=wc.ghsl_epoch)
         ),
@@ -150,7 +145,6 @@ rule download_nuts3:
     conda:
         "../envs/module.yaml"
     params:
-        kind="nuts3",
         url=internal["resources"]["stable"]["url"].format(dataset="nuts3.geojson"),
     message:
         "Download NUTS3 region boundaries."
@@ -166,7 +160,6 @@ rule download_eurostat_floor_area:
     conda:
         "../envs/module.yaml"
     params:
-        kind="floor_area",
         url=internal["resources"]["stable"]["url"].format(
             dataset="cens_21dwbnr_r3.tsv.gz"
         ),
@@ -186,7 +179,6 @@ rule download_eubucco_nuts:
     conda:
         "../envs/module.yaml"
     params:
-        kind="eubucco_nuts",
         url=internal["resources"]["automatic"]["eubucco_nuts"],
     message:
         "Download EUBUCCO NUTS region metadata."
@@ -202,7 +194,6 @@ rule download_eubucco_stats:
     conda:
         "../envs/module.yaml"
     params:
-        kind="eubucco_stats",
         url=internal["resources"]["automatic"]["eubucco_stats"],
     message:
         "Download EUBUCCO regional building statistics."
@@ -218,7 +209,6 @@ rule download_eurostat_building_age:
     conda:
         "../envs/module.yaml"
     params:
-        kind="building_age",
         url=internal["resources"]["stable"]["url"].format(
             dataset="cens_21dwop_r3.tsv.gz"
         ),
@@ -228,7 +218,7 @@ rule download_eurostat_building_age:
         "../scripts/download.py"
 
 
-if USE_PRECOMPUTED:
+if USE_PREBUILT:
 
     rule download_precomputed_building_raster:
         output:
@@ -240,7 +230,9 @@ if USE_PRECOMPUTED:
         conda:
             "../envs/module.yaml"
         params:
-            url=published_grid_url,
+            url=lambda wc: internal["resources"]["stable"]["url"].format(
+                dataset=f"{wc.dataset}.tif"
+            ),
         message:
             "Download precomputed {wildcards.dataset} raster."
         shell:
