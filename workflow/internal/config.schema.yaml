@@ -1,204 +1,509 @@
-$schema: "https://json-schema.org/draft/2020-12/schema"
-description: "Schema for user-provided heat demand configuration."
+$schema: https://json-schema.org/draft/2020-12/schema
+description: Schema for user-provided heat demand configuration.
 type: object
 additionalProperties: false
 required:
-  - demand_years
-  - weather_years
-  - threads
-  - population
-  - crs
-  - heat
+- building_rasters
+- demand_years
+- weather_years
+- threads
+- population
+- crs
+- data_proxies
+- spatial_weights
+- useful_heat_demand
+- tech_efficiencies
+- heat_pump
 properties:
-  demand_years:
-    description: >
-      Selects the annual heat-demand years. The range includes `start`
-      and excludes `end`.
+  building_rasters:
+    description: "Settings controlling whether building grids are downloaded or rebuilt."
     type: object
     additionalProperties: false
-    required: [start, end]
+    required:
+    - source
+    properties:
+      source:
+        type: string
+        enum:
+        - prebuilt
+        - rebuild
+        description: Download published building grids or rebuild them from raw data.
+      processing:
+        description: "Batching settings for building-data processing."
+        type: object
+        additionalProperties: false
+        required:
+        - nuts3_batches
+        properties:
+          nuts3_batches:
+            description: "Number of balanced regional batches used to process buildings."
+            type: integer
+            minimum: 1
+      buildings_microsoft:
+        description: "Microsoft building-footprint release and population-fallback settings."
+        type: object
+        additionalProperties: false
+        required:
+        - release
+        - minimum_building_count
+        properties:
+          release:
+            description: "Dated Microsoft building-footprint release to download and cache, in YYYY-MM-DD format."
+            type: string
+            pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+          minimum_building_count:
+            description: "Tiles with fewer source buildings use population-based fallback."
+            type: integer
+            minimum: 0
+      buildings_eubucco:
+        description: "Representative storey-count assumptions for EUBUCCO building footprints."
+        type: object
+        additionalProperties: false
+        required:
+        - floor_bin_representatives
+        properties:
+          floor_bin_representatives:
+            description: "Representative storey counts used to estimate mean storeys and missing floor-area totals."
+            type: object
+            additionalProperties: false
+            required:
+            - n_floors_0_2
+            - n_floors_2_4
+            - n_floors_4_7
+            - n_floors_7_inf
+            properties:
+              n_floors_0_2:
+                description: "Representative storey count for the 0-2 floor bin."
+                type: number
+                exclusiveMinimum: 0
+              n_floors_2_4:
+                description: "Representative storey count for the 2-4 floor bin."
+                type: number
+                exclusiveMinimum: 0
+              n_floors_4_7:
+                description: "Representative storey count for the 4-7 floor bin."
+                type: number
+                exclusiveMinimum: 0
+              n_floors_7_inf:
+                description: "Representative storey count for the 7 or more floor bin."
+                type: number
+                exclusiveMinimum: 0
+      eurostat:
+        description: "Census dwelling-area and room-count assumptions used to estimate residential floor area."
+        type: object
+        additionalProperties: false
+        required:
+        - useful_to_gross_ratio
+        - floor_space_m2
+        - rooms
+        - floor_area_per_room_m2
+        properties:
+          useful_to_gross_ratio:
+            description: "Multiplier converting useful dwelling floor area to gross building area, including walls
+              and shared space."
+            type: number
+            exclusiveMinimum: 0
+          floor_space_m2:
+            description: "Representative useful floor area in m² per dwelling in each Census 2021 area class."
+            type: object
+            additionalProperties: false
+            required:
+            - SQM_LT30
+            - SQM30-39
+            - SQM40-49
+            - SQM50-59
+            - SQM60-79
+            - SQM80-99
+            - SQM100-119
+            - SQM120-149
+            - SQM_GE150
+            properties:
+              SQM_LT30:
+                description: "Representative useful floor area in square metres for dwellings in the less than 30
+                  square metre class."
+                type: number
+                exclusiveMinimum: 0
+              SQM30-39:
+                description: "Representative useful floor area in square metres for dwellings in the 30-39 square
+                  metre class."
+                type: number
+                exclusiveMinimum: 0
+              SQM40-49:
+                description: "Representative useful floor area in square metres for dwellings in the 40-49 square
+                  metre class."
+                type: number
+                exclusiveMinimum: 0
+              SQM50-59:
+                description: "Representative useful floor area in square metres for dwellings in the 50-59 square
+                  metre class."
+                type: number
+                exclusiveMinimum: 0
+              SQM60-79:
+                description: "Representative useful floor area in square metres for dwellings in the 60-79 square
+                  metre class."
+                type: number
+                exclusiveMinimum: 0
+              SQM80-99:
+                description: "Representative useful floor area in square metres for dwellings in the 80-99 square
+                  metre class."
+                type: number
+                exclusiveMinimum: 0
+              SQM100-119:
+                description: "Representative useful floor area in square metres for dwellings in the 100-119 square
+                  metre class."
+                type: number
+                exclusiveMinimum: 0
+              SQM120-149:
+                description: "Representative useful floor area in square metres for dwellings in the 120-149 square
+                  metre class."
+                type: number
+                exclusiveMinimum: 0
+              SQM_GE150:
+                description: "Representative useful floor area in square metres for dwellings in the 150 or more
+                  square metre class."
+                type: number
+                exclusiveMinimum: 0
+          rooms:
+            description: "Representative room count for dwellings reported as nine or more rooms; exact counts 1–8
+              are fixed."
+            type: object
+            additionalProperties: false
+            required:
+            - GE9
+            properties:
+              GE9:
+                description: "Representative room count for dwellings with nine or more rooms."
+                type: number
+                minimum: 9
+          floor_area_per_room_m2:
+            description: "Useful floor area in square metres per room when dwelling floor-space totals are missing
+              or zero."
+            type: number
+            exclusiveMinimum: 0
+    allOf:
+    - if:
+        properties:
+          source:
+            const: rebuild
+      then:
+        required:
+        - processing
+        - buildings_microsoft
+        - buildings_eubucco
+        - eurostat
+  demand_years:
+    description: |
+      Selects the annual heat-demand years. The range includes `start` and excludes
+      `end`.
+    type: object
+    additionalProperties: false
+    required:
+    - start
+    - end
     properties:
       start:
+        description: "First annual heat-demand year, included in the range."
         type: integer
         minimum: 2010
         maximum: 2023
       end:
+        description: "End of the annual heat-demand year range, excluded from the range."
         type: integer
         minimum: 2011
         maximum: 2024
   weather_years:
-    description: >
-      Selects the ERA5 years used to construct hourly profiles. The range
-      includes `start`, excludes `end`, and must span the same number of years
-      as `demand_years`; weather and demand years are paired in order.
+    description: |
+      Selects the ERA5 years used to construct hourly profiles. The range includes
+      `start`, excludes `end`, and must span the same number of years as `demand_years`;
+      weather and demand years are paired in order.
     type: object
     additionalProperties: false
-    required: [start, end]
+    required:
+    - start
+    - end
     properties:
       start:
+        description: "First ERA5 weather year, included in the range."
         type: integer
       end:
+        description: "End of the ERA5 weather year range, excluded from the range."
         type: integer
   threads:
     description: Settings controlling parallel execution of aggregation tasks.
     type: object
     additionalProperties: false
-    required: [aggregation]
+    required:
+    - aggregation
     properties:
       aggregation:
-        description: >
-          Maximum number of worker threads used to calculate and aggregate
-          gridded heat-demand and heat-pump profiles.
+        description: |
+          Maximum number of worker threads used to calculate and aggregate gridded
+          heat-demand and heat-pump profiles.
         type: integer
         minimum: 1
   population:
-    description: >
-      Controls the GHSL population data used to allocate national demand and
-      weather-grid profiles to the input shapes.
+    description: "Population dataset and processing settings for gridded aggregation."
     type: object
     additionalProperties: false
+    required:
+    - epoch
     properties:
-      resolution:
-        description: >
-          GHSL GHS-POP raster resolution in metres.
-          Use 100 for more spatial detail or 1000 for a smaller, faster calculation.
+      epoch:
+        description: "Reference year of the gridded population dataset."
         type: integer
-        enum: [100, 1000]
+        enum:
+        - 1975
+        - 1980
+        - 1985
+        - 1990
+        - 1995
+        - 2000
+        - 2005
+        - 2010
+        - 2015
+        - 2020
+        - 2025
+        - 2030
   crs:
     description: Coordinate reference systems used for geometry calculations.
     type: object
     additionalProperties: false
-    required: [projected]
+    required:
+    - projected
     properties:
       projected:
-        description: >
-          Projected CRS used for centroid calculations, supplied as a CRS string
-          such as EPSG:3035 or as an integer EPSG code such as 3035.
+        description: |
+          Projected CRS used for centroid calculations, supplied as a CRS string such as
+          EPSG:3035 or as an integer EPSG code such as 3035.
         oneOf:
-          - type: string
-          - type: integer
+        - type: string
+        - type: integer
   data_proxies:
-    description: >
-      Optional mappings from unsupported target countries to reference
-      countries. Values from multiple reference countries are averaged.
+    description: |-
+      Explicit country-proxy mappings. Use an empty mapping when no proxies are needed; values from multiple reference countries are averaged.
     type: object
     additionalProperties: false
     properties:
       sfh_mfh_shares:
-        description: >
-          Maps countries missing dwelling-type data to countries whose
-          single-family homes (sfh) and multi-family homes (mfh) shares should be averaged.
-        $ref: "#/$defs/country_proxy_map"
+        description: |
+          Maps countries missing dwelling-type data to countries whose single-family homes
+          (sfh) and multi-family homes (mfh) shares should be averaged.
+        $ref: '#/$defs/country_proxy_map'
       annual_energy_balance:
-        description: >
-          Maps countries missing energy-balance data to countries whose
-          per-capita energy intensities should be averaged and scaled to the
-          target population.
-        $ref: "#/$defs/country_proxy_map"
+        description: |
+          Maps countries missing energy-balance data to countries whose per-capita energy
+          intensities should be averaged and scaled to the target population.
+        $ref: '#/$defs/country_proxy_map'
       household_end_use:
-        description: >
-          Maps countries missing residential end-use data to countries whose
-          carrier-level household end-use shares should be averaged.
-        $ref: "#/$defs/country_proxy_map"
+        description: |
+          Maps countries missing residential end-use data to countries whose carrier-level
+          household end-use shares should be averaged.
+        $ref: '#/$defs/country_proxy_map'
       jrc_idees:
-        description: >
-          Maps countries missing commercial end-use data to JRC-IDEES
-          countries whose carrier-level services end-use shares should be
-          averaged.
-        $ref: "#/$defs/country_proxy_map"
-  heat:
-    description: >
-      Controls the conversion of final energy to useful heat and the
-      calculation of heat-pump coefficient-of-performance profiles.
-    type: object
-    additionalProperties: false
-    required: [tech_efficiencies]
-    properties:
-      useful_heat_demand:
-        description: >
-          Chooses whether to use published useful-heat data where available
-          (`actual`) or calculate all useful heat from final energy and
-          `tech_efficiencies` (`calculate_all`).
-        type: string
-        enum: [actual, calculate_all]
-        default: actual
-      tech_efficiencies:
-        description: >
-          Final-to-useful energy conversion factors grouped by end use and
-          carrier; for example, 0.9 converts one unit of final energy to 0.9
-          units of useful heat.
-        type: object
-        additionalProperties: false
-        properties:
-          space_heat:
-            description: Conversion factors for space heating.
-            $ref: "#/$defs/technology_efficiencies"
-          hot_water:
-            description: Conversion factors for hot water.
-            $ref: "#/$defs/technology_efficiencies"
-          cooking:
-            description: Conversion factors for cooking.
-            $ref: "#/$defs/technology_efficiencies"
-      heat_pump:
-        description: >
-          Settings used to calculate the combined air-source and ground-source
-          heat-pump coefficient-of-performance profile.
+        description: |
+          Maps countries missing commercial end-use data to JRC-IDEES countries whose
+          carrier-level services end-use shares should be averaged.
+        $ref: '#/$defs/country_proxy_map'
+      floor_area:
+        description: "Reference-country settings for missing floor-area and building-count data."
         type: object
         additionalProperties: false
         required:
-          - sink_temperature
-          - space_heat_sink_shares
-          - heat_pump_shares
-          - correction_factor
+        - countries
         properties:
-          sink_temperature:
-            description: >
-              Operating temperature in degrees Celsius for each heat-delivery
-              method. Exactly one method omitted from
-              `space_heat_sink_shares` is treated as the hot-water sink.
-            type: object
-            minProperties: 2
-            additionalProperties:
-              description: Sink operating temperature in degrees Celsius.
-              type: number
-          space_heat_sink_shares:
-            description: >
-              Share of space heat delivered by each configured sink method.
-              Keys must occur in `sink_temperature`, and values must sum to
-              one.
-            type: object
-            minProperties: 1
-            additionalProperties:
-              description: Fraction of space heat delivered by this sink method.
-              type: number
-              minimum: 0
-              maximum: 1
-          heat_pump_shares:
-            description: >
-              Shares of air-source and ground-source heat pumps used to form
-              the combined COP profile; the two values must sum to one.
+          countries:
+            description: "Maps target countries to reference countries for floor-area and building-count proxies."
+            $ref: '#/$defs/country_proxies'
+    required:
+    - sfh_mfh_shares
+    - annual_energy_balance
+    - household_end_use
+    - jrc_idees
+  spatial_weights:
+    description: "Settings for spatial allocation of annual space-heating demand."
+    type: object
+    additionalProperties: false
+    properties:
+      population:
+        description: "Population contribution to residential structural heat-demand weights."
+        type: object
+        additionalProperties: false
+        required:
+        - share
+        properties:
+          share:
+            description: "Population fraction of the residential blend; zero uses floor area and one uses population."
+            type: number
+            minimum: 0
+            maximum: 1
+      surface_volume:
+        description: "Building compactness correction for residential space-heating weights."
+        type: object
+        additionalProperties: false
+        required:
+        - elasticity
+        properties:
+          elasticity:
+            description: "Exponent applied to the surface-to-volume ratio before country centring; zero is neutral."
+            type: number
+            minimum: 0
+      age:
+        description: "Building-age corrections centred on each country's floor-area-weighted mean."
+        type: object
+        additionalProperties: false
+        required:
+        - multipliers
+        properties:
+          multipliers:
+            description: "Relative heat intensities by construction period; setting all factors to one is neutral."
             type: object
             additionalProperties: false
-            required: [ashp, gshp]
+            required:
+            - before_1981
+            - '1981_2000'
+            - after_2000
             properties:
-              ashp:
-                description: Fraction of heat pumps that are air-source.
+              before_1981:
+                description: "Relative heat intensity for dwellings built before 1981."
                 type: number
-                minimum: 0
-                maximum: 1
-              gshp:
-                description: Fraction of heat pumps that are ground-source.
+                exclusiveMinimum: 0
+              '1981_2000':
+                description: "Relative heat intensity for dwellings built from 1981 through 2000."
                 type: number
-                minimum: 0
-                maximum: 1
-          correction_factor:
-            description: >
-              Positive multiplier applied to manufacturer COP curves to
-              represent expected operational performance.
+                exclusiveMinimum: 0
+              after_2000:
+                description: "Relative heat intensity for dwellings built after 2000."
+                type: number
+                exclusiveMinimum: 0
+      hdd:
+        description: Annual household and commercial space-heating severity correction from ERA5.
+        type: object
+        additionalProperties: false
+        properties:
+          base_temperature:
+            description: HDD base temperature in degrees Celsius, using daily mean temperature.
             type: number
-            exclusiveMinimum: 0
+          elasticity:
+            description: |
+              Exponent applied to HDD before country-normalised sector space-heat allocation.
+              Zero disables the correction.
+            type: number
+            minimum: 0
+        required:
+        - base_temperature
+        - elasticity
+    required:
+    - hdd
+  useful_heat_demand:
+    description: |
+      Chooses whether to use published useful-heat data where available (`actual`) or
+      calculate all useful heat from final energy and `tech_efficiencies`
+      (`calculate_all`).
+    type: string
+    enum:
+    - actual
+    - calculate_all
+  tech_efficiencies:
+    description: |
+      Final-to-useful energy conversion factors grouped by end use and carrier; for
+      example, 0.9 converts one unit of final energy to 0.9 units of useful heat.
+    type: object
+    additionalProperties: false
+    properties:
+      space_heat:
+        description: Conversion factors for space heating.
+        $ref: '#/$defs/technology_efficiencies'
+        required:
+        - gas
+        - oil
+        - solid_fossil
+        - biowaste
+        - electricity
+        - solar_thermal
+      hot_water:
+        description: Conversion factors for hot water.
+        $ref: '#/$defs/technology_efficiencies'
+        required:
+        - gas
+        - oil
+        - solid_fossil
+        - biowaste
+        - electricity
+        - solar_thermal
+      cooking:
+        description: Conversion factors for cooking.
+        $ref: '#/$defs/technology_efficiencies'
+        required:
+        - gas
+        - oil
+        - solid_fossil
+        - biowaste
+        - electricity
+    required:
+    - space_heat
+    - hot_water
+    - cooking
+  heat_pump:
+    description: |
+      Settings used to calculate the combined air-source and ground-source heat-pump
+      coefficient-of-performance profile.
+    type: object
+    additionalProperties: false
+    required:
+    - sink_temperature
+    - space_heat_sink_shares
+    - heat_pump_shares
+    - correction_factor
+    properties:
+      sink_temperature:
+        description: |
+          Operating temperature in degrees Celsius for each heat-delivery method. Exactly
+          one method omitted from `space_heat_sink_shares` is treated as the hot-water sink.
+        type: object
+        minProperties: 2
+        additionalProperties:
+          description: Sink operating temperature in degrees Celsius.
+          type: number
+      space_heat_sink_shares:
+        description: |
+          Share of space heat delivered by each configured sink method. Keys must occur in
+          `sink_temperature`, and values must sum to one.
+        type: object
+        minProperties: 1
+        additionalProperties:
+          description: Fraction of space heat delivered by this sink method.
+          type: number
+          minimum: 0
+          maximum: 1
+      heat_pump_shares:
+        description: |
+          Shares of air-source and ground-source heat pumps used to form the combined COP
+          profile; the two values must sum to one.
+        type: object
+        additionalProperties: false
+        required:
+        - ashp
+        - gshp
+        properties:
+          ashp:
+            description: Fraction of heat pumps that are air-source.
+            type: number
+            minimum: 0
+            maximum: 1
+          gshp:
+            description: Fraction of heat pumps that are ground-source.
+            type: number
+            minimum: 0
+            maximum: 1
+      correction_factor:
+        description: |
+          Positive multiplier applied to manufacturer COP curves to represent expected
+          operational performance.
+        type: number
+        exclusiveMinimum: 0
 $defs:
   technology_efficiencies:
+    description: "Final-to-useful energy conversion factors by energy carrier."
     type: object
     additionalProperties: false
     properties:
@@ -227,9 +532,9 @@ $defs:
         type: number
         minimum: 0
   country_proxy_map:
-    description: >
-      Maps each target ISO 3166-1 alpha-3 country code to one or more reference
-      country codes whose relevant values will be averaged.
+    description: |
+      Maps each target ISO 3166-1 alpha-3 country code to one or more reference country
+      codes whose relevant values will be averaged.
     type: object
     additionalProperties:
       description: Reference countries to use for one target country.
@@ -238,4 +543,42 @@ $defs:
       items:
         description: Reference-country ISO 3166-1 alpha-3 code.
         type: string
-        pattern: "^[A-Za-z]{3}$"
+        pattern: ^[A-Za-z]{3}$
+  country_proxies:
+    description: "Maps uppercase target ISO alpha-3 country codes to reference-country lists."
+    type: object
+    propertyNames:
+      description: "Target-country ISO 3166-1 alpha-3 code in uppercase."
+      pattern: ^[A-Z]{3}$
+    additionalProperties:
+      description: "Reference countries used for one target country."
+      type: array
+      minItems: 1
+      uniqueItems: true
+      items:
+        description: "Reference-country ISO 3166-1 alpha-3 code in uppercase."
+        type: string
+        pattern: ^[A-Z]{3}$
+allOf:
+- if:
+    properties:
+      building_rasters:
+        properties:
+          source:
+            const: prebuilt
+  then:
+    properties:
+      population:
+        properties:
+          epoch:
+            const: 2025
+  else:
+    properties:
+      data_proxies:
+        required:
+        - floor_area
+      spatial_weights:
+        required:
+        - population
+        - surface_volume
+        - age

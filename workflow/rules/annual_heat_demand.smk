@@ -12,10 +12,12 @@ checkpoint prepare_shape_country_scope:
     conda:
         "../envs/module.yaml"
     params:
+        dataset_scopes=internal["scope"]["datasets"],
+        data_proxies=config["data_proxies"],
         commercial_end_use_scope=internal["scope"]["datasets"]["commercial_end_use"][
             "countries"
         ],
-        jrc_idees_proxies=config.get("data_proxies", {}).get("jrc_idees", {}),
+        jrc_idees_proxies=config["data_proxies"]["jrc_idees"],
     message:
         "Determine heat-demand country scope for '{wildcards.shapes}' shapes."
     script:
@@ -75,7 +77,7 @@ rule process_final_heat_demand:
     params:
         demand_years=DEMAND_YEARS,
         countries=lambda wildcards, input: _read_checkpoint_lines(input.country_ids),
-        data_proxies=config.get("data_proxies", {}),
+        data_proxies=config["data_proxies"],
     message:
         "Prepare national annual final heat demand for household and commercial sectors."
     script:
@@ -97,8 +99,8 @@ rule process_useful_heat:
         "../envs/module.yaml"
     params:
         demand_years=DEMAND_YEARS,
-        heat_tech_params=config["heat"]["tech_efficiencies"],
-        useful_heat_demand=config["heat"].get("useful_heat_demand", "actual"),
+        heat_tech_params=config["tech_efficiencies"],
+        useful_heat_demand=config["useful_heat_demand"],
     message:
         "Calculate national annual useful heat demand."
     script:
@@ -110,8 +112,21 @@ rule rescale_annual_heat_demand_to_shapes:
         annual_demand=rules.process_useful_heat.output.total_demand,
         shapes=rules.prepare_shapes.output[0],
         population="<resources>/automatic/shapes/{shapes}/population.nc",
+        space_heat_weight="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
+        commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
+        annual_weights="<resources>/automatic/shapes/{shapes}/annual_spatial_weights.nc",
+        residential_raster=rules.merge_structural_support.output.residential_space_heat_weight,
+        commercial_raster=rules.merge_structural_support.output.commercial_space_heat_weight,
+        grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     output:
         annual_demand="<annual_heat_demand>",
+        space_heat="<space_heat_demand>",
+        hot_water="<hot_water_demand>",
+        density=report(
+            "<resources>/automatic/shapes/{shapes}/plots/space_heat_demand_density.png",
+            category="European Building Heat",
+            subcategory="Heat demand",
+        ),
         choropleth=report(
             "<resources>/automatic/shapes/{shapes}/plots/annual_heat_demand.png",
             category="European Building Heat",
@@ -121,6 +136,9 @@ rule rescale_annual_heat_demand_to_shapes:
         "<logs>/{shapes}/annual/rescale_annual_heat_demand_to_shapes.log",
     conda:
         "../envs/module.yaml"
+    params:
+        weather_demand_years=WEATHER_DEMAND_YEARS,
+        hdd_elasticity=config["spatial_weights"]["hdd"]["elasticity"],
     message:
         "Scale national annual heat demand to '{wildcards.shapes}' shapes."
     script:

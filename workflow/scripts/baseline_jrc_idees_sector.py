@@ -60,7 +60,7 @@ def main() -> None:
         unit="TWh",
     )
     fig.suptitle(f"{sector.capitalize()} energy demand")
-    fig.savefig(snakemake.output.plot, bbox_inches="tight")
+    _plots.save_figure(fig, snakemake.output.plot, bbox_inches="tight")
 
 
 if __name__ == "__main__":

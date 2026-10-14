@@ -1,15 +1,45 @@
-"""Schema validation generics."""
+"""Input validation and output table format definitions."""
 
+import json
 from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
 
+import numpy as np
 import pandas as pd
+import pyarrow
+import pyarrow.parquet as pq
+import rasterio
+import shapely
 from pandera import pandas as pa
 from pandera.typing.geopandas import GeoSeries
 from pandera.typing.pandas import Series
 from shapely.geometry import MultiPolygon, Polygon
 
+# Processed footprints use metric area/perimeter and processing-CRS centroids.
+# The schema preserves column types for empty tables.
+EUBUCCO_PROCESSED_SCHEMA = pyarrow.schema(
+    [
+        ("id", pyarrow.string()),
+        ("region_id", pyarrow.string()),
+        ("type", pyarrow.string()),
+        ("subtype", pyarrow.string()),
+        ("floors", pyarrow.float64()),
+        ("footprint_area_m2", pyarrow.float64()),
+        ("footprint_perimeter_m", pyarrow.float64()),
+        ("height_m", pyarrow.float64()),
+        ("x", pyarrow.float64()),
+        ("y", pyarrow.float64()),
+    ]
+)
+
+
 ENERGY_TYPES: tuple[str, ...] = ("useful_energy", "final_energy")
+
+
 SECTORS: tuple[str, ...] = ("residential", "services")
+
+
 CARRIERS: tuple[str, ...] = (
     "ambient_heat",
     "biomass_and_waste",
@@ -23,13 +53,19 @@ CARRIERS: tuple[str, ...] = (
     "solar_thermal",
     "solid_fossil",
 )
+
+
 END_USES: tuple[str, ...] = (
     "cooking",
     "end_use_electricity",
     "hot_water",
     "space_heat",
 )
+
+
 ANNUAL_HEAT_END_USES: tuple[str, ...] = ("cooking", "hot_water", "space_heat")
+
+
 BUILDING_CATEGORIES: tuple[str, ...] = ("commercial", "household")
 
 
@@ -88,7 +124,6 @@ class BaselineSchema(pa.DataFrameModel):
     "Country code."
     unit: Series[str] = pa.Field(eq="twh")
     "Unit of the value."
-    # FIXME: needs better name
     energy: Series[str] = pa.Field(isin=ENERGY_TYPES)
     "Type of energy measurement."
     year: Series[int] = pa.Field(ge=2000)
@@ -108,11 +143,6 @@ class BaselineSchema(pa.DataFrameModel):
             raise ValueError(f"Found countries outside scope: {mismatch}")
 
         return validated
-
-    @classmethod
-    def get_column_names(cls) -> list[str]:
-        """Get the schema column names."""
-        return list(cls.to_schema().columns.keys())
 
 
 class AnnualHeatDemandSchema(pa.DataFrameModel):
@@ -134,3 +164,136 @@ class AnnualHeatDemandSchema(pa.DataFrameModel):
     "Shape identifier."
     heat_demand_twh: Series[float] = pa.Field(ge=0)
     "Annual useful heat demand in TWh."
+
+
+# Series[Any] checks source values while preserving reader dtypes.
+
+
+class EubuccoRegionsSchema(pa.DataFrameModel):
+    """Schema for EUBUCCO administrative-region metadata."""
+
+    class Config:
+        coerce = False
+        strict = False
+
+    region_id: Series[Any] = pa.Field(unique=True, nullable=True)
+    geometry: Series[Any] = pa.Field()
+
+    @pa.dataframe_check
+    def check_crs(cls, table) -> bool:
+        return table.crs is not None and table.crs.to_epsg() == 3035
+
+    @pa.check("region_id")
+    def check_region_id(cls, values) -> bool:
+        return values.str.fullmatch("[A-Z0-9]+").all()
+
+    @pa.check("geometry")
+    def valid_geometry(cls, values) -> bool:
+        return values.is_valid.all()
+
+
+class EubuccoStatsSchema(pa.DataFrameModel):
+    """Schema for EUBUCCO NUTS-3 floor-area statistics."""
+
+    class Config:
+        coerce = False
+        strict = False
+
+    region_id: Series[Any] = pa.Field(unique=True, nullable=True)
+    country: Series[Any] = pa.Field(nullable=True)
+    n: Series[Any] = pa.Field(ge=0)
+    n_type_residential: Series[Any] = pa.Field(ge=0)
+    n_subtype_commercial: Series[Any] = pa.Field(ge=0)
+    n_subtype_public: Series[Any] = pa.Field(ge=0)
+    floor_area_type_residential: Series[Any] = pa.Field(ge=0)
+    n_floors_0_2: Series[Any] = pa.Field(ge=0)
+    n_floors_2_4: Series[Any] = pa.Field(ge=0)
+    n_floors_4_7: Series[Any] = pa.Field(ge=0)
+    n_floors_7_inf: Series[Any] = pa.Field(ge=0)
+    floor_area_subtype_commercial: Series[Any] = pa.Field(ge=0)
+    floor_area_subtype_public: Series[Any] = pa.Field(ge=0)
+    geometry: Series[Any] = pa.Field(nullable=True)
+
+    @pa.dataframe_check
+    def check_crs(cls, table) -> bool:
+        return table.crs is not None and table.crs.to_epsg() == 3035
+
+    @pa.check("country")
+    def check_country(cls, values) -> bool:
+        return values.str.fullmatch("[A-Z]{2}").all()
+
+    @pa.dataframe_check
+    def finite_values(cls, table) -> bool:
+        return np.isfinite(
+            table[
+                [
+                    "n",
+                    "n_type_residential",
+                    "n_subtype_commercial",
+                    "n_subtype_public",
+                    "floor_area_type_residential",
+                    "n_floors_0_2",
+                    "n_floors_2_4",
+                    "n_floors_4_7",
+                    "n_floors_7_inf",
+                    "floor_area_subtype_commercial",
+                    "floor_area_subtype_public",
+                ]
+            ].to_numpy()
+        ).all()
+
+
+class MicrosoftIndexSchema(pa.DataFrameModel):
+    """Schema for the columns consumed from Microsoft's tile index."""
+
+    class Config:
+        coerce = False
+        strict = False
+
+    Location: Series[Any] = pa.Field(nullable=True)
+    QuadKey: Series[Any] = pa.Field(nullable=True)
+    Url: Series[Any] = pa.Field(nullable=True)
+
+    @pa.check("QuadKey")
+    def check_quadkey(cls, values) -> bool:
+        return values.str.fullmatch("[0-3]{9}").all()
+
+    @pa.check("Url")
+    def https_urls(cls, values) -> bool:
+        return values.str.startswith("https://").all()
+
+
+def validate_microsoft_feature(feature: dict):
+    """Normalize and validate one GeoJSONL building footprint."""
+    assert "geometry" in feature
+    geometry = shapely.make_valid(
+        shapely.geometry.shape(feature["geometry"]),
+        method="structure",
+        keep_collapsed=False,
+    )
+    assert geometry.geom_type in {"Polygon", "MultiPolygon"}
+    assert geometry.is_valid
+    assert not geometry.is_empty
+    return geometry
+
+
+def validate_eubucco_footprints(path: str | Path) -> None:
+    """Validate EUBUCCO footprints and their EPSG:3035 geometry metadata."""
+    schema = pq.read_schema(path)
+    required = {"id", "region_id", "type", "subtype", "floors", "height", "geometry"}
+    assert required <= set(schema.names)
+    geo = json.loads(schema.metadata[b"geo"])
+    assert geo["primary_column"] == "geometry"
+    assert geo["columns"]["geometry"]["crs"]["id"] == {
+        "authority": "EPSG",
+        "code": 3035,
+    }
+
+
+def validate_population_raster(path: str | Path) -> None:
+    """Validate a GHSL GHS-POP Mollweide raster."""
+    with rasterio.open(path) as raster:
+        assert raster.count == 1
+        assert raster.crs.to_string() == "ESRI:54009"
+        assert np.allclose(np.abs(raster.res), 100)
+        assert np.issubdtype(np.dtype(raster.dtypes[0]), np.floating)

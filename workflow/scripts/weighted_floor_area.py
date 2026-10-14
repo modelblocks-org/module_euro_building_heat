@@ -1,0 +1,80 @@
+"""Calculate residential heat weights from persistent floor-area intermediates.
+
+Complete-region arrays preserve normalization and diagnostic totals. Scoped
+arrays preserve the distinct building-centroid and population-cell clipping.
+"""
+
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+import pandas as pd
+from _space_heat_weight import weight_from_support
+from _utils import SPACE_HEAT_WEIGHT_BANDS, read_region_support, write_raster
+
+if TYPE_CHECKING:
+    snakemake: Any
+
+sys.stderr = open(snakemake.log[0], "w")
+summary = pd.read_parquet(Path(snakemake.input.support) / "summary.parquet").set_index(
+    "region_id"
+)
+age = pd.read_parquet(snakemake.input.age).set_index("region_id")
+statistics = pd.read_parquet(snakemake.input.sv_statistics).set_index("country_id")
+output_directory = Path(snakemake.output.partials)
+output_directory.mkdir(parents=True, exist_ok=True)
+diagnostics = []
+
+for region_id, row in summary.iterrows():
+    floor, full, scoped, profile = read_region_support(
+        Path(snakemake.input.support) / region_id
+    )
+    age_row = age.loc[region_id]
+    eligible_population = full[1][full[0] > 0].sum()
+    arguments = dict(
+        reference=statistics.at[row.country_id, "sv_power_reference"],
+        total=row.residential_floor_area_m2,
+        population_total=eligible_population,
+        share=snakemake.params.population_share,
+        age=age_row.age_factor,
+    )
+    # Use complete-region denominators so clipping preserves allocation shares.
+    full_weights = weight_from_support(*full, **arguments)
+    weights = weight_from_support(floor[0], *scoped, **arguments)
+    raster_path = output_directory / f"{region_id}.tif"
+    write_raster(
+        raster_path,
+        {**profile, "dtype": "float32"},
+        (weights,),
+        SPACE_HEAT_WEIGHT_BANDS,
+        ("weighted_m2/ha",),
+        {
+            "region_id": region_id,
+            "method": "blended_floor_area * surface_volume * age",
+            "population_share": snakemake.params.population_share,
+        },
+    )
+
+    diagnostics.append(
+        {
+            "country_id": row.country_id,
+            "region_id": region_id,
+            "residential_floor_area_m2": row.residential_floor_area_m2,
+            "residential_source": row.residential_source,
+            "sv_valid_floor_area_fraction": row.valid_floor_area_m2
+            / row.residential_floor_area_m2
+            if row.residential_floor_area_m2 > 0
+            else 0.0,
+            "age_data_available": age_row.age_data_available,
+            "age_coverage_fraction": age_row.coverage_fraction,
+            "raw_age_factor": age_row.age_factor_raw,
+            "normalised_age_factor": age_row.age_factor,
+            "raw_heat_weight": full_weights.sum(),
+            "eligible_population": eligible_population,
+            "excluded_population": full[1][full[0] == 0].sum(),
+        }
+    )
+
+path = output_directory / "diagnostics.parquet"
+diagnostics = pd.DataFrame(diagnostics)
+diagnostics.to_parquet(path, index=False)
