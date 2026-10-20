@@ -30,6 +30,8 @@ EUBUCCO_PROCESSED_SCHEMA = pyarrow.schema(
         ("height_m", pyarrow.float64()),
         ("x", pyarrow.float64()),
         ("y", pyarrow.float64()),
+        ("height_floor_ratio_flagged", pyarrow.bool_()),
+        ("footprint_wkb", pyarrow.binary()),
     ]
 )
 
@@ -280,7 +282,17 @@ def validate_microsoft_feature(feature: dict):
 def validate_eubucco_footprints(path: str | Path) -> None:
     """Validate EUBUCCO footprints and their EPSG:3035 geometry metadata."""
     schema = pq.read_schema(path)
-    required = {"id", "region_id", "type", "subtype", "floors", "height", "geometry"}
+    required = {
+        "id",
+        "region_id",
+        "type",
+        "subtype",
+        "floors",
+        "height",
+        "geometry",
+        "height_source",
+        "floors_source",
+    }
     assert required <= set(schema.names)
     geo = json.loads(schema.metadata[b"geo"])
     assert geo["primary_column"] == "geometry"

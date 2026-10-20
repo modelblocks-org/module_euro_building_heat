@@ -11,9 +11,11 @@ Sources:
 """
 
 import json
+from decimal import Decimal
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset as ds
@@ -21,8 +23,76 @@ import shapely
 from _schemas import EUBUCCO_PROCESSED_SCHEMA
 
 
-def canonical_from_footprints(batch: pa.RecordBatch, transformer) -> pa.Table:
-    """Reduce building footprints to building measures and centroids.
+def repair_height_floors(batch, settings):
+    """Flag original ratio errors and optionally repair suspect attributes.
+
+    Compare source decimals before float conversion to retain exact boundary
+    pairs. Replacement storeys may be fractional; rounding would bias floor area.
+    Preserve the original flag so dominance removal cannot act on sound pairs.
+    """
+    height = (
+        pc.cast(batch.column("height"), pa.float64())
+        .to_numpy(zero_copy_only=False)
+        .copy()
+    )
+    floors = (
+        pc.cast(batch.column("floors"), pa.float64())
+        .to_numpy(zero_copy_only=False)
+        .copy()
+    )
+    valid_height = np.isfinite(height) & (height > 0)
+    valid_floors = np.isfinite(floors) & (floors > 0)
+    inconsistent = pc.fill_null(
+        pc.less(
+            batch.column("height"),
+            pc.multiply(
+                batch.column("floors"),
+                pa.scalar(Decimal(str(settings["minimum_height_per_floor_m"]))),
+            ),
+        ),
+        False,
+    ).to_numpy(zero_copy_only=False)
+    batch = batch.append_column(
+        "height_floor_ratio_flagged",
+        pa.array(inconsistent & np.isfinite(height) & valid_floors),
+    )
+    if not settings["repair_height_floors"]:
+        return batch
+    repair = ~valid_height | ~valid_floors | inconsistent
+    both = repair & valid_height & valid_floors
+    keep_height = valid_height.copy()
+    if both.any():
+        priority = {
+            source: rank for rank, source in enumerate(settings["source_priority"])
+        }
+        ranks = []
+        for column in ("height_source", "floors_source"):
+            values = batch.column(column).filter(pa.array(both)).to_pylist()
+            normalized = [
+                "gov" if isinstance(v, str) and v.startswith("gov-") else v
+                for v in values
+            ]
+            ranks.append(np.array([priority[v] for v in normalized]))
+        keep_height[both] = ranks[0] <= ranks[1]
+    replace_floors = repair & keep_height
+    replace_height = repair & ~keep_height
+    floors[replace_floors] = (
+        height[replace_floors] / settings["reference_floor_height_m"]
+    )
+    height[replace_height] = (
+        floors[replace_height] * settings["reference_floor_height_m"]
+    )
+    for name, values in (("height", height), ("floors", floors)):
+        batch = batch.set_column(
+            batch.schema.get_field_index(name), name, pa.array(values)
+        )
+    return batch
+
+
+def canonical_from_footprints(
+    batch: pa.RecordBatch, transformer, footprint_threshold_m2: float | None
+) -> pa.Table:
+    """Retain building measures, centroids and selectively stored large footprints.
 
     Decode WKB geometry in EPSG:3035, where area and perimeter are measured in
     square metres and metres. The transformer maps these centroids to the
@@ -33,6 +103,13 @@ def canonical_from_footprints(batch: pa.RecordBatch, transformer) -> pa.Table:
     )
     centroids = shapely.centroid(geometry)
     x, y = transformer.transform(shapely.get_x(centroids), shapely.get_y(centroids))
+    area = shapely.area(geometry)
+    footprints = np.full(len(geometry), None, dtype=object)
+    if footprint_threshold_m2 is not None:
+        large = area > footprint_threshold_m2
+        footprints[large] = shapely.to_wkb(
+            shapely.transform(geometry[large], transformer.transform, interleaved=False)
+        )
     return pa.Table.from_arrays(
         [
             pc.cast(batch.column("id"), pa.string()),
@@ -40,11 +117,13 @@ def canonical_from_footprints(batch: pa.RecordBatch, transformer) -> pa.Table:
             pc.cast(batch.column("type"), pa.string()),
             pc.cast(batch.column("subtype"), pa.string()),
             pc.cast(batch.column("floors"), pa.float64()),
-            pa.array(shapely.area(geometry)),
+            pa.array(area),
             pa.array(shapely.length(geometry)),
             pc.cast(batch.column("height"), pa.float64()),
             pa.array(x),
             pa.array(y),
+            batch.column("height_floor_ratio_flagged"),
+            pa.array(footprints, type=pa.binary()),
         ],
         schema=EUBUCCO_PROCESSED_SCHEMA,
     )

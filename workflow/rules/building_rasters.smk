@@ -80,6 +80,7 @@ else:
     rule create_floor_area_batch:
         input:
             scope=rules.prepare_shapes.output.scope,
+            shapes=rules.prepare_shapes.output.shapes,
             nuts3=rules.prepare_nuts3.output.regions,
             totals=rules.prepare_floor_area_totals.output.table,
             count_proxies=rules.prepare_building_count_proxies.output.table,
@@ -103,8 +104,14 @@ else:
         resources:
             mem_mb=4096,
         params:
+            footprint_allocation_threshold_cells=config["building_rasters"][
+                "buildings_eubucco"
+            ]["footprint_allocation_threshold_cells"],
             microsoft=config["building_rasters"]["buildings_microsoft"],
             surface_volume=config["spatial_weights"]["surface_volume"],
+            maximum_regional_floor_area_share=config["building_rasters"][
+                "buildings_eubucco"
+            ]["quality_control"]["maximum_regional_floor_area_share"],
         message:
             "Calculate floor area for batch {wildcards.batch} of '{wildcards.shapes}' shapes."
         script:

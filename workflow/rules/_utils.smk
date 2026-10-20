@@ -38,6 +38,15 @@ SECTOR_TO_JRC_DATASET = {"services": "Tertiary", "residential": "Residential"}
 
 def additional_config_validation() -> None:
     """Run additional validation that JSON schemas do not support."""
+    if not USE_PREBUILT:
+        quality = config["building_rasters"]["buildings_eubucco"]["quality_control"]
+        if quality["repair_height_floors"] and (
+            quality["reference_floor_height_m"] < quality["minimum_height_per_floor_m"]
+        ):
+            raise ValueError(
+                "Configuration error: reference_floor_height_m must be at least "
+                "minimum_height_per_floor_m when height/floor repair is enabled."
+            )
     if config["demand_years"]["start"] >= config["demand_years"]["end"]:
         raise ValueError(
             "Configuration error: demand_years.start must be less than "

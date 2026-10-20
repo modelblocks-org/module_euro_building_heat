@@ -1,36 +1,25 @@
-# Configuration options and source-mode requirements: config/README.md.
 module_euro_building_heat:
-  # Prebuilt grids require a matching population epoch.
   building_rasters:
     source: prebuilt
 
-  # Annual heat-demand years, with an exclusive end year.
   demand_years:
     start: 2023
     end: 2024
 
-  # ERA5 years shaping hourly demand and annual HDD corrections.
-  # Paired in order with demand_years and used for output timestamps.
   weather_years:
     start: 2023
     end: 2024
 
-  # Maximum worker threads for gridded demand and heat-pump aggregation.
   threads:
     aggregation: 1
 
-  # GHSL population on the fixed 100 m grid.
   population:
     epoch: 2025
 
-  # Projected CRS used for geometry calculations, such as shape centroids.
   crs:
     projected: EPSG:3035
 
-  # Fill missing country data using reference countries (ISO alpha-3 codes).
-  # Values from multiple reference countries are averaged.
   data_proxies:
-    # Mean single- and multi-family dwelling shares from reference countries.
     sfh_mfh_shares:
       ALB: [BGR, HRV, HUN, ROU, GRC]
       AND: [ESP]
@@ -42,14 +31,12 @@ module_euro_building_heat:
       SMR: [ITA]
       SRB: [BGR, HRV, HUN, ROU, GRC]
       XKX: [BGR, HRV, HUN, ROU, GRC]
-    # Reference energy balances scaled by the target country population.
     annual_energy_balance:
       AND: [ESP]
       LIE: [CHE]
       MCO: [FRA]
       SMR: [ITA]
       XKX: [BGR, HRV, HUN, ROU, GRC]
-    # Reference household end-use shares used to split annual energy balances.
     household_end_use:
       ALB: [BGR, HRV, HUN, ROU, GRC]
       AND: [ESP]
@@ -63,7 +50,6 @@ module_euro_building_heat:
       SMR: [ITA]
       SRB: [BGR, HRV, HUN, ROU, GRC]
       XKX: [BGR, HRV, HUN, ROU, GRC]
-    # Reference JRC-IDEES commercial end-use shares.
     jrc_idees:
       ALB: [BGR, HRV, HUN, ROU, GRC]
       AND: [ESP]
@@ -78,22 +64,13 @@ module_euro_building_heat:
       SRB: [BGR, HRV, HUN, ROU, GRC]
       XKX: [BGR, HRV, HUN, ROU, GRC]
 
-  # Annual HDD correction applied to the selected building grids.
   spatial_weights:
     hdd:
-      # Daily mean temperature threshold in °C for calculating HDD.
       base_temperature: 15.5
-      # Multiply structural support by HDD^elasticity, normalised within each country.
-      # Applies to residential and commercial space heat.
       elasticity: 0.5
 
-  # actual uses published useful heat where available.
-  # calculate_all converts final energy using the configured efficiencies.
-  # UK ECUK final demand is always converted using the efficiencies below.
   useful_heat_demand: actual
 
-  # Final-to-useful energy fractions by end use and fuel.
-  # Electricity excludes heat pumps. biowaste denotes biomass and waste.
   tech_efficiencies:
     space_heat:
       gas: 0.97
@@ -116,23 +93,17 @@ module_euro_building_heat:
       biowaste: 0.1
       electricity: 0.5
 
-  # Settings for the combined air-source and ground-source heat-pump COP profile.
   heat_pump:
-    # Delivery temperatures in °C. The sink omitted from space_heat_sink_shares
-    # represents hot water.
     sink_temperature:
       underfloor: 35
       radiator_large: 50
       radiator_conventional: 65
       hot_water: 60
-    # Space-heating fractions by sink, summing to one.
     space_heat_sink_shares:
       underfloor: 0.1
       radiator_large: 0.15
       radiator_conventional: 0.75
-    # Air-source (ashp) and ground-source (gshp) fractions, summing to one.
     heat_pump_shares:
       ashp: 0.9
       gshp: 0.1
-    # Positive multiplier reducing manufacturer COP to expected operating performance.
     correction_factor: 0.85

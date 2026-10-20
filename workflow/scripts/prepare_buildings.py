@@ -92,14 +92,14 @@ def building_sources(snakemake):
 
     plan = {
         "schema_version": 2,
-        "microsoft_release": snakemake.params.microsoft["release"],
+        "microsoft_release": snakemake.params.microsoft_release,
         "crs": regions.crs.to_string(),
         "regions": region_plan,
     }
     Path(snakemake.output.manifest).parent.mkdir(parents=True, exist_ok=True)
     with open(snakemake.output.manifest, "w") as stream:
         json.dump(plan, stream, indent=2)
-    # Downstream rules can read a consistent schema even for an unused source.
+    # Empty source tables also carry the processed height/floor ratio flag schema.
     pq.write_table(
         pa.Table.from_batches([], schema=EUBUCCO_PROCESSED_SCHEMA),
         snakemake.output.empty_eubucco,

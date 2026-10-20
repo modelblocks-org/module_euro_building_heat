@@ -121,13 +121,10 @@ snakemake --use-conda --cores 2
 To run a more comprehensive test and generate a Snakemake report with figures, use the following command:
 
 ```shell
-pixi run pytest tests/local_test.py -k test_report_figures
+pixi run pytest tests/local_test.py -k test_full_run
 ```
 
 This runs the scopes configured in [tests/local_test.py](tests/local_test.py).
-
-Source files are cached separately from processing. If input validation rejects a
-cached download, remove or replace that file before retrying.
 
 ## References
 

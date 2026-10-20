@@ -1,9 +1,8 @@
 """Regionalise floor-area totals with EUBUCCO-first building support.
 
-Each complete control region and sector uses one source. EUBUCCO floor area is
-preferred; Microsoft footprint area is the fallback weight. The requested
-shape receives only the share represented by building centroids and population
-cell centres inside it.
+Each complete control region and sector uses one selected source. EUBUCCO
+and Microsoft support use centroid or footprint allocation. Scope clipping
+preserves each contribution's regional share.
 
 Sources:
     Floor-area regionalisation: https://doi.org/10.3390/en12244789
@@ -24,6 +23,8 @@ import shapely
 from _building_count import building_count_grid
 from _eubucco import eubucco_batch_filter, read_plan
 from _floor_area import (
+    allocate_building_footprints,
+    filter_dominant_buildings,
     microsoft_floor_area_support,
     microsoft_population_support,
     select_building_sectors,
@@ -54,6 +55,8 @@ regions = (
 )
 scope = gpd.read_parquet(snakemake.input.scope).geometry.item()
 shapely.prepare(scope)
+land_shapes = gpd.read_parquet(snakemake.input.shapes).to_crs(regions.crs)
+country_land = land_shapes.dissolve(by="country_id").geometry
 totals = pd.read_parquet(snakemake.input.totals).set_index("region_id")
 count_proxies = pd.read_parquet(snakemake.input.count_proxies)
 count_proxies = count_proxies.set_index("country_id")
@@ -77,7 +80,7 @@ legacy_ids = sorted(
 eubucco = (
     ds.dataset(snakemake.input.eubucco, format="parquet")
     .to_table(
-        columns=EUBUCCO_PROCESSED_SCHEMA.names[1:],
+        columns=EUBUCCO_PROCESSED_SCHEMA.names,
         filter=eubucco_batch_filter(legacy_ids, regions.total_bounds),
     )
     .to_pandas(categories=["region_id", "type", "subtype"])
@@ -111,9 +114,29 @@ for region_id, region in regions.iterrows():
     selected = eubucco.loc[
         eubucco.region_id.isin(legacy) & eubucco.geometry.within(region.geometry)
     ]
+    sources = plan["regions"][region_id]
+    retained = filter_dominant_buildings(
+        selected, sources, snakemake.params.maximum_regional_floor_area_share, region_id
+    )
+    eligible = (
+        retained["type"].eq("residential")
+        & (sources["residential_source"] == "eubucco")
+    ) | (
+        retained.subtype.isin(["commercial", "public"])
+        & (sources["commercial_source"] == "eubucco")
+    )
+    full_profile = output_profile(region.geometry.bounds, regions.crs, dtype="float64")
+    selected = allocate_building_footprints(
+        retained.loc[eligible],
+        region.geometry,
+        full_profile,
+        scope,
+        country_land.loc[region.country_id],
+        snakemake.params.footprint_allocation_threshold_cells,
+        region_id,
+    )
     residential, commercial = select_building_sectors(selected)
     fallback = microsoft.loc[microsoft.region_id.eq(region_id)]
-    full_profile = output_profile(region.geometry.bounds, regions.crs, dtype="float64")
     region_low_quadkeys = low_quadkeys & set(
         plan["regions"][region_id]["microsoft_quadkeys"]
     )
@@ -121,22 +144,43 @@ for region_id, region in regions.iterrows():
         population_source, full_profile, region.geometry, region_totals.population
     )
 
-    sources = plan["regions"][region_id]
     uses_proxy = "microsoft" in {
         sources["residential_source"],
         sources["commercial_source"],
     }
     proxy_population = np.zeros_like(population)
     if uses_proxy:
-        fallback, proxy_population = microsoft_population_support(
-            full_profile, fallback, population, region_low_quadkeys
+        # Sparse coverage is classified on raw tile counts, never expanded rows.
+        fallback = fallback.loc[~fallback.quadkey.isin(region_low_quadkeys)].copy()
+        fallback["footprint_support_m2"] = fallback.footprint_area_m2
+        microsoft_threshold = microsoft_settings["footprint_allocation_threshold_cells"]
+        fallback = allocate_building_footprints(
+            fallback,
+            region.geometry,
+            full_profile,
+            scope,
+            country_land.loc[region.country_id],
+            microsoft_threshold,
+            region_id,
+            area_column="footprint_support_m2",
+        )
+        proxy_population = microsoft_population_support(
+            full_profile,
+            fallback,
+            population,
+            region_low_quadkeys,
+            footprint_allocation=microsoft_threshold is not None,
         )
 
     if plan["regions"][region_id]["residential_source"] == "eubucco":
         # Preserve relative building weights while matching the residential
         # control total derived from census data or configured country proxies.
         support = residential.floor_area_m2.sum()
-        assert support > 0
+        if not np.isfinite(support) or support <= 0:
+            raise ValueError(
+                f"No usable EUBUCCO residential support for {region_id}; "
+                "review building quality-control settings"
+            )
         residential = residential.copy()
         residential["floor_area_m2"] *= region_totals.residential_total_m2 / support
         residential_proxy = np.zeros_like(population)
@@ -150,7 +194,11 @@ for region_id, region in regions.iterrows():
 
     if plan["regions"][region_id]["commercial_source"] == "eubucco":
         # Commercial/public EUBUCCO area is retained at its observed total.
-        assert not commercial.empty
+        if commercial.empty:
+            raise ValueError(
+                f"No EUBUCCO commercial support for {region_id}; "
+                "review building quality-control settings"
+            )
         commercial_proxy = np.zeros_like(population)
     else:
         assert np.isfinite(region_totals.commercial_fallback_m2)
@@ -189,10 +237,8 @@ for region_id, region in regions.iterrows():
     full_power = point_grid(full_profile, residential, residential.weighted_power)
     # Clip after allocation so scoped cells retain their share of regional totals.
     profile = output_profile(clipped.bounds, regions.crs, dtype="float64")
-    inside = residential.loc[shapely.contains_xy(scope, residential.x, residential.y)]
-    commercial_inside = commercial.loc[
-        shapely.contains_xy(scope, commercial.x, commercial.y)
-    ]
+    inside = residential.loc[residential.in_scope]
+    commercial_inside = commercial.loc[commercial.in_scope]
     floor = (
         point_grid(profile, inside, inside.floor_area_m2)
         + clipped_grid(residential_proxy, full_profile, profile, clipped),
@@ -235,7 +281,6 @@ for region_id, region in regions.iterrows():
         sources,
         count_proxies.loc[region.country_id] if uses_proxy else None,
         proxy_population,
-        scope,
         clipped,
     )
     count_path = output_directory / region_id / "building_count.tif"

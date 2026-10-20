@@ -1,11 +1,12 @@
 """Create canonical points from the pinned EUBUCCO footprints.
 
 Only buildings assigned to legacy NUTS-3 regions intersecting the requested
-case are retained. EPSG:3035 footprints are reduced to centroids, areas, and
-perimeters. Batch processing bounds memory, and every partition uses the strict
-canonical schema.
-The output Parquet table retains legacy region IDs and is sorted by region ID
-and building ID. Current-region assignment happens during floor-area allocation.
+case are retained. Footprints are reduced to centroids, areas, and
+perimeters, with selected large footprints retained for cell allocation.
+
+The output Parquet table retains legacy region IDs and original height/floor
+ratio flags for dominance filtering after repair. It is sorted by region ID and
+building ID. Current-region assignment happens during floor-area allocation.
 
 Sources:
     EUBUCCO v0.2 schema: https://docs.eubucco.com/v0.2/data-format/schema/
@@ -23,8 +24,9 @@ import geopandas as gpd
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
-from _eubucco import canonical_from_footprints, read_plan
+from _eubucco import canonical_from_footprints, read_plan, repair_height_floors
 from _schemas import EUBUCCO_PROCESSED_SCHEMA, validate_eubucco_footprints
+from _utils import output_profile
 from pyproj import Transformer
 
 if TYPE_CHECKING:
@@ -32,6 +34,8 @@ if TYPE_CHECKING:
 
 sys.stderr = open(snakemake.log[0], "w")
 Path(snakemake.output.table).parent.mkdir(parents=True, exist_ok=True)
+quality = snakemake.params.quality_control
+
 with TemporaryDirectory(prefix="heat_buildings_") as temporary:
     plan = read_plan(snakemake.input.plan)
     regions = gpd.read_parquet(snakemake.input.regions)
@@ -50,7 +54,16 @@ with TemporaryDirectory(prefix="heat_buildings_") as temporary:
     selected = pa.array(region_ids)
     sources = sorted(Path(source) for source in snakemake.input.downloads)
     columns = ["id", "region_id", "type", "subtype", "floors", "height", "geometry"]
+    if quality["repair_height_floors"]:
+        columns += ["height_source", "floors_source"]
     transformer = Transformer.from_crs(3035, regions.crs, always_xy=True)
+    transform = output_profile(regions.total_bounds, regions.crs)["transform"]
+    threshold_cells = snakemake.params.footprint_allocation_threshold_cells
+    footprint_threshold = (
+        threshold_cells * abs(transform.determinant)
+        if threshold_cells is not None
+        else None
+    )
 
     # Filter before geometry conversion and partition by legacy region so the
     # final sort can process one region at a time within the job's memory limit.
@@ -62,7 +75,10 @@ with TemporaryDirectory(prefix="heat_buildings_") as temporary:
             filtered = batch.filter(pc.is_in(batch.column("region_id"), selected))
             if not filtered.num_rows:
                 continue
-            table = canonical_from_footprints(filtered, transformer)
+            filtered = repair_height_floors(filtered, quality)
+            table = canonical_from_footprints(
+                filtered, transformer, footprint_threshold
+            )
             for region in pc.unique(table["region_id"]).to_pylist():
                 # Numeric directory names avoid interpreting region IDs as paths.
                 partition = output / str(region_ids.index(region))

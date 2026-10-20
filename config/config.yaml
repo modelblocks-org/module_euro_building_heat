@@ -1,76 +1,62 @@
-# Configuration options and source-mode requirements: config/README.md.
 building_rasters:
-  source: prebuilt
-  # Settings below apply only to rebuild; prebuilt uses published grids.
+  source: rebuild
+  # Building_raster settings below apply only to rebuild; prebuilt uses published grids.
   processing:
-    # Number of balanced region batches for building processing.
     nuts3_batches: 128
 
   buildings_microsoft:
-    # Dated footprint release to download and cache (YYYY-MM-DD).
+    footprint_allocation_threshold_cells: 1.0
     release: '2026-08-13'
-    # Tiles with fewer source buildings use population fallback. Populated cells
-    # without a retained centroid also always use population fallback.
     minimum_building_count: 2000
 
   buildings_eubucco:
-    # Representative storeys for census bins, used to estimate missing floor area.
+    footprint_allocation_threshold_cells: 1.0
+    quality_control:
+      repair_height_floors: true  
+      minimum_height_per_floor_m: 1.5  
+      reference_floor_height_m: 4.17  
+      source_priority: [estimated, osm, gov, msft]  
+      maximum_regional_floor_area_share: 0.01
     floor_bin_representatives:
       n_floors_0_2: 1
       n_floors_2_4: 3
       n_floors_4_7: 5.5
       n_floors_7_inf: 9
 
-  # Census 2021 dwelling counts (cens_21dwbnr_r3) provide NUTS-3 residential
-  # floor-area totals.
   eurostat:
-    # Multiply useful dwelling area by this factor to estimate gross building area,
-    # including walls and shared space.
     useful_to_gross_ratio: 1.2
-    # Representative useful m² per dwelling, multiplied by census dwelling counts.
     floor_space_m2:
-      SQM_LT30: 25   # Dwellings with less than 30 m².
-      SQM30-39: 35   # 30–39 m².
-      SQM40-49: 45   # 40–49 m².
-      SQM50-59: 55   # 50–59 m².
-      SQM60-79: 70   # 60–79 m².
-      SQM80-99: 90   # 80–99 m².
-      SQM100-119: 110   # 100–119 m².
-      SQM120-149: 135   # 120–149 m².
-      SQM_GE150: 180   # 150 m² or more.
-    # Room counts estimate area when floor-space totals are missing or zero.
-    # Only the open-ended room class needs a representative count.
+      SQM_LT30: 25
+      SQM30-39: 35
+      SQM40-49: 45
+      SQM50-59: 55
+      SQM60-79: 70
+      SQM80-99: 90
+      SQM100-119: 110
+      SQM120-149: 135
+      SQM_GE150: 180
     rooms:
-      GE9: 10   # Assumed mean room count for dwellings with nine or more rooms.
-    # Useful m² per room, before conversion to gross floor area.
+      GE9: 10
     floor_area_per_room_m2: 20
 
 demand_years:
-  # End year is exclusive, matching the Modelblocks module convention.
   start: 2023
   end: 2024
 
 weather_years:
-  # Weather years used to shape hourly heat demand profiles. End year is exclusive.
   start: 2023
   end: 2024
 
 threads:
-  # Maximum worker threads for gridded demand and heat-pump aggregation.
   aggregation: 8
 
 population:
-  # Population epoch for the fixed 100 m GHSL grid.
   epoch: 2025
 
 crs:
-  # Projected CRS used for geometry calculations such as shape centroids.
   projected: EPSG:3035
 
-# Proxy country keys and lists use ISO alpha-3 codes.
 data_proxies:
-  # Reference-country values are averaged to fill missing country data.
-  # Reference countries for floor-area and building-count estimates (rebuild only).
   floor_area:
     countries:
       GBR: [IRL]
@@ -88,7 +74,6 @@ data_proxies:
       XKX: [BGR, HRV, HUN, ROU, GRC]
       BRA: [PRT]
       LBR: [PRT]
-  # sfh_mfh_shares uses the mean dwelling shares of the proxy countries.
   sfh_mfh_shares:
     ALB: [BGR, HRV, HUN, ROU, GRC]
     AND: [ESP]
@@ -100,14 +85,12 @@ data_proxies:
     SMR: [ITA]
     SRB: [BGR, HRV, HUN, ROU, GRC]
     XKX: [BGR, HRV, HUN, ROU, GRC]
-  # annual_energy_balance uses energy balance data from the proxy country and scales with population.
   annual_energy_balance:
     AND: [ESP]
     LIE: [CHE]
     MCO: [FRA]
     SMR: [ITA]
     XKX: [BGR, HRV, HUN, ROU, GRC]
-  # household_end_use uses household end use data from the proxy country to scale annual energy balance data.
   household_end_use:
     ALB: [BGR, HRV, HUN, ROU, GRC]
     AND: [ESP]
@@ -121,7 +104,6 @@ data_proxies:
     SMR: [ITA]
     SRB: [BGR, HRV, HUN, ROU, GRC]
     XKX: [BGR, HRV, HUN, ROU, GRC]
-  # jrc_idees uses JRC-IDEES commercial end-use shares from the proxy country.
   jrc_idees:
     ALB: [BGR, HRV, HUN, ROU, GRC]
     AND: [ESP]
@@ -137,52 +119,38 @@ data_proxies:
     XKX: [BGR, HRV, HUN, ROU, GRC]
 
 
-# Structural weights require rebuild. HDD applies to both source modes.
 spatial_weights:
   population:
-    # Population share of the residential floor-area/population blend.
-    # Only population in cells with residential floor area contributes.
     share: 0.5
   surface_volume:
-    # Exponent on the measured surface-to-volume ratio before country centring.
     elasticity: 0.33
   age:
-    # Factors are centred on the country's floor-area-weighted mean.
-    # Missing age observations receive a neutral factor.
     multipliers:
       before_1981: 1.25
       '1981_2000': 1.0
       after_2000: 0.8
   hdd:
-    # HDD = sum over days of max(base_temperature - daily mean ERA5 °C, 0).
-    base_temperature: 15.5  # Base temperature in °C.
-    # Exponent on annual HDD for residential and commercial space-heat allocation.
-    # Weights are normalised within each country.
+    base_temperature: 15.5
     elasticity: 0.5
 
-# Use published JRC-IDEES useful heat where available (actual), except for the
-# UK where ECUK final demand is always converted with the efficiencies below.
-# Use calculate_all to convert final energy for every country.
 useful_heat_demand: actual
 
-# Final-to-useful energy fractions by end use and fuel.
-# Electricity excludes heat pumps. biowaste denotes biomass and waste.
 tech_efficiencies:
-  space_heat:  # Space-heating conversion factors.
+  space_heat:
     gas: 0.97
     oil: 0.9
     solid_fossil: 0.8
     biowaste: 0.8
     solar_thermal: 1
     electricity: 1
-  hot_water:  # Domestic hot-water conversion factors.
+  hot_water:
     gas: 0.97
     oil: 0.9
     solid_fossil: 0.8
     biowaste: 0.8
     solar_thermal: 1
     electricity: 1
-  cooking:  # Cooking conversion factors.
+  cooking:
     gas: 0.28
     oil: 0.28
     solid_fossil: 0.15
@@ -190,21 +158,16 @@ tech_efficiencies:
     electricity: 0.5
 
 heat_pump:
-  # Delivery temperatures in °C. The sink omitted from space_heat_sink_shares
-  # represents hot water.
   sink_temperature:
     underfloor: 35
     radiator_large: 50
     radiator_conventional: 65
     hot_water: 60
-  # Space-heating fractions by sink, summing to one.
   space_heat_sink_shares:
     underfloor: 0.1
     radiator_large: 0.15
     radiator_conventional: 0.75
-  # Air-source (ashp) and ground-source (gshp) fractions, summing to one.
   heat_pump_shares:
     ashp: 0.9
     gshp: 0.1
-  # Positive multiplier reducing manufacturer COP to expected operating performance.
   correction_factor: 0.85

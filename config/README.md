@@ -1,11 +1,10 @@
 # Configuration
 
-Use [config.yaml](config.yaml) to configure the module. The
-[integration configuration](../tests/integration/test_config.yaml) and
-[Snakefile](../tests/integration/Snakefile) show how to use it from another workflow.
-The [schema](../workflow/internal/config.schema.yaml) defines required settings,
-accepted values, and validation constraints. Input and output paths are documented
-in [INTERFACE.yaml](../INTERFACE.yaml).
+We recommend consulting the following before using this module:
+- [`config/config.yaml`](config.yaml): a generic example configuration of this module.
+- [`workflow/internal/config.schema.yaml`](../workflow/internal/config.schema.yaml): a schematic overview of all the configuration options of this module.
+- [`INTERFACE.yaml`](../INTERFACE.yaml): lists module input and output files, and their default locations.
+- [`tests/integration/Snakefile`](../tests/integration/Snakefile): an example of how to call this module from another workflow.
 
 ## Building rasters
 
@@ -27,10 +26,16 @@ Rebuild settings control the following:
 - `processing.nuts3_batches`: number of balanced regional processing batches.
 - `buildings_eubucco.floor_bin_representatives`: representative storey counts
   used to estimate reference-country mean storeys and missing floor area.
+- `buildings_eubucco.footprint_allocation_threshold_cells`: footprint size above
+  which support and building counts are distributed by cell overlap.
+- `buildings_eubucco.quality_control`: source-ranked height/floor repairs followed
+  by removal of buildings with excessive regional floor-area shares.
 - `buildings_microsoft.release`: footprint release in `YYYY-MM-DD` format.
 - `buildings_microsoft.minimum_building_count`: tiles below this source-building
-  count use population-based estimates. Populated cells without a retained
-  building centroid also use population-based estimates.
+  count are excluded from building support.
+- `buildings_microsoft.footprint_allocation_threshold_cells`: footprint size above
+  which support and counts are distributed by overlap, with population fallback
+  in uncovered cells.
 - `eurostat.useful_to_gross_ratio`: conversion from useful dwelling area to gross
   building area, including walls and shared space.
 - `eurostat.floor_space_m2`: representative useful area for each dwelling-area class.

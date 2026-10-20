@@ -46,24 +46,91 @@ properties:
         required:
         - release
         - minimum_building_count
+        - footprint_allocation_threshold_cells
         properties:
           release:
             description: "Dated Microsoft building-footprint release to download and cache, in YYYY-MM-DD format."
             type: string
             pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
           minimum_building_count:
-            description: "Tiles with fewer source buildings use population-based fallback."
+            description: >-
+              Exclude buildings originating in tiles with fewer buildings.
+              Counts are measured before regional selection or footprint allocation.
             type: integer
             minimum: 0
+          footprint_allocation_threshold_cells:
+            type: [number, 'null']
+            exclusiveMinimum: 0
+            description: >-
+              Allocate retained microsoft footprints strictly above this multiple of grid-cell
+              area by exact polygon overlap. Null disables
+              footprint allocation.
       buildings_eubucco:
-        description: "Representative storey-count assumptions for EUBUCCO building footprints."
+        description: "EUBUCCO attribute repair, regional filtering, and representative storey counts."
         type: object
         additionalProperties: false
         required:
         - floor_bin_representatives
+        - quality_control
+        - footprint_allocation_threshold_cells
         properties:
+          footprint_allocation_threshold_cells:
+            type: [number, 'null']
+            exclusiveMinimum: 0
+            description: >-
+              Allocate retained EUBUCCO footprints strictly above this multiple of grid-cell
+              area by exact polygon overlap. Null disables
+              footprint allocation.
+          quality_control:
+            description: >-
+              Repair height/floors before regional dominance filtering and grid generation. Applies
+              only to rebuild. Published grids are unaffected.
+            type: object
+            additionalProperties: false
+            required:
+            - repair_height_floors
+            - minimum_height_per_floor_m
+            - reference_floor_height_m
+            - source_priority
+            - maximum_regional_floor_area_share
+            properties:
+              repair_height_floors:
+                type: boolean
+                description: >-
+                  Repair pairs with missing, nonfinite or nonpositive attributes, or a ratio below
+                  minimum_height_per_floor_m. False preserves supplied values. 
+              minimum_height_per_floor_m:
+                type: number
+                exclusiveMinimum: 0
+                description: >-
+                  Repair height divided by floors below this limit in metres per floor. 
+              reference_floor_height_m:
+                type: number
+                exclusiveMinimum: 0
+                description: >-
+                  Fixed metres per floor used to derive floors as height divided by this value, or height
+                  as floors multiplied by it. Retain fractional floors without rounding or clipping. Must
+                  be at least minimum_height_per_floor_m when repairing.
+              source_priority:
+                type: array
+                minItems: 4
+                maxItems: 4
+                uniqueItems: true
+                items:
+                  type: string
+                  enum: [estimated, osm, gov, msft]
+                description: >-
+                  User-defined source ranking, most trusted first.
+              maximum_regional_floor_area_share:
+                type: [number, 'null']
+                exclusiveMinimum: 0
+                maximum: 1
+                description: >-
+                  Remove buildings strictly above this fraction of repaired EUBUCCO floor area, separately
+                  for residential and commercial/public support in each complete current NUTS-3 region.
           floor_bin_representatives:
-            description: "Representative storey counts used to estimate mean storeys and missing floor-area totals."
+            description: "Representative storey counts used to estimate reference-country mean
+              storeys and missing floor-area totals."
             type: object
             additionalProperties: false
             required:
@@ -194,7 +261,7 @@ properties:
   demand_years:
     description: |
       Selects the annual heat-demand years. The range includes `start` and excludes
-      `end`.
+      `end`, matching the Modelblocks module convention.
     type: object
     additionalProperties: false
     required:
@@ -213,9 +280,9 @@ properties:
         maximum: 2024
   weather_years:
     description: |
-      Selects the ERA5 years used to construct hourly profiles. The range includes
-      `start`, excludes `end`, and must span the same number of years as `demand_years`;
-      weather and demand years are paired in order.
+      Selects the ERA5 years used for hourly profiles and annual heating degree days (HDD). The range includes
+      `start`, excludes `end`, and must span the same number of years as `demand_years`. 
+      Output hourly timestamps use weather years.
     type: object
     additionalProperties: false
     required:
@@ -332,7 +399,8 @@ properties:
         - share
         properties:
           share:
-            description: "Population fraction of the residential blend; zero uses floor area and one uses population."
+            description: "Population fraction of the residential floor-area/population blend; zero
+              uses floor area and one uses population.
             type: number
             minimum: 0
             maximum: 1
@@ -348,14 +416,16 @@ properties:
             type: number
             minimum: 0
       age:
-        description: "Building-age corrections centred on each country's floor-area-weighted mean."
+        description: "Building-age corrections centred on each country's floor-area-weighted mean.
+          Missing age observations receive a neutral factor."
         type: object
         additionalProperties: false
         required:
         - multipliers
         properties:
           multipliers:
-            description: "Relative heat intensities by construction period; setting all factors to one is neutral."
+            description: "Relative heat intensities by census construction period; equal factors
+              give neutral age weighting."
             type: object
             additionalProperties: false
             required:
@@ -381,7 +451,8 @@ properties:
         additionalProperties: false
         properties:
           base_temperature:
-            description: HDD base temperature in degrees Celsius, using daily mean temperature.
+            description: "Base temperature in degrees Celsius: HDD is the sum over days of
+              max(base_temperature minus daily mean ERA5 temperature, 0)."
             type: number
           elasticity:
             description: |
@@ -528,7 +599,7 @@ $defs:
         type: number
         minimum: 0
       electricity:
-        description: Final-to-useful energy conversion factor for electricity.
+        description: Final-to-useful energy conversion factor for electricity, excluding heat pumps.
         type: number
         minimum: 0
   country_proxy_map:

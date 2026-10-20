@@ -7,7 +7,15 @@ import pandas as pd
 import pyarrow as pa
 from shapely.geometry import box
 
-MICROSOFT_COLUMNS = ["id", "quadkey", "region_id", "footprint_area_m2", "x", "y"]
+MICROSOFT_COLUMNS = [
+    "id",
+    "quadkey",
+    "region_id",
+    "footprint_area_m2",
+    "x",
+    "y",
+    "footprint_wkb",
+]
 MICROSOFT_SCHEMA = pa.schema(
     [
         ("id", pa.string()),
@@ -16,6 +24,7 @@ MICROSOFT_SCHEMA = pa.schema(
         ("footprint_area_m2", pa.float64()),
         ("x", pa.float64()),
         ("y", pa.float64()),
+        ("footprint_wkb", pa.binary()),
     ]
 )
 MICROSOFT_TILE_STATISTICS_COLUMNS = ["quadkey", "building_count"]

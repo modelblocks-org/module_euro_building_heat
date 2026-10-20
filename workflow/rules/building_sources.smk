@@ -19,7 +19,7 @@ checkpoint prepare_building_sources:
         "../envs/module.yaml"
     params:
         step="building_sources",
-        microsoft=config["building_rasters"]["buildings_microsoft"],
+        microsoft_release=config["building_rasters"]["buildings_microsoft"]["release"],
         proxies=config["data_proxies"]["floor_area"],
     message:
         "Plan building-data sources for '{wildcards.shapes}' shapes."
@@ -59,6 +59,13 @@ rule process_eubucco:
         "../envs/module.yaml"
     resources:
         mem_mb=4096,
+    params:
+        quality_control=config["building_rasters"]["buildings_eubucco"][
+            "quality_control"
+        ],
+        footprint_allocation_threshold_cells=config["building_rasters"][
+            "buildings_eubucco"
+        ]["footprint_allocation_threshold_cells"],
     message:
         "Process EUBUCCO buildings for '{wildcards.shapes}' shapes."
     script:
@@ -121,6 +128,10 @@ rule process_microsoft:
         "../envs/module.yaml"
     resources:
         mem_mb=4096,
+    params:
+        footprint_allocation_threshold_cells=config["building_rasters"][
+            "buildings_microsoft"
+        ]["footprint_allocation_threshold_cells"],
     message:
         "Process Microsoft buildings for '{wildcards.shapes}' shapes."
     script:

@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-import shapely
 from _utils import clipped_grid, point_grid
 
 
@@ -24,9 +23,9 @@ def reference_count_ratios(stats, population):
 
 
 def building_count_grid(
-    profile, full_profile, sectors, sources, ratios, proxy_population, scope, clipped
+    profile, full_profile, sectors, sources, ratios, proxy_population, clipped
 ):
-    """Count sector centroids and reuse the shared Microsoft population fallback.
+    """Sum sector building equivalents and the Microsoft population fallback.
 
     Microsoft inputs must exclude sparse tiles. Proxy counts can be fractional.
     Clipping preserves the regional allocation weights.
@@ -34,12 +33,12 @@ def building_count_grid(
     proxy_population = clipped_grid(proxy_population, full_profile, profile, clipped)
     counts = np.zeros((profile["height"], profile["width"]))
     for sector, buildings in sectors.items():
-        inside = buildings.loc[shapely.contains_xy(scope, buildings.x, buildings.y)]
+        inside = buildings.loc[buildings.in_scope]
         if sources[f"{sector}_source"] == "eubucco":
-            counts += point_grid(profile, inside, np.ones(len(inside)))
+            counts += point_grid(profile, inside, inside.count_weight)
         else:
             counts += point_grid(
-                profile, inside, np.full(len(inside), ratios[f"{sector}_share"])
+                profile, inside, inside.count_weight * ratios[f"{sector}_share"]
             )
             counts += proxy_population * ratios[f"{sector}_per_person"]
     return counts

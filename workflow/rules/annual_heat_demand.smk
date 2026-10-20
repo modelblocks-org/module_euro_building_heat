@@ -117,6 +117,7 @@ rule rescale_annual_heat_demand_to_shapes:
         annual_weights="<resources>/automatic/shapes/{shapes}/annual_spatial_weights.nc",
         residential_raster=rules.merge_structural_support.output.residential_space_heat_weight,
         commercial_raster=rules.merge_structural_support.output.commercial_space_heat_weight,
+        building_count=rules.merge_building_count.output.building_count,
         grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     output:
         annual_demand="<annual_heat_demand>",

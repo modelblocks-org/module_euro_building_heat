@@ -1,4 +1,8 @@
-"""Check the module interface, environments, and integration workflow."""
+"""Set of standard Modelblocks tests.
+
+PLEASE ENSURE THIS SET OF MINIMAL TESTS WORKS BEFORE PUBLISHING YOUR MODULE.
+Contents may be updated in future template updates.
+"""
 
 import subprocess
 import tomllib

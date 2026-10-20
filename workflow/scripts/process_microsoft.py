@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 import duckdb
 import geopandas as gpd
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import shapely
@@ -28,6 +29,7 @@ from _microsoft import (
     tile_statistics,
 )
 from _schemas import validate_microsoft_feature
+from _utils import output_profile
 
 if TYPE_CHECKING:
     snakemake: Any
@@ -43,6 +45,10 @@ selected = [
     if "microsoft" in {settings["residential_source"], settings["commercial_source"]}
 ]
 targets = regions.loc[selected, ["geometry"]]
+threshold_cells = snakemake.params.footprint_allocation_threshold_cells
+cell_area = abs(
+    output_profile(regions.total_bounds, regions.crs)["transform"].determinant
+)
 output = Path(temporary.name)
 planned_quadkeys = sorted(
     {
@@ -68,6 +74,12 @@ def write_batch(source, key, batch_number, ids, geometries):
     if assigned.empty:
         return
     area = footprints.geometry.area.reindex(assigned.index)
+    footprint_wkb = pd.Series(None, index=assigned.index, dtype=object)
+    if threshold_cells is not None:
+        oversized = area > threshold_cells * cell_area
+        footprint_wkb.loc[oversized] = footprints.geometry.reindex(
+            assigned.index[oversized]
+        ).to_wkb()
     table = pa.Table.from_arrays(
         [
             pa.array(assigned.id),
@@ -76,6 +88,7 @@ def write_batch(source, key, batch_number, ids, geometries):
             pa.array(area),
             pa.array(assigned.geometry.x),
             pa.array(assigned.geometry.y),
+            pa.array(footprint_wkb, type=pa.binary()),
         ],
         schema=MICROSOFT_SCHEMA,
     )

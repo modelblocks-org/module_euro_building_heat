@@ -115,14 +115,8 @@ def main():
     }
     for dataset in snakemake.params.datasets:
         started = perf_counter()
-        print(f"Cropping {dataset} to requested shapes.", file=sys.stderr, flush=True)
         projected = crop_grid(
             snakemake.input[dataset], snakemake.output[dataset], shapes
-        )
-        print(
-            f"Cropped {dataset} in {perf_counter() - started:.1f}s; generating plot.",
-            file=sys.stderr,
-            flush=True,
         )
         started = perf_counter()
         title, unit = labels[dataset]
@@ -136,11 +130,6 @@ def main():
             snakemake.output[f"{dataset}_plot"],
             projected,
             unit,
-        )
-        print(
-            f"Plotted {dataset} in {perf_counter() - started:.1f}s.",
-            file=sys.stderr,
-            flush=True,
         )
 
 
