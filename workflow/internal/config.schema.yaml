@@ -98,12 +98,12 @@ properties:
                 type: boolean
                 description: >-
                   Repair pairs with missing, nonfinite or nonpositive attributes, or a ratio below
-                  minimum_height_per_floor_m. False preserves supplied values. 
+                  minimum_height_per_floor_m. False preserves supplied values.
               minimum_height_per_floor_m:
                 type: number
                 exclusiveMinimum: 0
                 description: >-
-                  Repair height divided by floors below this limit in metres per floor. 
+                  Repair height divided by floors below this limit in metres per floor.
               reference_floor_height_m:
                 type: number
                 exclusiveMinimum: 0
@@ -281,7 +281,7 @@ properties:
   weather_years:
     description: |
       Selects the ERA5 years used for hourly profiles and annual heating degree days (HDD). The range includes
-      `start`, excludes `end`, and must span the same number of years as `demand_years`. 
+      `start`, excludes `end`, and must span the same number of years as `demand_years`.
       Output hourly timestamps use weather years.
     type: object
     additionalProperties: false

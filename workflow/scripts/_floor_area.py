@@ -17,7 +17,6 @@ Sources:
     GHS-POP R2023A: https://human-settlement.emergency.copernicus.eu/documents/GHSL_Data_Package_2023.pdf
 """
 
-import sys
 from typing import Any
 
 import geopandas as gpd
@@ -45,7 +44,7 @@ def allocate_building_footprints(
 
     Oversized footprints are those whose area exceeds ``threshold_cells`` times the
     hectare-grid cell area. Building counts are weighted by the fraction of each
-    footprint that overlaps the hectare grid. Buildings spanning multiple regions are clipped to the current region. 
+    footprint that overlaps the hectare grid. Buildings spanning multiple regions are clipped to the current region.
 
     """
     result = buildings.copy()
@@ -131,11 +130,11 @@ def select_building_sectors(buildings):
 def filter_dominant_buildings(buildings, sources, maximum_share, region_id):
     """Exclude dominant buildings with an originally inconsistent height/floor ratio.
 
-    Dominant buildings are those whose floor area exceeds ``maximum_share`` of the regional total for their sector. 
+    Dominant buildings are those whose floor area exceeds ``maximum_share`` of the regional total for their sector.
     Only EUBUCCO-sourced buildings are checked as these are the only that have both height and floor number.
 
-    Only buildings with a flagged height/floor ratio are considered for removal to avoid overly aggresive building removal. 
-    Non-flagged buildings are therefore considered valid and just comparitively large. 
+    Only buildings with a flagged height/floor ratio are considered for removal to avoid overly aggresive building removal.
+    Non-flagged buildings are therefore considered valid and just comparitively large.
     """
     if maximum_share is None:
         return buildings
@@ -221,8 +220,7 @@ def residential_floor_area(data: pd.DataFrame, settings: dict[str, Any]) -> pd.S
 def microsoft_population_support(
     profile, buildings, population, low_quadkeys, footprint_allocation
 ):
-    """Use population in cells without retained Microsoft contributions.
-    """
+    """Use population in cells without retained Microsoft contributions."""
     missing = point_grid(profile, buildings, buildings.count_weight) == 0
     if not footprint_allocation and low_quadkeys:
         polygons = gpd.GeoSeries(

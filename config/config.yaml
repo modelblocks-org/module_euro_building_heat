@@ -12,10 +12,10 @@ building_rasters:
   buildings_eubucco:
     footprint_allocation_threshold_cells: 1.0
     quality_control:
-      repair_height_floors: true  
-      minimum_height_per_floor_m: 1.5  
-      reference_floor_height_m: 4.17  
-      source_priority: [estimated, osm, gov, msft]  
+      repair_height_floors: true
+      minimum_height_per_floor_m: 1.5
+      reference_floor_height_m: 4.17
+      source_priority: [estimated, osm, gov, msft]
       maximum_regional_floor_area_share: 0.01
     floor_bin_representatives:
       n_floors_0_2: 1
