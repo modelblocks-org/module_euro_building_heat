@@ -1,4 +1,4 @@
-"""Assign an IANA timezone to each prepared shape using its centroid."""
+"""Assign an IANA timezone using a centroid or interior point for each shape."""
 
 import sys
 from pathlib import Path

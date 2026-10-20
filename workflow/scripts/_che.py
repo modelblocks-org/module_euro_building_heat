@@ -33,7 +33,7 @@ END_USE_MAPPING = {
 SUPPORTED_YEARS = [2000, 2024]  # Right and left inclusive
 CHECKSUM_RTOL = 5e-5
 ELECTRIC_HEATING_CARRIERS = {"electricity", "direct_electric", "heat_pump"}
-BASELINE_COLUMNS = _schemas.BaselineSchema.get_column_names()
+BASELINE_COLUMNS = list(_schemas.BaselineSchema.to_schema().columns)
 COMMON_METADATA = {"country_code": "CHE", "unit": "twh", "energy": "final_energy"}
 
 

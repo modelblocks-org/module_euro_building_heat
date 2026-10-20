@@ -4,12 +4,15 @@ channels:
 - bioconda
 - nodefaults
 dependencies:
+- affine >=2.4
+- duckdb >=1.4
+- rasterio >=1.4.0
 - curl >=8.9.1
 - python >=3.12.9
 - aiohttp >=3.12
 - geopandas >=1.0.1
 - rioxarray >=0.18.2
-- shapely >=2.0.7
+- shapely >=2.1
 - bottleneck >=1.6.0
 - dask >=2026.6.0
 - ipdb >=0.13.13

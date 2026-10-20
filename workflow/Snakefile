@@ -13,8 +13,13 @@ pathvars:
     shapes="<resources>/user/{shapes}/shapes.parquet",
     edh_api="<resources>/user/edh_api.txt",
     # Module results
+    building_count="<results>/{shapes}/rasters/building_count.tif",
     annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
     heat_demand="<results>/{shapes}/hourly/heat_demand_mwh.parquet",
+    space_heat_demand="<results>/{shapes}/annual/space_heat_demand_mwh.tif",
+    hot_water_demand="<results>/{shapes}/annual/hot_water_demand_mwh.tif",
+    space_heat_profile="<results>/{shapes}/hourly/space_heat_profile.parquet",
+    hot_water_profile="<results>/{shapes}/hourly/hot_water_profile.parquet",
     heat_pump_cop="<results>/{shapes}/hourly/heat_pump_cop_pu.parquet",
     heat_pump_electricity_demand="<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet",
 
@@ -33,15 +38,20 @@ with open(workflow.source_path("internal/settings.yaml"), "r") as f:
 
 wildcard_constraints:
     ghsl_epoch="|".join(str(i) for i in internal["resources"]["ghsl"]["epochs"]),
-    ghsl_resolution="|".join(
-        str(i) for i in internal["resources"]["ghsl"]["resolutions"]
-    ),
 
 
 # Add all your includes here.
 include: "rules/_utils.smk"
 include: "rules/automatic.smk"
 include: "rules/prepare.smk"
+
+
+if not USE_PREBUILT:
+
+    include: "rules/building_sources.smk"
+
+
+include: "rules/building_rasters.smk"
 include: "rules/baseline.smk"
 include: "rules/annual_heat_demand.smk"
 include: "rules/heat_timeseries.smk"
@@ -58,6 +68,14 @@ workflow.source_path("scripts/_ecuk.py")
 workflow.source_path("scripts/_plots.py")
 workflow.source_path("scripts/_timeseries.py")
 workflow.source_path("scripts/_utils.py")
+workflow.source_path("scripts/prepare_shapes.py")
+workflow.source_path("scripts/_eubucco.py")
+workflow.source_path("scripts/_microsoft.py")
+workflow.source_path("scripts/_floor_area.py")
+workflow.source_path("scripts/_building_count.py")
+workflow.source_path("scripts/_space_heat_weight.py")
+
+workflow.source_path("scripts/gridded_heat_demand.py")
 
 # Run additional check on configuration / settings
 additional_config_validation()

@@ -33,7 +33,7 @@ def clean_interface_default(default: str, *, shapes: str) -> str:
 
 
 def build_full_result_request(interface: dict, shapes: str) -> str:
-    """Generate a string with all module results."""
+    """Request all module results."""
     interface_results = interface["pathvars"]["results"]
     result_paths = [
         clean_interface_default(i["default"], shapes=shapes)

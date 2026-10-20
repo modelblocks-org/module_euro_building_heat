@@ -49,7 +49,6 @@ def generate_annual_energy_balance_nc(
     Switzerland is not included in Eurostat, and post-Brexit UK coverage is
     incomplete, so national statistics are spliced in for both countries.
     """
-    # Names for each consumption category/sub-category and carriers prepared by hand
     cat_names = pd.read_csv(path_to_cat_names, header=0, index_col=0)
     carrier_names = pd.read_csv(path_to_carrier_names, header=0, index_col=0)
 
@@ -76,8 +75,7 @@ def generate_annual_energy_balance_nc(
 
     tdf = df.stack()
 
-    # Add CH energy use.
-    # Only covers a subset of sectors and carriers, but should be enough
+    # Swiss national statistics cover a subset of the Eurostat sectors and carriers.
     ch_energy_use_tdf = _add_ch_energy_balance(
         path_to_ch_excel, path_to_ch_industry_excel, index_levels=tdf.index.names
     )
@@ -87,8 +85,6 @@ def generate_annual_energy_balance_nc(
     tdf = _overlay_gbr_energy_balance(
         tdf, paths_to_gbr_baselines, carrier_names, index_levels=tdf.index.names
     )
-
-    # TODO treat missing values if necessary
 
     result = tdf.mul(TJ_TO_TWH).rename("value").reset_index()
     result["unit"] = "twh"
@@ -255,7 +251,7 @@ def _get_ch_energy_balance_sheet(path_to_excel, sheet, skipfooter, cat_code):
         "Übrige erneuerbare Energien": "RA000",
         "Total\n= %": "TOTAL",
     }
-    # Footnote labels lead to some strings randomly ending in numbers; remove them
+    # Numeric footnote suffixes are not part of the source labels.
     remove_digits = str.maketrans("", "", digits)
     df = (
         pd.read_excel(
@@ -287,10 +283,8 @@ def _get_ch_energy_balance_sheet(path_to_excel, sheet, skipfooter, cat_code):
 def get_ch_waste_consumption(path_to_excel):
     """Get data on waste burned in WtE plants.
 
-    Present in a sheet CH GEST dataset.
-    FIXME: why do the assumption below?
-    ASSUME: Small quantity (~2-3%) of fossil fuels consumed in Swiss WtE plants can be
-    ignored.
+    Uses the waste-consumption series from CH GEST. Fossil fuel inputs to
+    these plants are excluded.
     """
     category_code = "TI_EHG_E"
     carrier_code = "W6100_6220"
@@ -306,9 +300,9 @@ def get_ch_waste_consumption(path_to_excel):
     )[("Consommation d'énergie (GWh)", "Ordures")]
     waste_stream_tj = waste_stream_gwh * GWH_TO_TJ
     waste_stream_tdf = (
-        waste_stream_tj.to_frame(carrier_code)  # carrier code
+        waste_stream_tj.to_frame(carrier_code)
         .rename_axis(index="year", columns="carrier_code")
-        .assign(cat_code=category_code)  # cat code
+        .assign(cat_code=category_code)
         .set_index("cat_code", append=True)
         .stack()
     )
@@ -338,7 +332,7 @@ def _get_ch_transport_energy_balance(path_to_excel):
         header=[0, 1, 2, 3, 4],
     ).xs("TJ", level=-1, axis=1)
 
-    # Footnote labels lead to some strings randomly ending in numbers; remove them
+    # Numeric footnote suffixes are not part of the source labels.
     remove_digits = str.maketrans("", "", digits)
     # carrier names span across two column levels, which we merge with fillna
 
