@@ -400,7 +400,7 @@ properties:
         properties:
           share:
             description: "Population fraction of the residential floor-area/population blend; zero
-              uses floor area and one uses population.
+              uses floor area and one uses population."
             type: number
             minimum: 0
             maximum: 1

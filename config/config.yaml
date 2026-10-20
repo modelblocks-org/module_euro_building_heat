@@ -1,5 +1,5 @@
 building_rasters:
-  source: rebuild
+  source: prebuilt
   # Building_raster settings below apply only to rebuild; prebuilt uses published grids.
   processing:
     nuts3_batches: 128

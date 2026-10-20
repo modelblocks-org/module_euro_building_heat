@@ -48,7 +48,7 @@ resources:
     url: https://github.com/evansiroky/timezone-boundary-builder/releases/download/{version}/timezones.geojson.zip
     sha256: 7d3f0c5a33b6acd891335c0ad5ba767736b6914cb1a1d68c71921c17ce358948
   stable:
-    url: https://zenodo.org/records/23320641/files/{dataset}
+    url: https://zenodo.org/records/23478686/files/{dataset}
     datasets:
     - CHE_energy_balance.xlsx
     - CHE_energy_consumption_households.xlsx
