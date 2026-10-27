@@ -2,7 +2,6 @@
 
 import sys
 from pathlib import Path
-from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 import _plots
@@ -116,11 +115,9 @@ def main() -> None:
         ),
     }
     for dataset in snakemake.params.datasets:
-        started = perf_counter()
         projected = crop_grid(
             snakemake.input[dataset], snakemake.output[dataset], shapes
         )
-        started = perf_counter()
         title, unit = labels[dataset]
         Path(snakemake.output[f"{dataset}_plot"]).parent.mkdir(
             parents=True, exist_ok=True

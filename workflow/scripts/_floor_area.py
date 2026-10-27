@@ -141,8 +141,8 @@ def filter_dominant_buildings(
     Dominant buildings are those whose floor area exceeds ``maximum_share`` of the regional total for their sector.
     Only EUBUCCO-sourced buildings are checked as these are the only that have both height and floor number.
 
-    Only buildings with a flagged height/floor ratio are considered for removal to avoid overly aggresive building removal.
-    Non-flagged buildings are therefore considered valid and just comparitively large.
+    Only buildings with a flagged height/floor ratio are considered for removal to avoid overly aggressive building removal.
+    Non-flagged buildings are therefore considered valid and just comparatively large.
     """
     if maximum_share is None:
         return buildings
