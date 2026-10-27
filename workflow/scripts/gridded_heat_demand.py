@@ -9,7 +9,6 @@ import logging
 from collections.abc import Iterator
 from contextlib import ExitStack
 from pathlib import Path
-from time import perf_counter
 
 import geopandas as gpd
 import numpy as np
@@ -123,7 +122,6 @@ def write_heat_demand_rasters(
             for sector in sectors
         }
         assigned = {sector: np.zeros_like(grid_factors[sector]) for sector in sectors}
-        started = perf_counter()
         logger.info("Measuring raster allocation support (pass 1 of 2).")
         for _, labels, structural, heated in support_blocks(
             sources, shapes, intersections, grid_factors, assigned
@@ -136,7 +134,6 @@ def write_heat_demand_rasters(
                     total[band] += np.bincount(
                         labels.ravel(), weights=value.ravel(), minlength=count
                     )
-        logger.info("Measured raster support in %.1fs.", perf_counter() - started)
 
         # Check the weather-intersection country allocation before the
         # final shape correction, which can redistribute boundary-cell energy.
@@ -229,7 +226,6 @@ def write_heat_demand_rasters(
                 )
 
         actual_totals = {key: np.zeros(count) for key in expected_totals}
-        started = perf_counter()
         logger.info("Writing normalized demand rasters (pass 2 of 2).")
         for window, labels, structural, heated in support_blocks(
             sources, shapes, intersections, grid_factors
@@ -249,7 +245,6 @@ def write_heat_demand_rasters(
                         labels.ravel(), weights=energy.ravel(), minlength=count
                     )
                     output.write(energy, band + 1, window=window)
-        logger.info("Wrote demand rasters in %.1fs.", perf_counter() - started)
         for key, expected in expected_totals.items():
             if not np.allclose(actual_totals[key], expected, rtol=1e-6, atol=1e-3):
                 raise ValueError(
