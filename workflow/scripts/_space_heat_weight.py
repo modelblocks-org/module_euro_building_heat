@@ -13,12 +13,16 @@ import pandas as pd
 import xarray as xr
 
 
-def _return(values: np.ndarray):
+def _return(values: np.ndarray) -> float | np.ndarray:
     """Return a scalar when scalar inputs produced a zero-dimensional array."""
     return values.item() if values.ndim == 0 else values
 
 
-def surface_to_volume_ratio(footprint_area_m2, height_m, footprint_perimeter_m):
+def surface_to_volume_ratio(
+    footprint_area_m2: pd.Series | np.ndarray | float,
+    height_m: pd.Series | np.ndarray | float,
+    footprint_perimeter_m: pd.Series | np.ndarray | float,
+) -> float | np.ndarray:
     """Return ``P/A + 2/H`` using measured perimeter, or NaN for invalid buildings."""
     area, height, perimeter = np.broadcast_arrays(
         np.asarray(footprint_area_m2, dtype=float),
@@ -39,7 +43,9 @@ def surface_to_volume_ratio(footprint_area_m2, height_m, footprint_perimeter_m):
     return _return(ratio)
 
 
-def surface_volume_power(surface_volume_ratio, elasticity: float):
+def surface_volume_power(
+    surface_volume_ratio: np.ndarray | float, elasticity: float
+) -> float | np.ndarray:
     """Apply the compactness elasticity while preserving missing values."""
     ratio = np.asarray(surface_volume_ratio, dtype=float)
     values = np.where(
@@ -48,7 +54,9 @@ def surface_volume_power(surface_volume_ratio, elasticity: float):
     return _return(values)
 
 
-def cell_surface_volume_factor(floor_area, weighted_factor):
+def cell_surface_volume_factor(
+    floor_area: np.ndarray, weighted_factor: np.ndarray
+) -> np.ndarray:
     """Average building compactness by floor area, neutral in empty cells."""
     floor_area = np.asarray(floor_area, dtype=float)
     return np.divide(
@@ -56,22 +64,26 @@ def cell_surface_volume_factor(floor_area, weighted_factor):
     )
 
 
-def space_heat_weight(floor_area_m2, f_sv=1.0, f_age=1.0):
+def space_heat_weight(
+    floor_area_m2: np.ndarray | float,
+    f_sv: float | np.ndarray = 1.0,
+    f_age: float | np.ndarray = 1.0,
+) -> np.ndarray | np.floating:
     """Combine corrected floor area and dimensionless heat-support factors."""
     return np.asarray(floor_area_m2) * f_sv * f_age
 
 
 def weight_from_support(
-    floor_area,
-    population,
-    valid_area,
-    weighted_power,
-    reference,
-    total,
-    population_total,
-    share,
-    age,
-):
+    floor_area: np.ndarray,
+    population: np.ndarray,
+    valid_area: np.ndarray,
+    weighted_power: np.ndarray,
+    reference: float,
+    total: float,
+    population_total: float,
+    share: float,
+    age: float,
+) -> np.ndarray:
     """Calculate heat weights from cached additive building statistics.
 
     F - V retains neutral support from missing compactness and Microsoft.
@@ -85,7 +97,13 @@ def weight_from_support(
     )
 
 
-def blended_floor_area(floor_area, population, total, population_total, share):
+def blended_floor_area(
+    floor_area: np.ndarray,
+    population: np.ndarray,
+    total: float,
+    population_total: float,
+    share: float,
+) -> np.ndarray:
     """Blend supported population with floor area without modifying either input."""
     blended = floor_area
     if total > 0 and share > 0:

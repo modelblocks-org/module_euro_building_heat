@@ -42,7 +42,7 @@ from _schemas import (
 from _utils import population_summaries, processing_crs
 
 
-def building_sources(snakemake):
+def building_sources(snakemake: Any) -> None:
     """Choose building sources per control region and sector for one shape case.
 
     Positive floor-area sums in intersecting legacy regions select EUBUCCO
@@ -119,7 +119,7 @@ def building_sources(snakemake):
     )
 
 
-def floor_area_batches(snakemake):
+def floor_area_batches(snakemake: Any) -> None:
     """Write a batch manifest balanced by legacy EUBUCCO building counts.
 
     Keep current NUTS-2 groups together to reuse overlapping legacy selections.
@@ -138,7 +138,7 @@ def floor_area_batches(snakemake):
         json.dump(plan, stream, indent=2)
 
 
-def building_population(snakemake):
+def building_population(snakemake: Any) -> None:
     """Cache native-grid population for each distinct control/reference geometry."""
     regions = gpd.read_parquet(snakemake.input.regions)
     references = {
@@ -166,7 +166,7 @@ def building_population(snakemake):
     table.to_parquet(snakemake.output.table, index=False)
 
 
-def floor_area_totals(snakemake):
+def floor_area_totals(snakemake: Any) -> None:
     """Prepare residential and commercial/public control-region floor-area totals.
 
     Eurostat residential totals remain authoritative. Countries without totals use
@@ -198,7 +198,7 @@ def floor_area_totals(snakemake):
         .footprint_area_m2.reindex(regions.index, fill_value=0)
     )
 
-    def reference_mean_floors(reference_countries):
+    def reference_mean_floors(reference_countries: list[str]) -> np.floating:
         """Average country mean storeys using configured floor-bin representatives.
 
         Building counts weight bins within each country; reference countries
@@ -213,7 +213,7 @@ def floor_area_totals(snakemake):
             values.append(counts.dot(representatives) / counts.sum())
         return np.mean(values)
 
-    def reference_sector_shares(reference_countries):
+    def reference_sector_shares(reference_countries: list[str]) -> tuple[float, float]:
         """Average reference-country residential and commercial/public area shares.
 
         Shares use only these two sectors, excluding other building types.
@@ -233,7 +233,9 @@ def floor_area_totals(snakemake):
         residential = float(np.mean(values))
         return residential, 1 - residential
 
-    def reference_floor_area_per_inhabitant(reference_countries):
+    def reference_floor_area_per_inhabitant(
+        reference_countries: list[str],
+    ) -> np.floating:
         """Return the equal-weight processed Eurostat floor area per inhabitant."""
         values = []
         for country in reference_countries:
@@ -309,7 +311,7 @@ def floor_area_totals(snakemake):
     totals.to_parquet(snakemake.output.table, index=False)
 
 
-def nuts3(snakemake):
+def nuts3(snakemake: Any) -> None:
     """Prepare the current NUTS-3 geography for one user-defined shape case.
 
     The script selects official NUTS-3 polygons with positive-area overlap in land
@@ -375,7 +377,7 @@ def nuts3(snakemake):
     nuts3.to_parquet(snakemake.output.regions, index=False)
 
 
-def nuts3_building_age(snakemake):
+def nuts3_building_age(snakemake: Any) -> None:
     """Prepare observed and country-centred NUTS-3 residential age factors.
 
     The Eurostat 2021 dwelling construction-period table is used only where a
@@ -462,7 +464,7 @@ def nuts3_building_age(snakemake):
     age.to_parquet(snakemake.output.table, index=False)
 
 
-def space_heat_sv_statistics(snakemake):
+def space_heat_sv_statistics(snakemake: Any) -> None:
     """Aggregate cached complete-region compactness sums without rereading buildings."""
     summary = pd.concat(
         [

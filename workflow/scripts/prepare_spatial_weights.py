@@ -246,7 +246,9 @@ def _assign_unmapped_locations_to_nearest_gridbox(
     )
 
 
-def _aggregate_population_to_polygons(path, polygons, block_size=2048):
+def _aggregate_population_to_polygons(
+    path: str, polygons: gpd.GeoDataFrame, block_size: int = 2048
+) -> gpd.GeoDataFrame:
     polygons = polygons.copy()
     polygons["population"] = aggregate_support(
         path, polygons, sector=None, block_size=block_size

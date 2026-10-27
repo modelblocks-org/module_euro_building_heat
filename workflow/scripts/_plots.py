@@ -39,7 +39,7 @@ RASTER_PREVIEW_MAX_SIZE = 2000
 RASTER_OUTLINE_STYLE = {"color": "#808080", "linewidth": 0.6}
 
 
-def save_figure(figure: Figure, output_path: str | Path, **kwargs) -> None:
+def save_figure(figure: Figure, output_path: str | Path, **kwargs: Any) -> None:
     """Save and close any diagnostic figure, creating its destination directory."""
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -47,7 +47,9 @@ def save_figure(figure: Figure, output_path: str | Path, **kwargs) -> None:
     plt.close(figure)
 
 
-def plot_outlines(shapes, axis: Axes, style: dict, *, by_country=False) -> None:
+def plot_outlines(
+    shapes: gpd.GeoDataFrame, axis: Axes, style: dict, *, by_country: bool = False
+) -> None:
     """Draw shape or country outlines with the same map conventions."""
     if by_country:
         shapes = shapes.dissolve(by="country_id" if "country_id" in shapes else None)
@@ -224,7 +226,7 @@ def plot_annual_heat_demand_choropleth(
         save_figure(fig, output_path, bbox_inches="tight", pad_inches=0.05, dpi=200)
 
 
-def _histogram_legend(fig: Figure, axes_flat) -> None:
+def _histogram_legend(fig: Figure, axes_flat: np.ndarray) -> None:
     fig.legends.clear()
     handles, labels = axes_flat[0].get_legend_handles_labels()
     fig.legend(handles[::-1], labels[::-1], loc="center left", bbox_to_anchor=(1, 0.5))
@@ -232,7 +234,7 @@ def _histogram_legend(fig: Figure, axes_flat) -> None:
 
 def _histogram_axis_formatting(
     ax: Axes, container: str, x_label: str, y_label: str, x_nbins: int
-):
+) -> None:
     ax.set_title(container)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
@@ -262,9 +264,9 @@ def plot_bar_histogram(
     x_nbins: int = 10,
     format_container: bool = True,
     legend: bool = True,
-    fig=None,
-    axes=None,
-) -> tuple[Figure, Axes]:
+    fig: Figure | None = None,
+    axes: Axes | np.ndarray | None = None,
+) -> tuple[Figure, Axes | np.ndarray]:
     """Plot stacked values, optionally supplementing an existing histogram."""
     containers = sorted(df[container_col].unique())
     years = range(df[year_col].min(), df[year_col].max() + 1)
@@ -325,9 +327,9 @@ def plot_value_histogram(
     x_nbins: int = 10,
     format_container: bool = True,
     legend: bool = True,
-    fig=None,
-    axes=None,
-) -> tuple[Figure, Axes]:
+    fig: Figure | None = None,
+    axes: Axes | np.ndarray | None = None,
+) -> tuple[Figure, Axes | np.ndarray]:
     """Plot a single value, optionally supplementing an existing histogram."""
     containers = sorted(df[container_col].unique())
     years = range(df[year_col].min(), df[year_col].max() + 1)

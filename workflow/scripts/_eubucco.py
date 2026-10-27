@@ -16,14 +16,16 @@ from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset as ds
 import shapely
 from _schemas import EUBUCCO_PROCESSED_SCHEMA
+from pyproj import Transformer
 
 
-def repair_height_floors(batch, settings):
+def repair_height_floors(batch: pa.RecordBatch, settings: dict) -> pa.RecordBatch:
     """Flag original ratio errors and optionally repair suspect attributes.
 
     Compare source decimals before float conversion to retain exact boundary
@@ -90,7 +92,9 @@ def repair_height_floors(batch, settings):
 
 
 def canonical_from_footprints(
-    batch: pa.RecordBatch, transformer, footprint_threshold_m2: float | None
+    batch: pa.RecordBatch,
+    transformer: Transformer,
+    footprint_threshold_m2: float | None,
 ) -> pa.Table:
     """Retain building measures, centroids and selectively stored large footprints.
 
@@ -110,26 +114,26 @@ def canonical_from_footprints(
         footprints[large] = shapely.to_wkb(
             shapely.transform(geometry[large], transformer.transform, interleaved=False)
         )
-    return pa.Table.from_arrays(
-        [
-            pc.cast(batch.column("id"), pa.string()),
-            pc.cast(batch.column("region_id"), pa.string()),
-            pc.cast(batch.column("type"), pa.string()),
-            pc.cast(batch.column("subtype"), pa.string()),
-            pc.cast(batch.column("floors"), pa.float64()),
-            pa.array(area),
-            pa.array(shapely.length(geometry)),
-            pc.cast(batch.column("height"), pa.float64()),
-            pa.array(x),
-            pa.array(y),
-            batch.column("height_floor_ratio_flagged"),
-            pa.array(footprints, type=pa.binary()),
-        ],
+    return pa.Table.from_pydict(
+        {
+            "id": batch.column("id"),
+            "region_id": batch.column("region_id"),
+            "type": batch.column("type"),
+            "subtype": batch.column("subtype"),
+            "floors": batch.column("floors"),
+            "footprint_area_m2": area,
+            "footprint_perimeter_m": shapely.length(geometry),
+            "height_m": batch.column("height"),
+            "x": x,
+            "y": y,
+            "height_floor_ratio_flagged": batch.column("height_floor_ratio_flagged"),
+            "footprint_wkb": footprints,
+        },
         schema=EUBUCCO_PROCESSED_SCHEMA,
     )
 
 
-def eubucco_batch_filter(region_ids, bounds):
+def eubucco_batch_filter(region_ids: list[str], bounds: np.ndarray) -> ds.Expression:
     """Build an Arrow filter for legacy IDs and processing-CRS centroid bounds.
 
     Bounds are (left, bottom, right, top) for complete current control regions.
@@ -146,7 +150,9 @@ def eubucco_batch_filter(region_ids, bounds):
     )
 
 
-def assign_region_batches(mapping, stats, batch_count: int) -> dict[str, list[str]]:
+def assign_region_batches(
+    mapping: dict[str, dict], stats: pd.DataFrame, batch_count: int
+) -> dict[str, list[str]]:
     """Balance current NUTS-3 regions over deterministic processing batches.
 
     Current NUTS-2 groups stay together so neighbouring current regions reuse
@@ -197,7 +203,9 @@ def assign_region_batches(mapping, stats, batch_count: int) -> dict[str, list[st
 
 
 def map_regions(
-    nuts3: gpd.GeoDataFrame, eubucco_regions: gpd.GeoDataFrame, covered_regions
+    nuts3: gpd.GeoDataFrame,
+    eubucco_regions: gpd.GeoDataFrame,
+    covered_regions: pd.Series,
 ) -> dict[str, dict[str, list[str]]]:
     """Map current NUTS-3 polygons to legacy EUBUCCO regions.
 

@@ -22,7 +22,9 @@ from shapely.geometry import box
 logger = logging.getLogger(__name__)
 
 
-def shape_blocks(reference, shapes: gpd.GeoDataFrame) -> Iterator:
+def shape_blocks(
+    reference: rasterio.io.DatasetReader, shapes: gpd.GeoDataFrame
+) -> Iterator:
     """Assign output cells to shapes by pixel-centre containment."""
     # Index polygon parts so distant islands do not enlarge candidate bounds.
     # Keep original row IDs and ordering: later shapes win overlapping pixels.
@@ -46,7 +48,13 @@ def shape_blocks(reference, shapes: gpd.GeoDataFrame) -> Iterator:
         yield window, labels
 
 
-def support_blocks(sources, shapes, intersections, factors, assigned=None):
+def support_blocks(
+    sources: dict[str, rasterio.io.DatasetReader],
+    shapes: gpd.GeoDataFrame,
+    intersections: gpd.GeoDataFrame,
+    factors: dict[str, np.ndarray],
+    assigned: dict[str, np.ndarray] | None = None,
+) -> Iterator:
     """Evaluate both sector weights together, retaining intersection boundary cells."""
     reference = sources["household"]
     years = len(factors["household"])

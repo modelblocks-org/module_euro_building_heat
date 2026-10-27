@@ -18,7 +18,9 @@ if TYPE_CHECKING:
     snakemake: Any
 
 
-def crop_grid(source, target, shapes):
+def crop_grid(
+    source: str | Path, target: str | Path, shapes: gpd.GeoDataFrame
+) -> gpd.GeoDataFrame:
     """Crop published values after checking extent and grid compatibility."""
     crs = processing_crs(shapes)
     shapes = shapes.to_crs(crs)
@@ -96,7 +98,7 @@ def crop_grid(source, target, shapes):
     return shapes
 
 
-def main():
+def main() -> None:
     """Crop published building rasters and plot the results."""
     shapes = gpd.read_parquet(snakemake.input.shapes)
     labels = {

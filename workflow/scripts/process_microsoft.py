@@ -59,7 +59,13 @@ planned_quadkeys = sorted(
 )
 
 
-def write_batch(source, key, batch_number, ids, geometries):
+def write_batch(
+    source: Path,
+    key: str,
+    batch_number: int,
+    ids: list[str],
+    geometries: list[shapely.Geometry],
+) -> None:
     """Project, assign and persist one bounded GeoJSONL batch."""
     footprints = gpd.GeoDataFrame({"id": ids}, geometry=geometries, crs=4326).to_crs(
         regions.crs
@@ -80,16 +86,16 @@ def write_batch(source, key, batch_number, ids, geometries):
         footprint_wkb.loc[oversized] = footprints.geometry.reindex(
             assigned.index[oversized]
         ).to_wkb()
-    table = pa.Table.from_arrays(
-        [
-            pa.array(assigned.id),
-            pa.array([key] * len(assigned)),
-            pa.array(assigned.region_id),
-            pa.array(area),
-            pa.array(assigned.geometry.x),
-            pa.array(assigned.geometry.y),
-            pa.array(footprint_wkb, type=pa.binary()),
-        ],
+    table = pa.Table.from_pydict(
+        {
+            "id": assigned.id,
+            "quadkey": [key] * len(assigned),
+            "region_id": assigned.region_id,
+            "footprint_area_m2": area,
+            "x": assigned.geometry.x,
+            "y": assigned.geometry.y,
+            "footprint_wkb": footprint_wkb,
+        },
         schema=MICROSOFT_SCHEMA,
     )
     path = output / f"{source.stem}-{batch_number}.parquet"

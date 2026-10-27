@@ -17,6 +17,7 @@ Sources:
     GHS-POP R2023A: https://human-settlement.emergency.copernicus.eu/documents/GHSL_Data_Package_2023.pdf
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 import geopandas as gpd
@@ -31,15 +32,15 @@ from rasterio.windows import transform as window_transform
 
 
 def allocate_building_footprints(
-    buildings,
-    region,
-    profile,
-    scope,
-    country_land,
-    threshold_cells,
-    region_id,
-    area_column="floor_area_m2",
-):
+    buildings: gpd.GeoDataFrame,
+    region: shapely.Geometry,
+    profile: Mapping,
+    scope: shapely.Geometry,
+    country_land: shapely.Geometry,
+    threshold_cells: float | None,
+    region_id: str,
+    area_column: str = "floor_area_m2",
+) -> gpd.GeoDataFrame:
     """Split oversized building footprints into multiple hectare-grid contributions.
 
     Oversized footprints are those whose area exceeds ``threshold_cells`` times the
@@ -119,7 +120,9 @@ def allocate_building_footprints(
     return allocated
 
 
-def select_building_sectors(buildings):
+def select_building_sectors(
+    buildings: gpd.GeoDataFrame,
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """Return residential and commercial/public building subsets."""
     return (
         buildings.loc[buildings["type"].eq("residential")],
@@ -127,7 +130,12 @@ def select_building_sectors(buildings):
     )
 
 
-def filter_dominant_buildings(buildings, sources, maximum_share, region_id):
+def filter_dominant_buildings(
+    buildings: gpd.GeoDataFrame,
+    sources: dict[str, Any],
+    maximum_share: float | None,
+    region_id: str,
+) -> gpd.GeoDataFrame:
     """Exclude dominant buildings with an originally inconsistent height/floor ratio.
 
     Dominant buildings are those whose floor area exceeds ``maximum_share`` of the regional total for their sector.
@@ -218,8 +226,12 @@ def residential_floor_area(data: pd.DataFrame, settings: dict[str, Any]) -> pd.S
 
 
 def microsoft_population_support(
-    profile, buildings, population, low_quadkeys, footprint_allocation
-):
+    profile: Mapping,
+    buildings: gpd.GeoDataFrame,
+    population: np.ndarray,
+    low_quadkeys: set[str],
+    footprint_allocation: bool,
+) -> np.ndarray:
     """Use population in cells without retained Microsoft contributions."""
     missing = point_grid(profile, buildings, buildings.count_weight) == 0
     if not footprint_allocation and low_quadkeys:
@@ -233,8 +245,11 @@ def microsoft_population_support(
 
 
 def microsoft_floor_area_support(
-    buildings, proxy_population, sector_total, regional_population
-):
+    buildings: gpd.GeoDataFrame,
+    proxy_population: np.ndarray,
+    sector_total: float,
+    regional_population: float,
+) -> tuple[gpd.GeoDataFrame, np.ndarray]:
     """Allocate population proxies first, then retain the regional sector total."""
     proxy = np.zeros_like(proxy_population)
     if sector_total > 0 and proxy_population.sum() > 0:

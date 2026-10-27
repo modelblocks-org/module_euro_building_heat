@@ -5,7 +5,8 @@ from collections import Counter
 
 import pandas as pd
 import pyarrow as pa
-from shapely.geometry import box
+from shapely.geometry import Polygon, box
+from shapely.geometry.base import BaseGeometry
 
 MICROSOFT_COLUMNS = [
     "id",
@@ -63,7 +64,7 @@ def quadkey_xy(key: str) -> tuple[int, int]:
     return x, y
 
 
-def tile_bounds(x: int, y: int, zoom: int = 9):
+def tile_bounds(x: int, y: int, zoom: int = 9) -> Polygon:
     """Return a WGS84 polygon for one Bing tile."""
     scale = 1 << zoom
     west, east = x / scale * 360 - 180, (x + 1) / scale * 360 - 180
@@ -72,12 +73,12 @@ def tile_bounds(x: int, y: int, zoom: int = 9):
     return box(west, south, east, north)
 
 
-def quadkey_polygon(key: str):
+def quadkey_polygon(key: str) -> Polygon:
     """Return the WGS84 polygon represented by a Bing quadkey."""
     return tile_bounds(*quadkey_xy(key), zoom=len(key))
 
 
-def intersecting_quadkeys(geometry, zoom: int = 9) -> list[str]:
+def intersecting_quadkeys(geometry: BaseGeometry, zoom: int = 9) -> list[str]:
     """Return only level-nine Bing tiles intersecting a WGS84 geometry."""
     west, south, east, north = geometry.bounds
     left, top = tile_xy(west, north, zoom)
@@ -90,7 +91,9 @@ def intersecting_quadkeys(geometry, zoom: int = 9) -> list[str]:
     )
 
 
-def tile_statistics(planned_quadkeys, source_counts) -> pd.DataFrame:
+def tile_statistics(
+    planned_quadkeys: list[str], source_counts: list[tuple[str, int]]
+) -> pd.DataFrame:
     """Sum raw source-file feature counts and retain zero-count planned tiles."""
     counts = Counter(dict.fromkeys(planned_quadkeys, 0))
     for key, count in source_counts:

@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pyarrow
@@ -88,7 +89,7 @@ class ShapesSchema(pa.DataFrameModel):
     "Shape (multi)polygon."
 
     @pa.check("geometry", element_wise=True)
-    def check_geometries(cls, geom) -> bool:
+    def check_geometries(cls, geom: object) -> bool:
         return (
             isinstance(geom, (Polygon, MultiPolygon))
             and not geom.is_empty
@@ -182,15 +183,15 @@ class EubuccoRegionsSchema(pa.DataFrameModel):
     geometry: Series[Any] = pa.Field()
 
     @pa.dataframe_check
-    def check_crs(cls, table) -> bool:
+    def check_crs(cls, table: gpd.GeoDataFrame) -> bool:
         return table.crs is not None and table.crs.to_epsg() == 3035
 
     @pa.check("region_id")
-    def check_region_id(cls, values) -> bool:
+    def check_region_id(cls, values: pd.Series) -> bool:
         return values.str.fullmatch("[A-Z0-9]+").all()
 
     @pa.check("geometry")
-    def valid_geometry(cls, values) -> bool:
+    def valid_geometry(cls, values: gpd.GeoSeries) -> bool:
         return values.is_valid.all()
 
 
@@ -217,15 +218,15 @@ class EubuccoStatsSchema(pa.DataFrameModel):
     geometry: Series[Any] = pa.Field(nullable=True)
 
     @pa.dataframe_check
-    def check_crs(cls, table) -> bool:
+    def check_crs(cls, table: gpd.GeoDataFrame) -> bool:
         return table.crs is not None and table.crs.to_epsg() == 3035
 
     @pa.check("country")
-    def check_country(cls, values) -> bool:
+    def check_country(cls, values: pd.Series) -> bool:
         return values.str.fullmatch("[A-Z]{2}").all()
 
     @pa.dataframe_check
-    def finite_values(cls, table) -> bool:
+    def finite_values(cls, table: pd.DataFrame) -> bool:
         return np.isfinite(
             table[
                 [
@@ -257,15 +258,15 @@ class MicrosoftIndexSchema(pa.DataFrameModel):
     Url: Series[Any] = pa.Field(nullable=True)
 
     @pa.check("QuadKey")
-    def check_quadkey(cls, values) -> bool:
+    def check_quadkey(cls, values: pd.Series) -> bool:
         return values.str.fullmatch("[0-3]{9}").all()
 
     @pa.check("Url")
-    def https_urls(cls, values) -> bool:
+    def https_urls(cls, values: pd.Series) -> bool:
         return values.str.startswith("https://").all()
 
 
-def validate_microsoft_feature(feature: dict):
+def validate_microsoft_feature(feature: dict) -> Polygon | MultiPolygon:
     """Normalize and validate one GeoJSONL building footprint."""
     assert "geometry" in feature
     geometry = shapely.make_valid(

@@ -62,9 +62,7 @@ properties:
             type: [number, 'null']
             exclusiveMinimum: 0
             description: >-
-              Allocate retained microsoft footprints strictly above this multiple of grid-cell
-              area by exact polygon overlap. Null disables
-              footprint allocation.
+              Split microsoft building footprints into different grid cells if the footprint area exceeds this operator of grid-cell area.
       buildings_eubucco:
         description: "EUBUCCO attribute repair, regional filtering, and representative storey counts."
         type: object
@@ -78,9 +76,7 @@ properties:
             type: [number, 'null']
             exclusiveMinimum: 0
             description: >-
-              Allocate retained EUBUCCO footprints strictly above this multiple of grid-cell
-              area by exact polygon overlap. Null disables
-              footprint allocation.
+              Split EUBUCCO building footprints into different grid cells if the footprint area exceeds this operator of grid-cell area.
           quality_control:
             description: >-
               Repair height/floors before regional dominance filtering and grid generation. Applies
@@ -109,8 +105,7 @@ properties:
                 exclusiveMinimum: 0
                 description: >-
                   Fixed metres per floor used to derive floors as height divided by this value, or height
-                  as floors multiplied by it. Retain fractional floors without rounding or clipping. Must
-                  be at least minimum_height_per_floor_m when repairing.
+                  as floors multiplied by it. Must be at least minimum_height_per_floor_m when repairing.
               source_priority:
                 type: array
                 minItems: 4

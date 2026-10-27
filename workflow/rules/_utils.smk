@@ -85,13 +85,13 @@ def get_jrc_url(country: str, version: int | str) -> str:
     return internal["resources"]["jrc"]["url"].format(folder=folder, file=file)
 
 
-def _read_checkpoint_lines(path):
+def _read_checkpoint_lines(path: str) -> list[str]:
     """Read nonempty checkpoint lines with surrounding whitespace removed."""
     with open(path) as f:
         return [line.strip() for line in f if line.strip()]
 
 
-def _official_final_demand_inputs(wildcards, sector):
+def _official_final_demand_inputs(wildcards, sector: str) -> list[str]:
     """Return country statistics that provide absolute final demand."""
     country_data = checkpoints.prepare_shape_country_scope.get(
         shapes=wildcards.shapes
@@ -105,7 +105,7 @@ def _official_final_demand_inputs(wildcards, sector):
     return inputs
 
 
-def _annual_energy_balance_proxy_population_inputs(wildcards):
+def _annual_energy_balance_proxy_population_inputs(wildcards) -> list[str]:
     """Return population inputs when countries use annual energy balance proxies."""
     country_data = checkpoints.prepare_shape_country_scope.get(
         shapes=wildcards.shapes
@@ -148,7 +148,7 @@ def _get_ecuk_baseline_file() -> str:
     return f"<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"
 
 
-def read_building_plan(wildcards):
+def read_building_plan(wildcards) -> dict:
     """Load the building source plan from its JSON manifest."""
     import json
 
@@ -159,7 +159,7 @@ def read_building_plan(wildcards):
         return json.load(stream)
 
 
-def eubucco_download_inputs(wildcards):
+def eubucco_download_inputs(wildcards) -> list[str]:
     """Return EUBUCCO download paths required by the building source plan."""
     plan = read_building_plan(wildcards)
     regions = sorted(
@@ -176,7 +176,7 @@ def eubucco_download_inputs(wildcards):
     ]
 
 
-def microsoft_download_rows(wildcards):
+def microsoft_download_rows(wildcards) -> list[dict[str, str]]:
     """Return Microsoft index rows for planned quadkeys, sorted by quadkey and URL."""
     import csv
 
@@ -191,7 +191,7 @@ def microsoft_download_rows(wildcards):
     return sorted(rows, key=lambda row: (row["QuadKey"], row["Url"]))
 
 
-def microsoft_download_inputs(wildcards):
+def microsoft_download_inputs(wildcards) -> list[str]:
     """Return Microsoft download paths with numbered parts for each quadkey."""
     counts = {}
     downloads = []
@@ -206,7 +206,7 @@ def microsoft_download_inputs(wildcards):
     return downloads
 
 
-def selected_eubucco_input(wildcards):
+def selected_eubucco_input(wildcards) -> str:
     """Return processed EUBUCCO data or an empty table when no region needs it."""
     outputs = checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
     plan = read_building_plan(wildcards)
@@ -219,7 +219,7 @@ def selected_eubucco_input(wildcards):
     return outputs.empty_eubucco
 
 
-def selected_microsoft_input(wildcards):
+def selected_microsoft_input(wildcards) -> str:
     """Return processed Microsoft data or an empty table when no quadkeys are planned."""
     outputs = checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
     plan = read_building_plan(wildcards)
@@ -228,7 +228,7 @@ def selected_microsoft_input(wildcards):
     return outputs.empty_microsoft
 
 
-def selected_microsoft_statistics_input(wildcards):
+def selected_microsoft_statistics_input(wildcards) -> str:
     """Return Microsoft statistics or an empty table when no quadkeys are planned."""
     outputs = checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
     plan = read_building_plan(wildcards)
@@ -239,7 +239,7 @@ def selected_microsoft_statistics_input(wildcards):
     return outputs.empty_microsoft_statistics
 
 
-def read_floor_area_batch_plan(wildcards):
+def read_floor_area_batch_plan(wildcards) -> dict:
     """Load the floor area batch plan from its checkpoint JSON manifest."""
     import json
 
@@ -248,7 +248,7 @@ def read_floor_area_batch_plan(wildcards):
         return json.load(stream)
 
 
-def floor_area_batch_plan_input(wildcards):
+def floor_area_batch_plan_input(wildcards) -> str:
     """Resolve source planning before the dependent floor-area batch checkpoint."""
     # Discover nested checkpoints in order, including when manifests already exist.
     checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
@@ -257,7 +257,7 @@ def floor_area_batch_plan_input(wildcards):
     ).output.manifest
 
 
-def floor_area_batch_inputs(wildcards):
+def floor_area_batch_inputs(wildcards) -> list[str]:
     """Return floor area partial output paths for all planned batches."""
     plan = read_floor_area_batch_plan(wildcards)
     return [
@@ -268,7 +268,7 @@ def floor_area_batch_inputs(wildcards):
     ]
 
 
-def space_heat_weight_batch_inputs(wildcards):
+def space_heat_weight_batch_inputs(wildcards) -> list[str]:
     """Return space heat weight partial output paths for all planned batches."""
     plan = read_floor_area_batch_plan(wildcards)
     return [
@@ -279,7 +279,7 @@ def space_heat_weight_batch_inputs(wildcards):
     ]
 
 
-def selected_microsoft_totals_input(wildcards):
+def selected_microsoft_totals_input(wildcards) -> str:
     """Return Microsoft totals or an empty table when no quadkeys are planned."""
     outputs = checkpoints.prepare_building_sources.get(shapes=wildcards.shapes).output
     plan = read_building_plan(wildcards)

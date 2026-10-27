@@ -233,14 +233,14 @@ def report_country_total_discrepancies(
 
 
 def country_allocation_factors(
-    grid_shapes,
-    national_demand,
-    shape_to_country,
-    annual_weights,
-    severity,
-    weather_demand_years,
-    category="household",
-):
+    grid_shapes: gpd.GeoDataFrame,
+    national_demand: pd.DataFrame,
+    shape_to_country: pd.Series,
+    annual_weights: pd.DataFrame,
+    severity: xr.DataArray,
+    weather_demand_years: dict[int, int],
+    category: str = "household",
+) -> np.ndarray:
     """Return country-normalised factors per weather/shape intersection."""
     mask = (national_demand.index.get_level_values("cat_name") == category) & (
         national_demand.index.get_level_values("end_use") == "space_heat"

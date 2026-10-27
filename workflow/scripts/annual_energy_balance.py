@@ -188,7 +188,9 @@ def _eurostat_values_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _add_ch_energy_balance(path_to_ch_excel, path_to_ch_industry_excel, index_levels):
+def _add_ch_energy_balance(
+    path_to_ch_excel: str, path_to_ch_industry_excel: str, index_levels: list[str]
+) -> pd.Series:
     household_sheet = "T17a"
     industry_sheet = "T17b"
     other_sectors_sheet = "T17c"
@@ -239,7 +241,9 @@ def _add_ch_energy_balance(path_to_ch_excel, path_to_ch_industry_excel, index_le
     return ch_energy_use_tdf
 
 
-def _get_ch_energy_balance_sheet(path_to_excel, sheet, skipfooter, cat_code):
+def _get_ch_energy_balance_sheet(
+    path_to_excel: str, sheet: str, skipfooter: int, cat_code: str
+) -> pd.Series:
     ch_energy_carriers = {
         "Erdölprodukte": "O4000XBIO",
         "Elektrizität": "E7000",
@@ -280,7 +284,7 @@ def _get_ch_energy_balance_sheet(path_to_excel, sheet, skipfooter, cat_code):
     return df.assign(cat_code=cat_code).set_index("cat_code", append=True).stack()
 
 
-def get_ch_waste_consumption(path_to_excel):
+def get_ch_waste_consumption(path_to_excel: str) -> pd.Series:
     """Get data on waste burned in WtE plants.
 
     Uses the waste-consumption series from CH GEST. Fossil fuel inputs to
@@ -309,7 +313,7 @@ def get_ch_waste_consumption(path_to_excel):
     return waste_stream_tdf
 
 
-def _get_ch_transport_energy_balance(path_to_excel):
+def _get_ch_transport_energy_balance(path_to_excel: str) -> pd.Series:
     carriers = {
         "Gas übriger Vekehr": ("G3000", "FC_TRA_ROAD_E"),
         "Übrige erneuerbare Energien": ("R5220B", "FC_TRA_ROAD_E"),
@@ -336,7 +340,7 @@ def _get_ch_transport_energy_balance(path_to_excel):
     remove_digits = str.maketrans("", "", digits)
     # carrier names span across two column levels, which we merge with fillna
 
-    def carrier_name_func(index):
+    def carrier_name_func(index: int) -> pd.Series:
         return (
             df.columns.to_frame()
             .iloc[:, index]
@@ -356,7 +360,7 @@ def _get_ch_transport_energy_balance(path_to_excel):
     return df.stack()
 
 
-def _get_ch_industry_energy_balance(path_to_excel):
+def _get_ch_industry_energy_balance(path_to_excel: str) -> pd.Series:
     ch_subsector_codes = {
         "1": "FC_IND_FBT_E",  # 'Food, beverages & tobacco',
         "2": "FC_IND_TL_E",  # 'Textile & leather',

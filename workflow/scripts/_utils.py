@@ -1,6 +1,7 @@
 """General utility functions."""
 
 import math
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 import geopandas as gpd
@@ -13,6 +14,7 @@ import shapely
 import xarray as xr
 from affine import Affine
 from gregor.aggregate import aggregate_raster_to_polygon
+from pyproj import CRS
 from rasterio.enums import Resampling
 from rasterio.features import geometry_mask
 from rasterio.warp import reproject
@@ -55,7 +57,14 @@ SUPPORT_UNITS = {
 }
 
 
-def write_raster(path, profile, values, bands, units, tags):
+def write_raster(
+    path: str | Path,
+    profile: Mapping,
+    values: tuple[np.ndarray, ...],
+    bands: tuple[str, ...],
+    units: tuple[str, ...],
+    tags: dict,
+) -> None:
     """Persist aligned support arrays with their explicit band contract."""
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(path, "w+", **{**profile, "count": len(bands)}) as output:
@@ -69,7 +78,7 @@ def write_raster(path, profile, values, bands, units, tags):
         output.update_tags(**tags)
 
 
-def read_region_support(directory):
+def read_region_support(directory: Path) -> tuple:
     """Load complete-region and scoped floor-area support arrays.
 
     Complete-region support supplies normalization totals. The two scoped
@@ -95,7 +104,12 @@ def processing_crs(shapes: gpd.GeoDataFrame) -> str:
     )
 
 
-def output_profile(bounds, crs="EPSG:3035", count=3, dtype="float32"):
+def output_profile(
+    bounds: tuple[float, float, float, float] | np.ndarray,
+    crs: str | CRS | rasterio.crs.CRS = "EPSG:3035",
+    count: int = 3,
+    dtype: str = "float32",
+) -> dict:
     """Return an equal-area raster profile aligned to the hectare grid.
 
     Bounds are rounded outward to exact multiples of 100 metres. Every
@@ -123,7 +137,12 @@ def output_profile(bounds, crs="EPSG:3035", count=3, dtype="float32"):
     }
 
 
-def population_grid(source, profile, geometry, total):
+def population_grid(
+    source: rasterio.io.DatasetReader,
+    profile: Mapping,
+    geometry: shapely.Geometry,
+    total: float,
+) -> np.ndarray:
     """Reproject counts, retain region-centred cells, and conserve its total."""
     population = np.zeros((profile["height"], profile["width"]), dtype=float)
     reproject(
@@ -142,7 +161,9 @@ def population_grid(source, profile, geometry, total):
     return population
 
 
-def point_grid(profile, points, values):
+def point_grid(
+    profile: Mapping, points: gpd.GeoDataFrame, values: pd.Series | np.ndarray
+) -> np.ndarray:
     """Sum point values into an aligned raster array."""
     grid = np.zeros((profile["height"], profile["width"]), dtype=float)
     if points.empty:
@@ -154,7 +175,12 @@ def point_grid(profile, points, values):
     return grid
 
 
-def clipped_grid(grid, source_profile, profile, geometry):
+def clipped_grid(
+    grid: np.ndarray,
+    source_profile: Mapping,
+    profile: Mapping,
+    geometry: shapely.Geometry,
+) -> np.ndarray:
     """Extract one aligned shape window and retain cells centred in its geometry."""
     bounds = rasterio.transform.array_bounds(
         profile["height"], profile["width"], profile["transform"]
@@ -168,7 +194,12 @@ def clipped_grid(grid, source_profile, profile, geometry):
     return clipped
 
 
-def add_partial(output, partial, bands=(1, 2), source_bands=None) -> None:
+def add_partial(
+    output: rasterio.io.DatasetWriter,
+    partial: rasterio.io.DatasetReader,
+    bands: tuple[int, ...] = (1, 2),
+    source_bands: tuple[int, ...] | None = None,
+) -> None:
     """Add aligned bands in bounded windows, optionally mapping source bands."""
     raw = rasterio.windows.from_bounds(*partial.bounds, output.transform)
     for _, window in partial.block_windows(1):
@@ -186,7 +217,9 @@ def add_partial(output, partial, bands=(1, 2), source_bands=None) -> None:
         )
 
 
-def intersecting_windows(raster, polygons, block_size=512):
+def intersecting_windows(
+    raster: rasterio.io.DatasetReader, polygons: gpd.GeoDataFrame, block_size: int = 512
+) -> Iterator:
     """Visit bounded blocks inside the polygon extent, including untiled GHSL files.
 
     Bounded windows limit both raster-read and polygon-intersection memory,
@@ -215,7 +248,9 @@ def intersecting_windows(raster, polygons, block_size=512):
             )
 
 
-def window_polygons(polygons, window, transform):
+def window_polygons(
+    polygons: gpd.GeoDataFrame, window: Window, transform: Affine
+) -> gpd.GeoDataFrame:
     """Clip candidate polygons to a window, preserving positional identifiers."""
     bounds = shapely.box(*rasterio.windows.bounds(window, transform))
     candidates = polygons.sindex.query(bounds, predicate="intersects")
@@ -224,7 +259,9 @@ def window_polygons(polygons, window, transform):
     return local.loc[local.area > 0]
 
 
-def project_raster_polygons(polygons, crs):
+def project_raster_polygons(
+    polygons: gpd.GeoDataFrame, crs: str | CRS | rasterio.crs.CRS
+) -> gpd.GeoDataFrame:
     """Project polygons for raster clipping, retaining positional row identifiers."""
     projected = polygons.to_crs(crs).reset_index(drop=True)
     # Reprojection can collapse tiny rings or introduce self-intersections.
@@ -236,7 +273,12 @@ def project_raster_polygons(polygons, crs):
     return projected
 
 
-def _iter_raster_blocks(raster_path, polygons, sector="residential", block_size=512):
+def _iter_raster_blocks(
+    raster_path: str | Path,
+    polygons: gpd.GeoDataFrame,
+    sector: str | None = "residential",
+    block_size: int = 512,
+) -> Iterator:
     """Yield bounded raster windows and clipped polygons on the native source grid."""
     with rasterio.open(raster_path) as raster:
         projected = project_raster_polygons(polygons, raster.crs)
@@ -283,7 +325,9 @@ def aggregate_support(
     return weights
 
 
-def population_summaries(path, groups, block_size=2048):
+def population_summaries(
+    path: str | Path, groups: dict[str, gpd.GeoDataFrame], block_size: int = 2048
+) -> pd.DataFrame:
     """Aggregate one population source once per exact projected geometry.
 
     Retain separate regional, floor-reference and count-reference rows: their

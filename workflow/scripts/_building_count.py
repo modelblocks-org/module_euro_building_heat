@@ -1,11 +1,15 @@
 """Sector building counts kept independent of floor-area and heat support."""
 
+from collections.abc import Mapping
+
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 from _utils import clipped_grid, point_grid
+from shapely.geometry.base import BaseGeometry
 
 
-def reference_count_ratios(stats, population):
+def reference_count_ratios(stats: pd.DataFrame, population: float) -> pd.Series:
     """Return sector shares of all buildings and counts per covered inhabitant."""
     counts = pd.Series(
         {
@@ -23,8 +27,14 @@ def reference_count_ratios(stats, population):
 
 
 def building_count_grid(
-    profile, full_profile, sectors, sources, ratios, proxy_population, clipped
-):
+    profile: Mapping,
+    full_profile: Mapping,
+    sectors: dict[str, gpd.GeoDataFrame],
+    sources: dict,
+    ratios: pd.Series | None,
+    proxy_population: np.ndarray,
+    clipped: BaseGeometry,
+) -> np.ndarray:
     """Sum sector building equivalents and the Microsoft population fallback.
 
     Microsoft inputs must exclude sparse tiles. Proxy counts can be fractional.
