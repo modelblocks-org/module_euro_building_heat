@@ -2,12 +2,14 @@
 
 import math
 from pathlib import Path
+from typing import Any
 
 import geopandas as gpd
 import inflection
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import rioxarray
 from cmap import Colormap
 from matplotlib.axes import Axes
 from matplotlib.colors import PowerNorm
@@ -21,10 +23,37 @@ PLOT_STYLE = {
     "xtick.color": "#4b5563",
     "ytick.color": "#4b5563",
 }
+
+
 MAP_CMAP = "YlOrRd"
+
+
 MAP_BACKGROUND_COLOR = "#eef3f5"
+
+
 MAP_BASE_COLOR = "#e6e2d9"
+
+
 MAP_BASE_EDGE_COLOR = "#7a858d"
+RASTER_PREVIEW_MAX_SIZE = 2000
+RASTER_OUTLINE_STYLE = {"color": "#808080", "linewidth": 0.6}
+
+
+def save_figure(figure: Figure, output_path: str | Path, **kwargs: Any) -> None:
+    """Save and close any diagnostic figure, creating its destination directory."""
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output, **kwargs)
+    plt.close(figure)
+
+
+def plot_outlines(
+    shapes: gpd.GeoDataFrame, axis: Axes, style: dict, *, by_country: bool = False
+) -> None:
+    """Draw shape or country outlines with the same map conventions."""
+    if by_country:
+        shapes = shapes.dissolve(by="country_id" if "country_id" in shapes else None)
+    shapes.boundary.plot(ax=axis, **style, zorder=3)
 
 
 def draw_empty(ax: Axes, title: str, message: str = "No data available") -> None:
@@ -82,10 +111,7 @@ def plot_timeseries(
             ax.set_ylabel(ylabel)
         ax.set_xlabel("")
 
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output)
-    plt.close(fig)
+    save_figure(fig, output_path)
 
 
 def plot_heat_demand_timeseries(
@@ -125,10 +151,6 @@ def plot_annual_heat_demand_choropleth(
     width = maximum_x - minimum_x
     height = maximum_y - minimum_y
     padding = max(width, height) * 0.04
-    if "country_id" in shapes.columns:
-        country_boundaries = shapes.dissolve(by="country_id").boundary
-    else:
-        country_boundaries = shapes.dissolve().boundary
 
     with plt.rc_context(PLOT_STYLE):
         fig, axes = plt.subplots(
@@ -164,8 +186,11 @@ def plot_annual_heat_demand_choropleth(
                 alpha=0.94,
                 zorder=2,
             )
-            country_boundaries.plot(
-                ax=ax, color=MAP_BASE_EDGE_COLOR, linewidth=0.9, zorder=3
+            plot_outlines(
+                shapes,
+                ax,
+                {"color": MAP_BASE_EDGE_COLOR, "linewidth": 0.9},
+                by_country=True,
             )
             ax.set_xlim(minimum_x - padding, maximum_x + padding)
             ax.set_ylim(minimum_y - padding, maximum_y + padding)
@@ -198,13 +223,10 @@ def plot_annual_heat_demand_choropleth(
         colorbar.outline.set_edgecolor("#a5adb3")
         colorbar.set_label("Annual useful heat demand (TWh)")
 
-        output = Path(output_path)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(output, bbox_inches="tight", pad_inches=0.05, dpi=200)
-        plt.close(fig)
+        save_figure(fig, output_path, bbox_inches="tight", pad_inches=0.05, dpi=200)
 
 
-def _histogram_legend(fig: Figure, axes_flat) -> None:
+def _histogram_legend(fig: Figure, axes_flat: np.ndarray) -> None:
     fig.legends.clear()
     handles, labels = axes_flat[0].get_legend_handles_labels()
     fig.legend(handles[::-1], labels[::-1], loc="center left", bbox_to_anchor=(1, 0.5))
@@ -212,7 +234,7 @@ def _histogram_legend(fig: Figure, axes_flat) -> None:
 
 def _histogram_axis_formatting(
     ax: Axes, container: str, x_label: str, y_label: str, x_nbins: int
-):
+) -> None:
     ax.set_title(container)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
@@ -230,7 +252,6 @@ def _histogram_subplot(n_rows: int, n_columns: int) -> tuple[Figure, np.ndarray]
     )
 
 
-# FIXME: color ordering should be deterministic
 def plot_bar_histogram(
     df: pd.DataFrame,
     stacked_col: str,
@@ -243,9 +264,9 @@ def plot_bar_histogram(
     x_nbins: int = 10,
     format_container: bool = True,
     legend: bool = True,
-    fig=None,
-    axes=None,
-) -> tuple[Figure, Axes]:
+    fig: Figure | None = None,
+    axes: Axes | np.ndarray | None = None,
+) -> tuple[Figure, Axes | np.ndarray]:
     """Plot stacked values, optionally supplementing an existing histogram."""
     containers = sorted(df[container_col].unique())
     years = range(df[year_col].min(), df[year_col].max() + 1)
@@ -306,9 +327,9 @@ def plot_value_histogram(
     x_nbins: int = 10,
     format_container: bool = True,
     legend: bool = True,
-    fig=None,
-    axes=None,
-) -> tuple[Figure, Axes]:
+    fig: Figure | None = None,
+    axes: Axes | np.ndarray | None = None,
+) -> tuple[Figure, Axes | np.ndarray]:
     """Plot a single value, optionally supplementing an existing histogram."""
     containers = sorted(df[container_col].unique())
     years = range(df[year_col].min(), df[year_col].max() + 1)
@@ -351,3 +372,46 @@ def plot_value_histogram(
     if legend:
         _histogram_legend(fig, axes_flat)
     return fig, axes
+
+
+def plot_floor_area(
+    raster_path: str,
+    band: int,
+    title: str,
+    output_path: str,
+    shapes: gpd.GeoDataFrame,
+    colorbar_label: str = "Floor area (m²/ha)",
+) -> None:
+    """Plot a Dask-coarsened density band without loading the full raster."""
+    opened: Any = rioxarray.open_rasterio(raster_path, chunks="auto")
+    with opened as raster:
+        values = raster.sel(band=band)
+        factor = max(1, int(np.ceil(max(values.shape) / RASTER_PREVIEW_MAX_SIZE)))
+        values = (
+            values.coarsen(x=factor, y=factor, boundary="pad")
+            .max()
+            .compute()
+            .to_numpy()
+        )
+        values = np.ma.masked_equal(values, raster.rio.nodata)
+        shapes = shapes.to_crs(raster.rio.crs)
+        bounds = raster.rio.bounds()
+        extent = bounds[0], bounds[2], bounds[1], bounds[3]
+    positive = values.compressed()
+    vmax = (
+        max(1, float(np.quantile(positive[positive > 0], 0.99)))
+        if np.any(positive > 0)
+        else 1
+    )
+    figure, axis = plt.subplots(figsize=(9, 7), constrained_layout=True)
+    axis.set_facecolor(MAP_BACKGROUND_COLOR)
+    image = axis.imshow(
+        values, extent=extent, cmap=MAP_CMAP, norm=PowerNorm(0.35, vmin=0, vmax=vmax)
+    )
+    # Preserve each user-provided boundary, including internal borders and holes.
+    plot_outlines(shapes, axis, RASTER_OUTLINE_STYLE)
+    axis.set_xlim(extent[:2])
+    axis.set_ylim(extent[2:])
+    axis.set(title=title, xlabel="Easting (m)", ylabel="Northing (m)")
+    figure.colorbar(image, ax=axis, label=colorbar_label)
+    save_figure(figure, output_path, dpi=200)

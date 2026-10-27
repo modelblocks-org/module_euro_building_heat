@@ -1,25 +1,24 @@
 # Module Input-Output structure for automated docs generation
 convention_version: v1.0.0
-
 pathvars:
   snakemake_defaults:
     logs:
-      default: "<logs>"
+      default: <logs>
       description: location of snakemake log files.
     resources:
-      default: "<resources>"
-      description: "location of module resource (input) files."
+      default: <resources>
+      description: location of module resource (input) files.
     results:
-      default: "<results>"
-      description: "location of module result (output) files."
+      default: <results>
+      description: location of module result (output) files.
   user_resources:
     edh_api:
-      default: "<resources>/user/edh_api.txt"
+      default: <resources>/user/edh_api.txt
       description: |
         Earth Data Hub API key used to download ERA5 weather data.
         The file must contain only the API key.
     shapes:
-      default: "<resources>/user/{shapes}/shapes.parquet"
+      default: <resources>/user/{shapes}/shapes.parquet
       description: |
         Region-specific polygons to process.
         The parquet file must include the following columns:
@@ -30,26 +29,72 @@ pathvars:
         - `geometry`: polygon geometry.
   results:
     annual_heat_demand:
-      default: "<results>/{shapes}/annual/heat_demand_twh.parquet"
+      default: <results>/{shapes}/annual/heat_demand_twh.parquet
       description: |
         Annual useful heat demand in TWh, scaled from countries to shapes.
+        Household and commercial space heating use their sector structural support
+        times ERA5 HDD^elasticity,
+        normalised within each country and paired demand/weather year.
+        Hot water uses the same sector structural support without HDD.
+        Cooking retains population allocation.
         This table contains the following columns:
         - `end_use`: cooking, hot_water or space_heat.
-        - `category`: commercial or households
+        - `category`: commercial or household
         - `year`: year the demand applies to.
         - `shape_id`: exact shape ID as seen in the input `shapes.parquet` case.
         - `heat_demand_twh`: annual demand in TWh.
     heat_demand:
-      default: "<results>/{shapes}/hourly/heat_demand_mwh.parquet"
+      default: <results>/{shapes}/hourly/heat_demand_mwh.parquet
       description: |
         Shape-aggregated heat demand in MWh with a harmonised UTC hourly index.
+    space_heat_demand:
+      default: <results>/{shapes}/annual/space_heat_demand_mwh.tif
+      description: |
+        Annual useful space heat demand for households and commercial buildings in MWh per
+        cell on the shared 100 m building grid. Each sector uses structural support times
+        HDD^elasticity, normalized within each country and corrected for shape boundaries.
+        Cell sums preserve annual shape totals. One band per configured
+        demand/weather year pair, recorded in descriptions and tags. Nodata is 0.
+    hot_water_demand:
+      default: <results>/{shapes}/annual/hot_water_demand_mwh.tif
+      description: |
+        Annual useful hot water demand for households and commercial buildings in MWh per
+        cell on the shared 100 m building grid. Allocates each sector separately with
+        structural support without HDD, normalises per shape, and sums sectors. Cell sums
+        preserve annual shape totals. One band per demand/weather year pair, recorded in
+        descriptions and tags. Nodata is 0.
+    space_heat_profile:
+      default: <results>/{shapes}/hourly/space_heat_profile.parquet
+      description: |
+        Normalised hourly space heat shares (p.u.) for households and commercial
+        buildings combined, weighted by their annual demand. UTC-aware hourly
+        timesteps index and one column per shape ID. Each shape/weather year sums
+        to 1; zero annual demand yields all zeros. Attributes include units,
+        end use, normalisation, shape timezones, and weather-to-demand year mapping.
+    hot_water_profile:
+      default: <results>/{shapes}/hourly/hot_water_profile.parquet
+      description: |
+        Normalised hourly hot water shares (p.u.) for households and commercial
+        buildings combined, weighted by their annual demand. UTC-aware hourly
+        timesteps index and one column per shape ID. Each shape/weather year sums
+        to 1; zero annual demand yields all zeros. Attributes include units,
+        end use, normalisation, shape timezones, and weather-to-demand year mapping.
     heat_pump_cop:
-      default: "<results>/{shapes}/hourly/heat_pump_cop_pu.parquet"
-      description: >
-        Shape-aggregated heat-pump coefficient of performance in p.u. with a harmonised UTC hourly index.
+      default: <results>/{shapes}/hourly/heat_pump_cop_pu.parquet
+      description: |
+        Shape-aggregated heat-pump coefficient of performance in p.u. with a harmonised
+        UTC hourly index.
     heat_pump_electricity_demand:
-      default: "<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet"
-      description: >
-        Shape-aggregated electricity demand for heat pumps in MWh with a harmonised UTC hourly index.
+      default: <results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet
+      description: |
+        Shape-aggregated electricity demand for heat pumps in MWh with a harmonised UTC
+        hourly index.
+    building_count:
+      default: <results>/{shapes}/rasters/building_count.tif
+      description: |
+        Residential plus commercial/public buildings per hectare on the shared 100 m
+        equal-area grid. One building_count band, units buildings/ha, nodata 0. Other
+        building uses are excluded and proxy counts may be fractional. This output does
+        not require weather, heat statistics or an ERA5 credential.
 wildcards:
   shapes: name of the provided shapes case.

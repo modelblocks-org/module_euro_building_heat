@@ -11,16 +11,105 @@ if TYPE_CHECKING:
     snakemake: Any
 
 
-def group_gridcells(gridded_data: xr.Dataset, grid_weight: xr.DataArray) -> xr.Dataset:
+def group_gridcells(
+    gridded_data: xr.Dataset,
+    grid_weight: xr.DataArray,
+    residential_weight: xr.DataArray | None = None,
+    commercial_weight: xr.DataArray | None = None,
+) -> xr.Dataset:
     """Group gridded heat data into resolution-specific units.
 
     Args:
         gridded_data (xr.Dataset): Gridded timeseries space heat and hot water data.
         grid_weight (xr.DataArray): Weighted mapping from grid (a.k.a. "site") to units.
+        residential_weight: Optional structural weights for household SFH/MFH
+            space-heating profiles.
+        commercial_weight: Optional structural weights for commercial space heat.
+            Hot-water profiles retain population weights.
 
     Returns:
         xr.Dataset: Data grouped into resolution-specific units.
     """
+    if commercial_weight is not None:
+        if set(commercial_weight.dims) != {"site", "id"}:
+            raise ValueError("Commercial weights must have dimensions site and id.")
+        if set(commercial_weight.id.values) != set(grid_weight.id.values):
+            raise ValueError(
+                "Commercial and population weights must cover the same shapes."
+            )
+        population, commercial = xr.align(
+            grid_weight.fillna(0),
+            commercial_weight.fillna(0),
+            join="outer",
+            fill_value=0,
+        )
+        # Population supplies a temporal profile when structural support is zero.
+        profiles = group_gridcells(
+            gridded_data,
+            population.where(population.sum("site") > 0, commercial),
+            residential_weight,
+        )
+        if (
+            "space_heat" in gridded_data
+            and "building" in gridded_data.space_heat.dims
+            and "COM" in gridded_data.building
+        ):
+            commercial_profiles = group_gridcells(
+                gridded_data[["space_heat"]].sel(building=["COM"]),
+                commercial.where(commercial.sum("site") > 0, population),
+            )
+            profiles["space_heat"] = xr.where(
+                profiles.building == "COM",
+                commercial_profiles.space_heat.reindex(
+                    building=profiles.building, fill_value=0
+                ),
+                profiles.space_heat,
+            )
+        return profiles
+
+    if residential_weight is not None:
+        if set(residential_weight.dims) != {"site", "id"}:
+            raise ValueError("Residential weights must have dimensions site and id.")
+        if set(residential_weight.id.values) != set(grid_weight.id.values):
+            raise ValueError(
+                "Residential and population weights must cover the same shapes."
+            )
+        grid_weight, residential_weight = xr.align(
+            grid_weight.fillna(0),
+            residential_weight.fillna(0),
+            join="outer",
+            fill_value=0,
+        )
+        # Retain zero-demand shapes. Fallback profiles do not change annual demand.
+        population_weights = grid_weight.where(
+            grid_weight.sum("site") > 0, residential_weight
+        )
+        heat_weights = residential_weight.where(
+            residential_weight.sum("site") > 0, grid_weight
+        )
+        population_profiles = group_gridcells(gridded_data, population_weights)
+        if (
+            "space_heat" not in gridded_data
+            or "building" not in gridded_data.space_heat.dims
+        ):
+            return population_profiles
+        household_buildings = [
+            b for b in gridded_data.building.values if b in {"SFH", "MFH"}
+        ]
+        if not household_buildings:
+            return population_profiles
+        household_profiles = group_gridcells(
+            gridded_data[["space_heat"]].sel(building=household_buildings), heat_weights
+        )
+        population_profiles["space_heat"] = xr.where(
+            population_profiles.building.isin(household_buildings),
+            household_profiles.space_heat.reindex(
+                building=population_profiles.building, fill_value=0
+            ),
+            population_profiles.space_heat,
+        )
+        return population_profiles
+
     required_dimensions = {"site", "id"}
     if set(grid_weight.dims) != required_dimensions:
         raise ValueError(
@@ -48,8 +137,7 @@ def group_gridcells(gridded_data: xr.Dataset, grid_weight: xr.DataArray) -> xr.D
     if len(weighted_ids) == 0:
         raise ValueError("No shapes have positive population weights.")
 
-    # Construct every shape reduction in one Dask graph. Source chunks shared by
-    # multiple shapes are then loaded and calculated once instead of once per process.
+    # One Dask graph lets shape reductions reuse shared source chunks.
     per_id_averages = [
         _site_weighted_ave(id, gridded_data, grid_weight) for id in weighted_ids
     ]
@@ -82,7 +170,9 @@ def main() -> None:
     """Main Snakemake process."""
     with (
         xr.open_dataset(
-            snakemake.input.gridded_timeseries_data, decode_timedelta=True, chunks={}
+            snakemake.input.gridded_timeseries_data,
+            decode_timedelta=True,
+            chunks="auto",
         ) as gridded_data,
         xr.open_dataarray(
             snakemake.input.grid_weights, decode_timedelta=True

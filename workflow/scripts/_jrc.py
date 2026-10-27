@@ -46,7 +46,7 @@ ELECTRIC_END_USE_ROW = {
 }
 
 
-def _get_sheet(sector: str, sheet_type: str):
+def _get_sheet(sector: str, sheet_type: str) -> str:
     if sector not in SECTORS:
         raise ValueError(f"Sector must be one of {SECTORS}, got {sector!r}.")
     return f"{sector}_{SHEETS[sheet_type]}"
@@ -72,7 +72,7 @@ def _select_year_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _clean_df(df: pd.DataFrame, energy_type: str):
+def _clean_df(df: pd.DataFrame, energy_type: str) -> pd.DataFrame:
     """Tidy up JRC-IDEES long-form sheets."""
     country_code = df.index.names[0].split(" - ")[0]
     df = _select_year_columns(df)
