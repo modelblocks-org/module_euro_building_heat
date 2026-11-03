@@ -4,6 +4,7 @@ channels:
 - bioconda
 - nodefaults
 dependencies:
+- scipy >=1.15
 - affine >=2.4
 - duckdb >=1.4
 - rasterio >=1.4.0

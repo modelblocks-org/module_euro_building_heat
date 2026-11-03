@@ -1,0 +1,44 @@
+"""Calculate per-cell district-heating costs and identify coherent DH areas."""
+
+
+rule district_heating:
+    input:
+        shapes=rules.prepare_shapes.output[0],
+        space_heat="<space_heat_demand>",
+        hot_water="<hot_water_demand>",
+        building_count="<building_count>",
+        baselines=workflow.source_path("../internal/district_heating_baselines.csv"),
+    output:
+        heat="<resources>/automatic/{shapes}/district_heating/heat.tif",
+        costs="<resources>/automatic/{shapes}/district_heating/costs.tif",
+    log:
+        "<logs>/{shapes}/district_heating.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        assumptions=config["district_heating"]
+        | {"data_proxies": config["data_proxies"]["district_heating"]},
+        block_size=512,
+        grid_crs=config["crs"]["projected"],
+    message:
+        "Calculate district-heating network costs for '{wildcards.shapes}' shapes."
+    script:
+        "../scripts/district_heating.py"
+
+
+rule district_heating_areas:
+    input:
+        shapes=rules.prepare_shapes.output[0],
+        costs=rules.district_heating.output.costs,
+        heat=rules.district_heating.output.heat,
+    output:
+        ids="<resources>/automatic/{shapes}/district_heating/area_ids.tif",
+        areas="<district_heating_areas>",
+    log:
+        "<logs>/{shapes}/district_heating_areas.log",
+    conda:
+        "../envs/module.yaml"
+    message:
+        "Identify coherent district-heating areas for '{wildcards.shapes}' shapes."
+    script:
+        "../scripts/district_heating_areas.py"

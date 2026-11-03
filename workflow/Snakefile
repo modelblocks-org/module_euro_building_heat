@@ -22,6 +22,7 @@ pathvars:
     hot_water_profile="<results>/{shapes}/hourly/hot_water_profile.parquet",
     heat_pump_cop="<results>/{shapes}/hourly/heat_pump_cop_pu.parquet",
     heat_pump_electricity_demand="<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet",
+    district_heating_areas="<results>/{shapes}/district_heating/areas.parquet",
 
 
 # Load the example configuration. This will be overridden by users.
@@ -56,6 +57,7 @@ include: "rules/baseline.smk"
 include: "rules/annual_heat_demand.smk"
 include: "rules/heat_timeseries.smk"
 include: "rules/heat_pump_cop.smk"
+include: "rules/district_heating.smk"
 
 
 # Add additional files to be delivered alongside the workflow here.

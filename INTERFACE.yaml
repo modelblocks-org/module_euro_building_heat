@@ -94,7 +94,11 @@ pathvars:
       description: |
         Residential plus commercial/public buildings per hectare on the shared 100 m
         equal-area grid. One building_count band, units buildings/ha, nodata 0. Other
-        building uses are excluded and proxy counts may be fractional. This output does
-        not require weather, heat statistics or an ERA5 credential.
+        building uses are excluded and proxy counts may be fractional.
+    district_heating_areas:
+      default: <results>/{shapes}/district_heating/areas.parquet
+      description: |
+        District heating areas in m², aggregated to shapes. One row per shape and
+        district heating area.
 wildcards:
   shapes: name of the provided shapes case.

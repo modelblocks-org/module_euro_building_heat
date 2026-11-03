@@ -14,7 +14,119 @@ required:
 - useful_heat_demand
 - tech_efficiencies
 - heat_pump
+- district_heating
 properties:
+  district_heating:
+    type: object
+    additionalProperties: false
+    required:
+    - assessment_year
+    - area_selection
+    - lifetime_years
+    - discount_rate
+    - distribution_length_curve
+    - distribution_diameter_curve
+    - service_length_curve
+    - service_diameter_curve
+    - pipe_diameter_range_m
+    properties:
+      area_selection:
+        description: Thresholds for selecting district-heating areas by heat density
+          and connected demand.
+        type: object
+        additionalProperties: false
+        required:
+        - initial_density_mwh_per_ha
+        - minimum_heat_mwh_per_year
+        - connectivity
+        properties:
+          initial_density_mwh_per_ha:
+            description: Heat-demand density threshold in MWh per hectare per
+              year.
+            type: number
+            exclusiveMinimum: 0
+          minimum_heat_mwh_per_year:
+            description: Minimum connected heat demand per area in MWh per year.
+            type: number
+            exclusiveMinimum: 0
+          connectivity:
+            enum:
+            - 4
+            - 8
+      assessment_year:
+        description: >
+          Year used to label demand and interpolate country connection shares.
+        type: integer
+        minimum: 1900
+        maximum: 9999
+      lifetime_years:
+        type: integer
+        minimum: 1
+      discount_rate:
+        type: number
+        minimum: 0
+      distribution_length_curve:
+        type: object
+        additionalProperties: false
+        required: [log_slope_m, intercept_m, minimum_connected_buildings]
+        properties:
+          log_slope_m:
+            type: number
+            exclusiveMinimum: 0
+          intercept_m:
+            type: number
+          minimum_connected_buildings:
+            type: number
+            minimum: 2
+      distribution_diameter_curve:
+        type: object
+        additionalProperties: false
+        required: [small_pipe_density_gj_per_m, log_slope_m, intercept_m, small_pipe_diameter_m]
+        properties:
+          small_pipe_density_gj_per_m:
+            type: number
+            exclusiveMinimum: 0
+          log_slope_m:
+            type: number
+            exclusiveMinimum: 0
+          intercept_m:
+            type: number
+          small_pipe_diameter_m:
+            type: number
+            exclusiveMinimum: 0
+      service_length_curve:
+        type: object
+        additionalProperties: false
+        required: [asymptote_m_per_ha, logistic_a, logistic_b_ha_per_building]
+        properties:
+          asymptote_m_per_ha:
+            type: number
+            exclusiveMinimum: 0
+          logistic_a:
+            type: number
+            exclusiveMinimum: 0
+          logistic_b_ha_per_building:
+            type: number
+            exclusiveMinimum: 0
+      service_diameter_curve:
+        type: object
+        additionalProperties: false
+        required: [exponential_a_mm, exponential_b_m_per_gj]
+        properties:
+          exponential_a_mm:
+            type: number
+            exclusiveMinimum: 0
+          exponential_b_m_per_gj:
+            type: number
+            exclusiveMinimum: 0
+      pipe_diameter_range_m:
+        description: Allowed pipe diameter [minimum, maximum] in metres.
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: number
+          exclusiveMinimum: 0
   building_rasters:
     description: "Settings controlling whether building grids are downloaded or rebuilt."
     type: object
@@ -346,6 +458,9 @@ properties:
     type: object
     additionalProperties: false
     properties:
+      district_heating:
+        description: Countries supplying missing network parameters and cost ceilings.
+        $ref: '#/$defs/country_proxy_map'
       sfh_mfh_shares:
         description: |
           Maps countries missing dwelling-type data to countries whose single-family homes
@@ -381,6 +496,7 @@ properties:
     - annual_energy_balance
     - household_end_use
     - jrc_idees
+    - district_heating
   spatial_weights:
     description: "Settings for spatial allocation of annual space-heating demand."
     type: object

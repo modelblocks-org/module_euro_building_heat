@@ -78,6 +78,7 @@ rule unzip_raw_population:
 rule prepare_shapes:
     input:
         shapes="<shapes>",
+        dh_baselines=workflow.source_path("../internal/district_heating_baselines.csv"),
     output:
         shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
         scope="<resources>/automatic/shapes/{shapes}/scope_equal_area.parquet",
@@ -85,6 +86,8 @@ rule prepare_shapes:
         "<logs>/{shapes}/prepare_shapes.log",
     conda:
         "../envs/module.yaml"
+    params:
+        dh_proxies=config["data_proxies"]["district_heating"],
     message:
         "Filter non-land regions from '{wildcards.shapes}' shapes."
     script:

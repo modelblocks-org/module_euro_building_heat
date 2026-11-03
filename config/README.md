@@ -106,3 +106,26 @@ UK ECUK final demand is converted using these efficiencies in both modes.
 - `heat_pump_shares`: air-source (`ashp`) and ground-source (`gshp`) fractions,
   summing to one.
 - `correction_factor`: multiplier converting manufacturer COP to operating performance.
+
+## District heating
+
+`district_heating` configures the `district_heating_areas` output:
+
+- `assessment_year`: Determines the percentage of heat that is supplied through district heating. Edit [district_heating_baselines.csv](../workflow/internal/district_heating_baselines.csv)
+to change country connection shares or construction-cost coefficients. These
+assumptions come from Tables A-1 and A-2 of
+[Fallahnejad’s thesis](https://repositum.tuwien.at/handle/20.500.12708/203902).
+- `area_selection`: gives the minimum amount of heat required for a district heating network to be viable. Is used to select district heating areas. 
+- `lifetime_years` and `discount_rate`: network cost accounting assumptions.
+- `distribution_length_curve`, `distribution_diameter_curve`,
+  `service_length_curve`, and `service_diameter_curve`: empirical
+  coefficients and thresholds for modelling the district heating network. Distribution curves are adapted from
+  [Fallahnejad et al. (2024), *District heating potential in the EU-27*](https://doi.org/10.1016/j.apenergy.2023.122154).
+  The logistic service-length and exponential service-diameter curves follow
+  [Sánchez-García et al. (2023), *Understanding effective width for district heating*](https://doi.org/10.1016/j.energy.2023.127427).
+- `pipe_diameter_range_m`: physical limit of pipe diameter size used to remove cells in which district heating would give unrealistic diameter values. The example range follows the
+  product range described by
+  [Hofmann et al. (2025), *How much district heating in a future sector-coupled energy system?*](https://doi.org/10.1016/j.energy.2025.136436).
+
+
+

@@ -24,6 +24,7 @@ pytz = ">=2026.1.post1"
 pyarrow = ">=24.0.0"
 
 [feature.module.dependencies]
+scipy = ">=1.15"
 affine = ">=2.4"
 duckdb = ">=1.4"
 rasterio = ">=1.4.0"
