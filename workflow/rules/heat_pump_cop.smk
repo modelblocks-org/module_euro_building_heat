@@ -13,10 +13,10 @@ rule heat_pump_cop:
     conda:
         "../envs/module.yaml"
     params:
-        sink_temperature=config["heat"]["heat_pump"]["sink_temperature"],
-        space_heat_sink_shares=config["heat"]["heat_pump"]["space_heat_sink_shares"],
-        correction_factor=config["heat"]["heat_pump"]["correction_factor"],
-        heat_pump_shares=config["heat"]["heat_pump"]["heat_pump_shares"],
+        sink_temperature=config["heat_pump"]["sink_temperature"],
+        space_heat_sink_shares=config["heat_pump"]["space_heat_sink_shares"],
+        correction_factor=config["heat_pump"]["correction_factor"],
+        heat_pump_shares=config["heat_pump"]["heat_pump_shares"],
         weather_years=WEATHER_YEARS,
     message:
         "Generate gridded heat-pump coefficient of performance (COP)."
@@ -27,7 +27,7 @@ rule heat_pump_cop:
 rule group_gridded_timeseries_heat_pump_cop:
     input:
         gridded_timeseries_data=rules.heat_pump_cop.output[0],
-        grid_weights=rules.population_per_weather_gridbox.output[0],
+        grid_weights=rules.prepare_spatial_weights.output[0],
     output:
         temp("<resources>/automatic/shapes/{shapes}/heat-pump-cop.nc"),
     log:

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import _schemas
 import geopandas as gpd
+from prepare_shapes import check_proxied_country_scope
 
 if TYPE_CHECKING:
     snakemake: Any
@@ -26,6 +27,9 @@ def main() -> None:
     shapes = gpd.read_parquet(snakemake.input.shapes)
     shapes = _schemas.ShapesSchema.validate(shapes)
 
+    check_proxied_country_scope(
+        shapes, snakemake.params.dataset_scopes, snakemake.params.data_proxies
+    )
     country_ids = sorted(shapes["country_id"].unique())
 
     proxy_country_ids = _country_scope_w_proxies(

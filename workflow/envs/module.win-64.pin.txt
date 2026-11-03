@@ -268,6 +268,8 @@ https://conda.anaconda.org/conda-forge/noarch/distributed-2026.6.0-pyhc364b38_1.
 https://conda.anaconda.org/conda-forge/noarch/bokeh-3.9.1-pyhd8ed1ab_0.conda#123fcfe0df4b6fc21804538e59cdaafe
 https://conda.anaconda.org/conda-forge/noarch/dask-2026.6.0-pyhc364b38_0.conda#a2d2a05abf6076c3d041ec91b2235823
 https://conda.anaconda.org/conda-forge/noarch/gregor-0.1.0-pyhcf101f3_0.conda#36a2d7837350f7e8da83bcaad552d0b5
+https://conda.anaconda.org/conda-forge/win-64/python-duckdb-1.5.5-py312hbb81ca0_1.conda#a165e31f92a164e17c8c39f7a2b38786
+https://conda.anaconda.org/conda-forge/noarch/duckdb-1.5.5-hff2d567_1.conda#1ed60a1b3682dc764bacb3a50c18764e
 https://conda.anaconda.org/conda-forge/win-64/curl-8.21.0-h51a1c48_2.conda#1b94ffaa3757ec26686231f607a27512
 https://conda.anaconda.org/conda-forge/noarch/cmap-0.7.2-pyhd8ed1ab_0.conda#992b4902eb5ff13646048cd7629a82bf
 https://conda.anaconda.org/conda-forge/win-64/bottleneck-1.6.0-np2py312h226b611_3.conda#a062b6b39e12d9b4a2fb8c79a0ac4b8f

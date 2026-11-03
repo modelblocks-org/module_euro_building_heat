@@ -31,7 +31,7 @@ CARRIER_MAPPING = {
 SECTOR_TRANSLATION = {"residential": "Domestic", "services": "Services"}
 
 ECUK_KTOE_TO_TWH = 0.01163
-BASELINE_COLUMNS = _schemas.BaselineSchema.get_column_names()
+BASELINE_COLUMNS = list(_schemas.BaselineSchema.to_schema().columns)
 
 
 def get_sector_demand(path: str, sector: str) -> pd.DataFrame:

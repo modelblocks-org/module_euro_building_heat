@@ -12,7 +12,6 @@ def module_path():
     """Parent directory of the project."""
     path = Path(__file__).parent.parent
 
-    # Ensure the EDH API is set up.
     edh_api = path / "resources/user/edh_api.txt"
     integration_api = path / "tests/integration/resources/user/edh_api.txt"
     integration_api.parent.mkdir(parents=True, exist_ok=True)

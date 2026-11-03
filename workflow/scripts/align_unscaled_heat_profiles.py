@@ -125,7 +125,9 @@ def align_local_profile_files_to_utc(
             weather_years, local_profile_paths, strict=True
         ):
             local_profiles = stack.enter_context(
-                xr.open_dataset(local_profile_path, decode_timedelta=True, chunks={})
+                xr.open_dataset(
+                    local_profile_path, decode_timedelta=True, chunks="auto"
+                )
             )
             if local_profiles.attrs.get("time_basis") != LOCAL_TIME_BASIS:
                 raise ValueError(

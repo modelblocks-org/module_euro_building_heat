@@ -1,7 +1,5 @@
 """Rules to download automatic resource files for heat demand."""
 
-CURL_ARGS = "--fail --silent --show-error --location --retry 5 --retry-delay 5 --retry-all-errors --continue-at -"
-
 
 rule download_when2heat_params:
     output:
@@ -104,23 +102,19 @@ rule download_era5_data:
 
 rule download_raw_population:
     output:
-        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_{ghsl_resolution}.zip",
+        archive=update("<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.zip"),
     log:
-        "<logs>/automatic/download_raw_population_{ghsl_epoch}_{ghsl_resolution}.log",
-    localrule: True
+        "<logs>/automatic/download_raw_population_{ghsl_epoch}_100.log",
     conda:
         "../envs/module.yaml"
     params:
-        curl_args=CURL_ARGS,
         url=lambda wc: internal["resources"]["ghsl"]["url"].format(
-            stem=internal["resources"]["ghsl"]["stem"].format(
-                epoch=wc.ghsl_epoch, resolution=wc.ghsl_resolution
-            )
+            stem=internal["resources"]["ghsl"]["stem"].format(epoch=wc.ghsl_epoch)
         ),
     message:
-        "Download GHSL gridded population data for {wildcards.ghsl_epoch} at {wildcards.ghsl_resolution} m."
-    shell:
-        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
+        "Download GHSL population data for epoch {wildcards.ghsl_epoch}."
+    script:
+        "../scripts/download.py"
 
 
 rule download_jrc_idees:
@@ -141,3 +135,107 @@ rule download_jrc_idees:
         "Download JRC-IDEES data for {wildcards.country_code}-{wildcards.version}."
     shell:
         "curl {params.curl_args} --output {output:q} {params.dataset_url:q} 2> {log:q}"
+
+
+rule download_nuts3:
+    output:
+        geojson="<resources>/automatic/gisco/nuts3.geojson",
+    log:
+        "<logs>/download_nuts3.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        url=internal["resources"]["stable"]["url"].format(dataset="nuts3.geojson"),
+    message:
+        "Download NUTS3 region boundaries."
+    script:
+        "../scripts/download.py"
+
+
+rule download_eurostat_floor_area:
+    output:
+        table="<resources>/automatic/eurostat/cens_21dwbnr_r3.tsv.gz",
+    log:
+        "<logs>/download_eurostat_floor_area.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        url=internal["resources"]["stable"]["url"].format(
+            dataset="cens_21dwbnr_r3.tsv.gz"
+        ),
+    message:
+        "Download Eurostat dwelling census data for floor-area estimates."
+    script:
+        "../scripts/download.py"
+
+
+rule download_eubucco_nuts:
+    output:
+        table=update(
+            "<resources>/automatic/eubucco-metadata/v0.2/NUTS-regions-2016.parquet"
+        ),
+    log:
+        "<logs>/download_eubucco_nuts.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        url=internal["resources"]["automatic"]["eubucco_nuts"],
+    message:
+        "Download EUBUCCO NUTS region metadata."
+    script:
+        "../scripts/download.py"
+
+
+rule download_eubucco_stats:
+    output:
+        table=update("<resources>/automatic/eubucco-metadata/v0.2/region-stats.parquet"),
+    log:
+        "<logs>/download_eubucco_stats.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        url=internal["resources"]["automatic"]["eubucco_stats"],
+    message:
+        "Download EUBUCCO regional building statistics."
+    script:
+        "../scripts/download.py"
+
+
+rule download_eurostat_building_age:
+    output:
+        table="<resources>/automatic/eurostat/cens_21dwop_r3.tsv.gz",
+    log:
+        "<logs>/download_eurostat_building_age.log",
+    conda:
+        "../envs/module.yaml"
+    params:
+        url=internal["resources"]["stable"]["url"].format(
+            dataset="cens_21dwop_r3.tsv.gz"
+        ),
+    message:
+        "Download Eurostat building-age census data."
+    script:
+        "../scripts/download.py"
+
+
+if USE_PREBUILT:
+
+    rule download_precomputed_building_raster:
+        output:
+            raster="<resources>/automatic/precomputed_buildings/{dataset}.tif",
+        log:
+            "<logs>/download_precomputed_{dataset}.log",
+        wildcard_constraints:
+            dataset="building_count|residential_space_heat_weight|commercial_space_heat_weight",
+        conda:
+            "../envs/module.yaml"
+        params:
+            url=lambda wc: internal["resources"]["stable"]["url"].format(
+                dataset=f"{wc.dataset}.tif"
+            ),
+        message:
+            "Download precomputed {wildcards.dataset} raster."
+        shell:
+            "curl --fail --silent --show-error --location --retry 5 "
+            "--output {output.raster:q}.part {params.url:q} 2> {log:q} && "
+            "mv {output.raster:q}.part {output.raster:q}"

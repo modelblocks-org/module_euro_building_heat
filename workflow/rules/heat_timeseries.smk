@@ -11,12 +11,14 @@ rule process_gridded_weather_data:
         ),
         wind10m=temp("<resources>/automatic/shapes/{shapes}/gridded_weather/wind10m.nc"),
         tsoil5=temp("<resources>/automatic/shapes/{shapes}/gridded_weather/tsoil5.nc"),
+        hdd="<resources>/automatic/shapes/{shapes}/gridded_weather/hdd.nc",
     log:
         "<logs>/{shapes}/timeseries/process_gridded_weather_data.log",
     conda:
         "../envs/module.yaml"
     params:
         weather_years=WEATHER_YEARS,
+        hdd_base_temperature=config["spatial_weights"]["hdd"]["base_temperature"],
     message:
         "Process ERA5 weather data for '{wildcards.shapes}'."
     script:
@@ -28,6 +30,8 @@ rule local_unscaled_heat_profiles:
         wind_speed=rules.process_gridded_weather_data.output.wind10m,
         temperature=rules.process_gridded_weather_data.output.temperature,
         grid_weights="<resources>/automatic/shapes/{shapes}/population.nc",
+        residential_weights="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
+        commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
         when2heat_daily="<resources>/automatic/when2heat/daily_demand.csv",
         when2heat_hourly_com="<resources>/automatic/when2heat/hourly_factors_COM.csv",
         when2heat_hourly_mfh="<resources>/automatic/when2heat/hourly_factors_MFH.csv",
@@ -66,24 +70,33 @@ rule unscaled_heat_profiles:
         "../scripts/align_unscaled_heat_profiles.py"
 
 
-rule population_per_weather_gridbox:
+rule prepare_spatial_weights:
     input:
         weather_grid=rules.process_gridded_weather_data.output.grid,
-        population=rules.clip_population.output.path,
+        hdd=rules.process_gridded_weather_data.output.hdd,
+        population=POPULATION_FILE,
         locations=rules.prepare_shapes.output[0],
+        residential_raster=rules.merge_structural_support.output.residential_space_heat_weight,
+        commercial_raster=rules.merge_structural_support.output.commercial_space_heat_weight,
     output:
-        temp("<resources>/automatic/shapes/{shapes}/population.nc"),
+        population="<resources>/automatic/shapes/{shapes}/population.nc",
+        annual_weights="<resources>/automatic/shapes/{shapes}/annual_spatial_weights.nc",
+        residential_weights="<resources>/automatic/shapes/{shapes}/residential_space_heat_weight.nc",
+        commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
+        grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     log:
-        "<logs>/{shapes}/timeseries/population_per_weather_gridbox.log",
+        "<logs>/{shapes}/timeseries/prepare_spatial_weights.log",
     conda:
         "../envs/module.yaml"
     params:
+        weather_demand_years=WEATHER_DEMAND_YEARS,
+        hdd_elasticity=config["spatial_weights"]["hdd"]["elasticity"],
         lat_name="lat",
         lon_name="lon",
     message:
-        "Calculate population weights per weather gridbox for '{wildcards.shapes}'."
+        "Calculate population and building-support weights per weather gridbox for '{wildcards.shapes}'."
     script:
-        "../scripts/population_per_gridbox.py"
+        "../scripts/prepare_spatial_weights.py"
 
 
 rule heat_demand_final_timeseries:
@@ -95,6 +108,8 @@ rule heat_demand_final_timeseries:
         shape_timezones=rules.prepare_shape_timezones.output[0],
     output:
         timeseries="<heat_demand>",
+        space_heat_profile="<space_heat_profile>",
+        hot_water_profile="<hot_water_profile>",
         plot=report(
             "<resources>/automatic/shapes/{shapes}/plots/heat_demand_timeseries.pdf",
             category="European Building Heat",

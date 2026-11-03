@@ -24,7 +24,7 @@ def main() -> None:
             df, "end_use", container_col="country_code", unit="TWh"
         )
         fig.suptitle(f"{sector.capitalize()} final energy demand")
-        fig.savefig(snakemake.output[f"{sector}_plot"], bbox_inches="tight")
+        _plots.save_figure(fig, snakemake.output[f"{sector}_plot"], bbox_inches="tight")
 
 
 if __name__ == "__main__":
