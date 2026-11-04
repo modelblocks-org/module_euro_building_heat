@@ -15,7 +15,10 @@ from rasterio.windows import Window, bounds, transform
 
 
 def country_parameters(
-    baselines: pd.DataFrame, country: str, p: dict[str, Any]
+    baselines: pd.DataFrame,
+    country: str,
+    p: dict[str, Any],
+    data_proxies: dict[str, list[str]],
 ) -> dict[str, Any]:
     """Return country parameters for district heating network sizing and costing.
 
@@ -30,7 +33,7 @@ def country_parameters(
     table["connection_fraction"] = table.share_start + weight * (
         table.share_end - table.share_start
     )
-    donors = p["data_proxies"].get(country, [])
+    donors = data_proxies.get(country, [])
     result: dict[str, Any] = {"provenance": {}}
     for key in ("connection_fraction", "c1_eur_per_m", "c2_eur_per_m2"):
         if country in table.index and pd.notna(table.at[country, key]):
@@ -41,13 +44,6 @@ def country_parameters(
             result[key] = float(values.mean())
             result["provenance"][key] = table.loc[donors, "source"].to_dict()
     return result
-
-
-def lifetime_heat_factor(p: dict[str, Any]) -> float:
-    """Discount constant annual delivery with the existing t=0..L-1 convention."""
-    return float(
-        np.sum((1 + p["discount_rate"]) ** -np.arange(p["lifetime_years"], dtype=float))
-    )
 
 
 def distribution_trench_length(
@@ -127,18 +123,17 @@ def network_costs(
     p: dict[str, Any],
     building_count: np.ndarray,
 ) -> np.ndarray:
-    """Size for fixed connected horizon demand and discount constant annual heat.
+    """Calculate network investment for fixed connected horizon demand.
 
     Calculate investment as I = L * (C1 + C2 * d).
-    Zero investments are undefined; NaNs propagate into levelized and total costs.
+    Zero investments are undefined; NaNs propagate into total investment.
     """
     curve = p["distribution_diameter_curve"]
     share = country["connection_fraction"]
-    discounted = share * lifetime_heat_factor(p)
     distribution = distribution_trench_length(building_count, share, p)
     service = service_trench_length(building_count, share, cell_area_ha, p)
-    result = np.full((6, heat.size), np.nan)
-    if discounted == 0:
+    result = np.full((3, heat.size), np.nan)
+    if share == 0:
         return result
     active = (
         np.isfinite(heat)
@@ -177,7 +172,6 @@ def network_costs(
     investment[investment == 0] = np.nan
     result[:2, active] = investment
     result[2, active] = investment.sum(axis=0)
-    result[3:, active] = result[:3, active] / (heat[active] * discounted)
     return result
 
 
@@ -189,7 +183,7 @@ def calculate_district_heating(
     heat_output: str,
     costs_output: str,
     p: dict[str, Any],
-    block_size: int,
+    data_proxies: dict[str, Any],
     grid_crs: str,
     building_count_path: str,
 ) -> None:
@@ -199,16 +193,16 @@ def calculate_district_heating(
     baselines = pd.read_csv(baselines_path)
     invalid_cells = 0
     invalid_heat = 0.0
-    parameters = {c: country_parameters(baselines, c, p) for c in countries}
+    proxies = data_proxies["district_heating"]
+    parameters = {c: country_parameters(baselines, c, p, proxies) for c in countries}
     # These are file-format/provenance conventions, not configurable physical assumptions.
     tags = {
         "technology": "district_heating",
         "grid_crs": grid_crs,
         "assessment_year": p["assessment_year"],
-        "lifetime_heat_factor": lifetime_heat_factor(p),
-        "assumptions": json.dumps(p, sort_keys=True),
+        "assumptions": json.dumps(p | {"data_proxies": proxies}, sort_keys=True),
         "country_parameters": json.dumps(parameters, sort_keys=True),
-        "method": "Fallahnejad2024 adaptation; fixed horizon demand and connection fraction; t=0..L-1; unscreened",
+        "method": "Fallahnejad2024 adaptation; fixed horizon demand and connection fraction; unscreened",
         "domain": "cell centres in supplied land shapes; outside is nodata",
         "pipe_diameter_validity_m": json.dumps(p["pipe_diameter_range_m"]),
         "invalid_estimates": "NaN cost; heat retained; outside empirical diameter envelope or insufficient connected buildings; not economic rejection",
@@ -241,11 +235,11 @@ def calculate_district_heating(
             rasterio.open(heat_output, "w", count=2, **profile)
         )
         costs = stack.enter_context(
-            rasterio.open(costs_output, "w", count=6, **profile)
+            rasterio.open(costs_output, "w", count=len(DH_COST_BANDS), **profile)
         )
         for output, descriptions, units in (
             (supply, DH_HEAT_BANDS, ("MWh/cell",) * supply.count),
-            (costs, DH_COST_BANDS, ("EUR/cell",) * 3 + ("EUR/MWh",) * 3),
+            (costs, DH_COST_BANDS, ("EUR/cell",) * costs.count),
         ):
             output.update_tags(**tags)
             for band, (description, unit) in enumerate(
@@ -253,6 +247,7 @@ def calculate_district_heating(
             ):
                 output.set_band_description(band, description)
                 output.set_band_unit(band, unit)
+        block_size = 512
         for row in range(0, heat.height, block_size):
             for col in range(0, heat.width, block_size):
                 window = Window(
@@ -281,7 +276,7 @@ def calculate_district_heating(
                     sorted(shapes.sindex.intersection(bounds(window, heat.transform)))
                 ]
                 supply_block = np.full((supply.count, *demand.shape), np.nan)
-                cost_block = np.full((6, *demand.shape), np.nan)
+                cost_block = np.full((costs.count, *demand.shape), np.nan)
                 for country, group in candidates.groupby("country_id", sort=True):
                     selected = geometry_mask(
                         group.geometry,
@@ -325,7 +320,7 @@ if __name__ == "__main__":
         snakemake.output.heat,
         snakemake.output.costs,
         snakemake.params.assumptions,
-        snakemake.params.block_size,
+        snakemake.params.data_proxies,
         snakemake.params.grid_crs,
         snakemake.input.building_count,
     )

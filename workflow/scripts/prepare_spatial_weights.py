@@ -43,8 +43,6 @@ def population_on_weather_grid(
     path_to_population: str,
     path_to_locations: str,
     path_to_coordinates: str,
-    lat_name: str,
-    lon_name: str,
     out_path: str,
     residential_raster: str,
     residential_out_path: str,
@@ -65,9 +63,7 @@ def population_on_weather_grid(
     validate_population_raster(path_to_population)
     with rasterio.open(path_to_population) as source:
         population_crs = source.crs
-    gridbox = _weather_gridbox_polygons(coordinate_ds, lat_name, lon_name).to_crs(
-        population_crs
-    )
+    gridbox = _weather_gridbox_polygons(coordinate_ds).to_crs(population_crs)
     locations = locations.to_crs(population_crs)
     minx, miny, maxx, maxy = locations.total_bounds
     gridbox = gridbox.cx[minx:maxx, miny:maxy]
@@ -157,17 +153,15 @@ def population_on_weather_grid(
     coordinate_ds.close()
 
 
-def _weather_gridbox_polygons(
-    coordinate_ds: xr.Dataset, lat_name: str, lon_name: str
-) -> gpd.GeoDataFrame:
+def _weather_gridbox_polygons(coordinate_ds: xr.Dataset) -> gpd.GeoDataFrame:
     """Build weather grid-cell polygons from grid point coordinates."""
     if "grid_degrees" not in coordinate_ds.attrs:
         raise ValueError("Weather grid is missing required 'grid_degrees' metadata.")
     grid_degrees = float(coordinate_ds.attrs["grid_degrees"])
     if not np.isfinite(grid_degrees) or grid_degrees <= 0:
         raise ValueError("Weather grid 'grid_degrees' must be finite and positive.")
-    lat_values = np.asarray(coordinate_ds[lat_name].values, dtype=float)
-    lon_values = np.asarray(coordinate_ds[lon_name].values, dtype=float)
+    lat_values = np.asarray(coordinate_ds["lat"].values, dtype=float)
+    lon_values = np.asarray(coordinate_ds["lon"].values, dtype=float)
     lat_bounds = _coordinate_bounds(lat_values, grid_degrees)
     lon_bounds = _coordinate_bounds(lon_values, grid_degrees)
 
@@ -263,9 +257,7 @@ if __name__ == "__main__":
         path_to_population=snakemake.input.population,
         path_to_locations=snakemake.input.locations,
         path_to_coordinates=snakemake.input.weather_grid,
-        lat_name=snakemake.params.lat_name,
-        lon_name=snakemake.params.lon_name,
-        out_path=snakemake.output[0],
+        out_path=snakemake.output.population,
         residential_raster=snakemake.input.residential_raster,
         residential_out_path=snakemake.output.residential_weights,
         commercial_raster=snakemake.input.commercial_raster,

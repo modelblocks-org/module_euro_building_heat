@@ -115,8 +115,7 @@ UK ECUK final demand is converted using these efficiencies in both modes.
 to change country connection shares or construction-cost coefficients. These
 assumptions come from Tables A-1 and A-2 of
 [Fallahnejad’s thesis](https://repositum.tuwien.at/handle/20.500.12708/203902).
-- `area_selection`: gives the minimum amount of heat required for a district heating network to be viable. Is used to select district heating areas. 
-- `lifetime_years` and `discount_rate`: network cost accounting assumptions.
+- `area_selection`: selects areas by total annual heat demand per hectare and minimum connected annual heat demand per area. These thresholds do not establish economic viability.
 - `distribution_length_curve`, `distribution_diameter_curve`,
   `service_length_curve`, and `service_diameter_curve`: empirical
   coefficients and thresholds for modelling the district heating network. Distribution curves are adapted from
@@ -126,6 +125,3 @@ assumptions come from Tables A-1 and A-2 of
 - `pipe_diameter_range_m`: physical limit of pipe diameter size used to remove cells in which district heating would give unrealistic diameter values. The example range follows the
   product range described by
   [Hofmann et al. (2025), *How much district heating in a future sector-coupled energy system?*](https://doi.org/10.1016/j.energy.2025.136436).
-
-
-

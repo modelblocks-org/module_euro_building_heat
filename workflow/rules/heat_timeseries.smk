@@ -54,9 +54,11 @@ rule local_unscaled_heat_profiles:
 rule unscaled_heat_profiles:
     input:
         local_profiles=rules.local_unscaled_heat_profiles.output.local_profiles,
-        shape_timezones=rules.prepare_shape_timezones.output[0],
+        shape_timezones=rules.prepare_shape_timezones.output.timezones,
     output:
-        temp("<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"),
+        profiles=temp(
+            "<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"
+        ),
     log:
         "<logs>/{shapes}/timeseries/unscaled_heat_profiles.log",
     conda:
@@ -75,7 +77,7 @@ rule prepare_spatial_weights:
         weather_grid=rules.process_gridded_weather_data.output.grid,
         hdd=rules.process_gridded_weather_data.output.hdd,
         population=POPULATION_FILE,
-        locations=rules.prepare_shapes.output[0],
+        locations=rules.prepare_shapes.output.shapes,
         residential_raster=rules.merge_structural_support.output.residential_space_heat_weight,
         commercial_raster=rules.merge_structural_support.output.commercial_space_heat_weight,
     output:
@@ -91,8 +93,6 @@ rule prepare_spatial_weights:
     params:
         weather_demand_years=WEATHER_DEMAND_YEARS,
         hdd_elasticity=config["spatial_weights"]["hdd"]["elasticity"],
-        lat_name="lat",
-        lon_name="lon",
     message:
         "Calculate population and building-support weights per weather gridbox for '{wildcards.shapes}'."
     script:
@@ -101,11 +101,11 @@ rule prepare_spatial_weights:
 
 rule heat_demand_final_timeseries:
     input:
-        timeseries_data=rules.unscaled_heat_profiles.output[0],
+        timeseries_data=rules.unscaled_heat_profiles.output.profiles,
         annual_demand=rules.rescale_annual_heat_demand_to_shapes.output.annual_demand,
-        sfh_mfh_shares=rules.prepare_sfh_mfh_shares.output[0],
-        shapes=rules.prepare_shapes.output[0],
-        shape_timezones=rules.prepare_shape_timezones.output[0],
+        sfh_mfh_shares=rules.prepare_sfh_mfh_shares.output.shares,
+        shapes=rules.prepare_shapes.output.shapes,
+        shape_timezones=rules.prepare_shape_timezones.output.timezones,
     output:
         timeseries="<heat_demand>",
         space_heat_profile="<space_heat_profile>",

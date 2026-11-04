@@ -19,7 +19,6 @@ if USE_PREBUILT:
             "../envs/module.yaml"
         params:
             datasets=["building_count"],
-            source="zenodo",
         message:
             "Prepare precomputed building counts for '{wildcards.shapes}' shapes."
         script:
@@ -49,7 +48,6 @@ if USE_PREBUILT:
             "../envs/module.yaml"
         params:
             datasets=["residential_space_heat_weight", "commercial_space_heat_weight"],
-            source="zenodo",
         message:
             "Prepare precomputed space-heating weights for '{wildcards.shapes}' shapes."
         script:
@@ -62,7 +60,7 @@ else:
             plan=lambda wc: checkpoints.prepare_building_sources.get(
                 shapes=wc.shapes
             ).output.manifest,
-            stats=rules.download_eubucco_stats.output.table,
+            stats=rules.download_eubucco_stats.output.file,
         output:
             manifest="<resources>/automatic/{shapes}/heat_rasters/batches.json",
         log:

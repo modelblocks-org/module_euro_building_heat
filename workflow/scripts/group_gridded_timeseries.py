@@ -184,7 +184,7 @@ def main() -> None:
             resolution_specific_data.attrs["timezone"] = "UTC"
             resolution_specific_data.time.attrs["timezone"] = "UTC"
         with dask_config.set(scheduler="threads", num_workers=snakemake.threads):
-            resolution_specific_data.to_netcdf(snakemake.output[0])
+            resolution_specific_data.to_netcdf(snakemake.output.cop)
 
 
 if __name__ == "__main__":

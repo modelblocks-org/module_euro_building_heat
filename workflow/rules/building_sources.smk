@@ -4,8 +4,8 @@
 checkpoint prepare_building_sources:
     input:
         regions=rules.prepare_nuts3.output.regions,
-        eubucco_nuts=rules.download_eubucco_nuts.output.table,
-        eubucco_stats=rules.download_eubucco_stats.output.table,
+        eubucco_nuts=rules.download_eubucco_nuts.output.file,
+        eubucco_stats=rules.download_eubucco_stats.output.file,
         microsoft_index=f"<resources>/automatic/microsoft/{config['building_rasters']['buildings_microsoft']['release']}/dataset-links.csv",
     output:
         manifest="<resources>/automatic/{shapes}/buildings/plan.json",
@@ -29,7 +29,7 @@ checkpoint prepare_building_sources:
 
 rule download_eubucco:
     output:
-        table=update("<resources>/automatic/eubucco/v0.2/downloads/{region}.parquet"),
+        file=update("<resources>/automatic/eubucco/v0.2/downloads/{region}.parquet"),
     log:
         "<logs>/eubucco/v0.2/download_{region}.log",
     conda:
@@ -74,7 +74,7 @@ rule process_eubucco:
 
 rule download_microsoft_index:
     output:
-        table=update(
+        file=update(
             f"<resources>/automatic/microsoft/{config['building_rasters']['buildings_microsoft']['release']}/dataset-links.csv"
         ),
     log:
@@ -93,7 +93,7 @@ rule download_microsoft_index:
 
 rule download_microsoft:
     input:
-        index=rules.download_microsoft_index.output.table,
+        index=rules.download_microsoft_index.output.file,
     output:
         table=update(
             f"<resources>/automatic/microsoft/{config['building_rasters']['buildings_microsoft']['release']}/downloads/{{quadkey}}-{{part}}.csv.gz"

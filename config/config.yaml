@@ -194,11 +194,9 @@ heat_pump:
 district_heating:
   assessment_year: 2050
   area_selection:
-    initial_density_mwh_per_ha: 20
-    minimum_heat_mwh_per_year: 5000
+    minimum_heat_per_hectare: 20
+    minimum_heat_per_district_heating_area: 5000
     connectivity: 8
-  lifetime_years: 40
-  discount_rate: 0.02
   distribution_length_curve:
     log_slope_m: 65.3
     intercept_m: -42.25

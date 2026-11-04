@@ -4,7 +4,7 @@ configfile: workflow.source_path("./test_config.yaml")
 
 rule create_external_shapes:
     output:
-        "resources/user/test/shapes.parquet",
+        shapes="resources/user/test/shapes.parquet",
     log:
         "logs/create_external_shapes.log",
     conda:
@@ -14,14 +14,14 @@ rule create_external_shapes:
     message:
         "Emulating shape inputs for integration testing."
     shell:
-        "curl --fail --silent --show-error --location --output {output:q} {params.url:q} 2> {log:q}"
+        "curl --fail --silent --show-error --location --output {output.shapes:q} {params.url:q} 2> {log:q}"
 
 
 # Import the module and configure it.
 module module_euro_building_heat:
     pathvars:
         # Redirect specific user resources (inputs)
-        shapes=rules.create_external_shapes.output[0],
+        shapes=rules.create_external_shapes.output.shapes,
         edh_api="resources/user/edh_api.txt",
         # Redirect specific module results (outputs)
         building_count="results/output/{shapes}/rasters/building_count.tif",

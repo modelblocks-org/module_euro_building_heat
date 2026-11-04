@@ -6,7 +6,7 @@ rule prepare_sfh_mfh_shares:
         census="<resources>/automatic/eurostat/cens_21dwbnr_r3.tsv.gz",
         shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
     output:
-        temp("<resources>/automatic/shapes/{shapes}/sfh_mfh_shares.parquet"),
+        shares=temp("<resources>/automatic/shapes/{shapes}/sfh_mfh_shares.parquet"),
     log:
         "<logs>/{shapes}/prepare_sfh_mfh_shares.log",
     conda:
@@ -21,9 +21,11 @@ rule prepare_sfh_mfh_shares:
 
 rule unzip_jrc_idees:
     input:
-        rules.download_jrc_idees.output[0],
+        rules.download_jrc_idees.output.archive,
     output:
-        temp("<resources>/automatic/jrc-idees/{version}/{dataset}_{country_code}.xlsx"),
+        table=temp(
+            "<resources>/automatic/jrc-idees/{version}/{dataset}_{country_code}.xlsx"
+        ),
     log:
         "<logs>/automatic/unzip_jrc_idees_v{version}_{dataset}_{country_code}.log",
     wildcard_constraints:
@@ -43,7 +45,7 @@ rule unzip_ECUK_release:
     input:
         "<resources>/automatic/stable/GBR_End_Use_tables.zip",
     output:
-        temp("<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"),
+        table=temp("<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"),
     log:
         "<logs>/unzip_GBR_end_use_{release}.log",
     wildcard_constraints:
@@ -59,9 +61,9 @@ rule unzip_ECUK_release:
 
 rule unzip_raw_population:
     input:
-        rules.download_raw_population.output[0],
+        rules.download_raw_population.output.file,
     output:
-        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.tif",
+        population="<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.tif",
     log:
         "<logs>/automatic/unzip_raw_population_{ghsl_epoch}_100.log",
     params:
@@ -78,7 +80,6 @@ rule unzip_raw_population:
 rule prepare_shapes:
     input:
         shapes="<shapes>",
-        dh_baselines=workflow.source_path("../internal/district_heating_baselines.csv"),
     output:
         shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
         scope="<resources>/automatic/shapes/{shapes}/scope_equal_area.parquet",
@@ -86,8 +87,6 @@ rule prepare_shapes:
         "<logs>/{shapes}/prepare_shapes.log",
     conda:
         "../envs/module.yaml"
-    params:
-        dh_proxies=config["data_proxies"]["district_heating"],
     message:
         "Filter non-land regions from '{wildcards.shapes}' shapes."
     script:
@@ -96,10 +95,10 @@ rule prepare_shapes:
 
 rule prepare_shape_timezones:
     input:
-        shapes=rules.prepare_shapes.output[0],
+        shapes=rules.prepare_shapes.output.shapes,
         timezone_boundaries=rules.extract_timezone_boundaries.output.geojson,
     output:
-        temp("<resources>/automatic/shapes/{shapes}/shape_timezones.parquet"),
+        timezones=temp("<resources>/automatic/shapes/{shapes}/shape_timezones.parquet"),
     log:
         "<logs>/{shapes}/prepare_shape_timezones.log",
     conda:
@@ -117,7 +116,7 @@ if not USE_PREBUILT:
     rule prepare_nuts3:
         input:
             shapes=rules.prepare_shapes.output.shapes,
-            nuts3=rules.download_nuts3.output.geojson,
+            nuts3=rules.download_nuts3.output.file,
         output:
             regions="<resources>/automatic/{shapes}/nuts3.parquet",
         log:
@@ -135,8 +134,8 @@ if not USE_PREBUILT:
     rule prepare_building_population:
         input:
             regions=rules.prepare_nuts3.output.regions,
-            nuts3_source=rules.download_nuts3.output.geojson,
-            stats=rules.download_eubucco_stats.output.table,
+            nuts3_source=rules.download_nuts3.output.file,
+            stats=rules.download_eubucco_stats.output.file,
             population=POPULATION_FILE,
         output:
             table="<resources>/automatic/{shapes}/building_population.parquet",
@@ -158,10 +157,10 @@ if not USE_PREBUILT:
     rule prepare_floor_area_totals:
         input:
             nuts3=rules.prepare_nuts3.output.regions,
-            nuts3_source=rules.download_nuts3.output.geojson,
-            census=rules.download_eurostat_floor_area.output.table,
+            nuts3_source=rules.download_nuts3.output.file,
+            census=rules.download_eurostat_floor_area.output.file,
             population_summaries=rules.prepare_building_population.output.table,
-            eubucco_stats=rules.download_eubucco_stats.output.table,
+            eubucco_stats=rules.download_eubucco_stats.output.file,
             plan=lambda wc: checkpoints.prepare_building_sources.get(
                 shapes=wc.shapes
             ).output.manifest,
@@ -191,7 +190,7 @@ if not USE_PREBUILT:
                 shapes=wc.shapes
             ).output.manifest,
             regions=rules.prepare_nuts3.output.regions,
-            stats=rules.download_eubucco_stats.output.table,
+            stats=rules.download_eubucco_stats.output.file,
             population_summaries="<resources>/automatic/{shapes}/building_population.parquet",
         output:
             table="<resources>/automatic/{shapes}/building_count_proxies.parquet",
@@ -211,7 +210,7 @@ if not USE_PREBUILT:
         input:
             nuts3=rules.prepare_nuts3.output.regions,
             floor_area=rules.prepare_floor_area_totals.output.table,
-            census=rules.download_eurostat_building_age.output.table,
+            census=rules.download_eurostat_building_age.output.file,
         output:
             table="<resources>/automatic/{shapes}/nuts3_building_age.parquet",
         log:

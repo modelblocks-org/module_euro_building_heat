@@ -3,7 +3,7 @@
 
 rule download_when2heat_params:
     output:
-        "<resources>/automatic/when2heat/{dataset}.csv",
+        table="<resources>/automatic/when2heat/{dataset}.csv",
     log:
         "<logs>/automatic/download_when2heat_params_{dataset}.log",
     wildcard_constraints:
@@ -19,7 +19,7 @@ rule download_when2heat_params:
     message:
         "Download When2Heat demand profile parameters for {wildcards.dataset}."
     shell:
-        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
+        "curl {params.curl_args} --output {output.table:q} {params.url:q} 2> {log:q}"
 
 
 rule download_timezone_boundaries:
@@ -64,7 +64,7 @@ rule extract_timezone_boundaries:
 
 rule download_stable_dataset:
     output:
-        "<resources>/automatic/stable/{dataset}",
+        file="<resources>/automatic/stable/{dataset}",
     log:
         "<logs>/automatic/download_stable_dataset_{dataset}.log",
     wildcard_constraints:
@@ -78,7 +78,7 @@ rule download_stable_dataset:
     message:
         "Download stable dataset {wildcards.dataset}."
     shell:
-        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
+        "curl {params.curl_args} --output {output.file:q} {params.url:q} 2> {log:q}"
 
 
 rule download_era5_data:
@@ -102,7 +102,7 @@ rule download_era5_data:
 
 rule download_raw_population:
     output:
-        archive=update("<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.zip"),
+        file=update("<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.zip"),
     log:
         "<logs>/automatic/download_raw_population_{ghsl_epoch}_100.log",
     conda:
@@ -119,7 +119,7 @@ rule download_raw_population:
 
 rule download_jrc_idees:
     output:
-        temp("<resources>/automatic/jrc-idees/{country_code}_v{version}.zip"),
+        archive=temp("<resources>/automatic/jrc-idees/{country_code}_v{version}.zip"),
     log:
         "<logs>/automatic/download_jrc_idees_{country_code}_v{version}.log",
     wildcard_constraints:
@@ -134,12 +134,12 @@ rule download_jrc_idees:
     message:
         "Download JRC-IDEES data for {wildcards.country_code}-{wildcards.version}."
     shell:
-        "curl {params.curl_args} --output {output:q} {params.dataset_url:q} 2> {log:q}"
+        "curl {params.curl_args} --output {output.archive:q} {params.dataset_url:q} 2> {log:q}"
 
 
 rule download_nuts3:
     output:
-        geojson="<resources>/automatic/gisco/nuts3.geojson",
+        file="<resources>/automatic/gisco/nuts3.geojson",
     log:
         "<logs>/download_nuts3.log",
     conda:
@@ -154,7 +154,7 @@ rule download_nuts3:
 
 rule download_eurostat_floor_area:
     output:
-        table="<resources>/automatic/eurostat/cens_21dwbnr_r3.tsv.gz",
+        file="<resources>/automatic/eurostat/cens_21dwbnr_r3.tsv.gz",
     log:
         "<logs>/download_eurostat_floor_area.log",
     conda:
@@ -171,7 +171,7 @@ rule download_eurostat_floor_area:
 
 rule download_eubucco_nuts:
     output:
-        table=update(
+        file=update(
             "<resources>/automatic/eubucco-metadata/v0.2/NUTS-regions-2016.parquet"
         ),
     log:
@@ -188,7 +188,7 @@ rule download_eubucco_nuts:
 
 rule download_eubucco_stats:
     output:
-        table=update("<resources>/automatic/eubucco-metadata/v0.2/region-stats.parquet"),
+        file=update("<resources>/automatic/eubucco-metadata/v0.2/region-stats.parquet"),
     log:
         "<logs>/download_eubucco_stats.log",
     conda:
@@ -203,7 +203,7 @@ rule download_eubucco_stats:
 
 rule download_eurostat_building_age:
     output:
-        table="<resources>/automatic/eurostat/cens_21dwop_r3.tsv.gz",
+        file="<resources>/automatic/eurostat/cens_21dwop_r3.tsv.gz",
     log:
         "<logs>/download_eurostat_building_age.log",
     conda:

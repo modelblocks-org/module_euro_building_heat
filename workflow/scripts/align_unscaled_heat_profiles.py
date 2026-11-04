@@ -160,5 +160,5 @@ if __name__ == "__main__":
         shape_timezones_path=snakemake.input.shape_timezones,
         weather_years=snakemake.params.weather_years,
         workers=snakemake.threads,
-        out_path=snakemake.output[0],
+        out_path=snakemake.output.profiles,
     )

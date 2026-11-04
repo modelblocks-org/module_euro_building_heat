@@ -22,8 +22,6 @@ properties:
     required:
     - assessment_year
     - area_selection
-    - lifetime_years
-    - discount_rate
     - distribution_length_curve
     - distribution_diameter_curve
     - service_length_curve
@@ -36,17 +34,16 @@ properties:
         type: object
         additionalProperties: false
         required:
-        - initial_density_mwh_per_ha
-        - minimum_heat_mwh_per_year
+        - minimum_heat_per_hectare
+        - minimum_heat_per_district_heating_area
         - connectivity
         properties:
-          initial_density_mwh_per_ha:
-            description: Heat-demand density threshold in MWh per hectare per
-              year.
+          minimum_heat_per_hectare:
+            description: Minimum heat demand per hectare cell to be considered for district heating in MWh per hectare per year.
             type: number
             exclusiveMinimum: 0
-          minimum_heat_mwh_per_year:
-            description: Minimum connected heat demand per area in MWh per year.
+          minimum_heat_per_district_heating_area:
+            description: Minimum connected heat demand per complete district heating area in MWh per year.
             type: number
             exclusiveMinimum: 0
           connectivity:
@@ -59,12 +56,6 @@ properties:
         type: integer
         minimum: 1900
         maximum: 9999
-      lifetime_years:
-        type: integer
-        minimum: 1
-      discount_rate:
-        type: number
-        minimum: 0
       distribution_length_curve:
         type: object
         additionalProperties: false
@@ -459,7 +450,7 @@ properties:
     additionalProperties: false
     properties:
       district_heating:
-        description: Countries supplying missing network parameters and cost ceilings.
+        description: Countries supplying missing connection fractions and network construction-cost coefficients.
         $ref: '#/$defs/country_proxy_map'
       sfh_mfh_shares:
         description: |

@@ -17,6 +17,28 @@ from pandera.typing.geopandas import GeoSeries
 from pandera.typing.pandas import Series
 from shapely.geometry import MultiPolygon, Polygon
 
+# Raster band order and empty-table dtypes define the district-heating outputs.
+DH_HEAT_BANDS = ("heat_demand", "connected_heat")
+DH_COST_BANDS = (
+    "distribution_investment",
+    "service_investment",
+    "total_investment",
+)
+DH_AREA_COLUMNS = {
+    "area_id": "int64",
+    "country_id": "object",
+    "cell_count": "int64",
+    "area_ha": "float64",
+    "assessment_year": "int64",
+    "connection_fraction": "float64",
+    "heat_demand_mwh_per_year": "float64",
+    "heat_potential_mwh_per_year": "float64",
+    "distribution_investment_eur": "float64",
+    "service_investment_eur": "float64",
+    "total_investment_eur": "float64",
+    "geometry": "geometry",
+}
+
 # Processed footprints use metric area/perimeter and processing-CRS centroids.
 # The schema preserves column types for empty tables.
 EUBUCCO_PROCESSED_SCHEMA = pyarrow.schema(

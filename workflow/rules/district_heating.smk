@@ -3,7 +3,7 @@
 
 rule district_heating:
     input:
-        shapes=rules.prepare_shapes.output[0],
+        shapes=rules.prepare_shapes.output.shapes,
         space_heat="<space_heat_demand>",
         hot_water="<hot_water_demand>",
         building_count="<building_count>",
@@ -16,9 +16,8 @@ rule district_heating:
     conda:
         "../envs/module.yaml"
     params:
-        assumptions=config["district_heating"]
-        | {"data_proxies": config["data_proxies"]["district_heating"]},
-        block_size=512,
+        assumptions=config["district_heating"],
+        data_proxies=config["data_proxies"],
         grid_crs=config["crs"]["projected"],
     message:
         "Calculate district-heating network costs for '{wildcards.shapes}' shapes."
@@ -28,7 +27,7 @@ rule district_heating:
 
 rule district_heating_areas:
     input:
-        shapes=rules.prepare_shapes.output[0],
+        shapes=rules.prepare_shapes.output.shapes,
         costs=rules.district_heating.output.costs,
         heat=rules.district_heating.output.heat,
     output:

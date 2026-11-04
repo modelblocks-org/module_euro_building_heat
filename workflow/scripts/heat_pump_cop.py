@@ -175,5 +175,5 @@ if __name__ == "__main__":
         correction_factor=snakemake.params.correction_factor,
         heat_pump_shares=snakemake.params.heat_pump_shares,
         weather_years=snakemake.params.weather_years,
-        path_to_output=snakemake.output[0],
+        path_to_output=snakemake.output.cop,
     )

@@ -433,5 +433,5 @@ if __name__ == "__main__":
         path_to_cat_names=snakemake.input.cat_names,
         path_to_carrier_names=snakemake.input.carrier_names,
         first_year=snakemake.params.first_year,
-        path_to_result=snakemake.output[0],
+        path_to_result=snakemake.output.energy_balance,
     )

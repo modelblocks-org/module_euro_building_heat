@@ -35,7 +35,7 @@ def identify_areas(
         & np.isfinite(connected_heat)
         & (connected_heat > 0)
     )
-    mask = eligible & (density > selection["initial_density_mwh_per_ha"])
+    mask = eligible & (density > selection["minimum_heat_per_hectare"])
     mask = (
         ndimage.binary_closing(np.pad(mask, 1), structure=np.ones((3, 3), dtype=bool))[
             1:-1, 1:-1
@@ -46,7 +46,7 @@ def identify_areas(
     totals = np.bincount(
         labels[mask], weights=connected_heat[mask], minlength=count + 1
     )
-    selected = totals >= selection["minimum_heat_mwh_per_year"]
+    selected = totals >= selection["minimum_heat_per_district_heating_area"]
     selected[0] = False
     return ndimage.label(selected[labels], structure)[0]
 
@@ -89,11 +89,10 @@ def calculate_areas(
                 investment = source.read([1, 2, 3], window=window, masked=True).filled(
                     np.nan
                 )
-                cost = source.read(6, window=window, masked=True).filled(np.nan)
                 demand, connected = heat.read(
                     [1, 2], window=window, masked=True
                 ).filled(np.nan)
-                eligible = domain & (demand > 0) & np.isfinite(cost)
+                eligible = domain & (demand > 0) & np.isfinite(investment[2])
                 labels = identify_areas(
                     demand / cell_area_ha, connected, eligible, selection
                 )
@@ -143,8 +142,6 @@ def calculate_areas(
                         "distribution_investment_eur": investments[0],
                         "service_investment_eur": investments[1],
                         "total_investment_eur": investments[2],
-                        "levelized_cost_eur_per_mwh": investments[2]
-                        / (connected_totals * float(tags["lifetime_heat_factor"])),
                     },
                     geometry=pieces.geometry.to_numpy(),
                     crs=source.crs,

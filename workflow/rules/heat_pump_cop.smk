@@ -7,7 +7,7 @@ rule heat_pump_cop:
         temperature_ground=rules.process_gridded_weather_data.output.tsoil5,
         heat_pump_characteristics="<resources>/automatic/stable/heat_pump_characteristics.nc",
     output:
-        temp("<resources>/automatic/shapes/{shapes}/gridded-heat-pump-cop.nc"),
+        cop=temp("<resources>/automatic/shapes/{shapes}/gridded-heat-pump-cop.nc"),
     log:
         "<logs>/{shapes}/heat-pump/heat_pump_cop.log",
     conda:
@@ -26,10 +26,10 @@ rule heat_pump_cop:
 
 rule group_gridded_timeseries_heat_pump_cop:
     input:
-        gridded_timeseries_data=rules.heat_pump_cop.output[0],
-        grid_weights=rules.prepare_spatial_weights.output[0],
+        gridded_timeseries_data=rules.heat_pump_cop.output.cop,
+        grid_weights=rules.prepare_spatial_weights.output.population,
     output:
-        temp("<resources>/automatic/shapes/{shapes}/heat-pump-cop.nc"),
+        cop=temp("<resources>/automatic/shapes/{shapes}/heat-pump-cop.nc"),
     log:
         "<logs>/{shapes}/heat-pump/group_gridded_timeseries_heat_pump_cop.log",
     conda:
@@ -43,10 +43,10 @@ rule group_gridded_timeseries_heat_pump_cop:
 
 rule heat_pump_electricity_demand_timeseries:
     input:
-        timeseries_data=rules.group_gridded_timeseries_heat_pump_cop.output[0],
+        timeseries_data=rules.group_gridded_timeseries_heat_pump_cop.output.cop,
         annual_demand=rules.rescale_annual_heat_demand_to_shapes.output.annual_demand,
         heat_demand=rules.heat_demand_final_timeseries.output.timeseries,
-        shape_timezones=rules.prepare_shape_timezones.output[0],
+        shape_timezones=rules.prepare_shape_timezones.output.timezones,
     output:
         cop="<heat_pump_cop>",
         electricity_demand="<heat_pump_electricity_demand>",
