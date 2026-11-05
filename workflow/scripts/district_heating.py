@@ -15,7 +15,7 @@ from rasterio.windows import Window, bounds, transform
 
 
 def country_parameters(
-    baselines: pd.DataFrame,
+    country_table: pd.DataFrame,
     country: str,
     p: dict[str, Any],
     data_proxies: dict[str, list[str]],
@@ -23,9 +23,9 @@ def country_parameters(
     """Return country parameters for district heating network sizing and costing.
 
     Use the assessment year to interpolate between the start and end years of the
-    baseline table. If the country is missing, use country proxies.
+    country parameter table. If the country is missing, use country proxies.
     """
-    table = baselines.set_index("country_id")
+    table = country_table.set_index("country_id")
     weight = (p["assessment_year"] - table.start_year) / (
         table.end_year - table.start_year
     )
@@ -179,7 +179,7 @@ def calculate_district_heating(
     shapes_path: str,
     demand_path: str,
     hot_water_path: str,
-    baselines_path: str,
+    country_parameters_path: str,
     heat_output: str,
     costs_output: str,
     p: dict[str, Any],
@@ -190,11 +190,11 @@ def calculate_district_heating(
     """Write raster blocks using country parameters assigned by cell centre."""
     shapes = gpd.read_parquet(shapes_path).to_crs(grid_crs)
     countries = sorted(shapes.country_id.unique())
-    baselines = pd.read_csv(baselines_path)
+    country_table = pd.read_csv(country_parameters_path)
     invalid_cells = 0
     invalid_heat = 0.0
     proxies = data_proxies["district_heating"]
-    parameters = {c: country_parameters(baselines, c, p, proxies) for c in countries}
+    parameters = {c: country_parameters(country_table, c, p, proxies) for c in countries}
     # These are file-format/provenance conventions, not configurable physical assumptions.
     tags = {
         "technology": "district_heating",
@@ -316,7 +316,7 @@ if __name__ == "__main__":
         snakemake.input.shapes,
         snakemake.input.space_heat,
         snakemake.input.hot_water,
-        snakemake.input.baselines,
+        snakemake.input.country_parameters,
         snakemake.output.heat,
         snakemake.output.costs,
         snakemake.params.assumptions,

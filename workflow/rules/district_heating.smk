@@ -7,7 +7,7 @@ rule district_heating:
         space_heat="<space_heat_demand>",
         hot_water="<hot_water_demand>",
         building_count="<building_count>",
-        baselines=workflow.source_path("../internal/district_heating_baselines.csv"),
+        country_parameters=workflow.source_path("../internal/district_heating_country_parameters.csv"),
     output:
         heat="<resources>/automatic/{shapes}/district_heating/heat.tif",
         costs="<resources>/automatic/{shapes}/district_heating/costs.tif",

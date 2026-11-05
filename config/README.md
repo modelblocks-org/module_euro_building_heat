@@ -111,7 +111,7 @@ UK ECUK final demand is converted using these efficiencies in both modes.
 
 `district_heating` configures the `district_heating_areas` output:
 
-- `assessment_year`: Determines the percentage of heat that is supplied through district heating. Edit [district_heating_baselines.csv](../workflow/internal/district_heating_baselines.csv)
+- `assessment_year`: Determines the percentage of heat that is supplied through district heating. Edit [district_heating_country_parameters.csv](../workflow/internal/district_heating_country_parameters.csv)
 to change country connection shares or construction-cost coefficients. These
 assumptions come from Tables A-1 and A-2 of
 [Fallahnejad’s thesis](https://repositum.tuwien.at/handle/20.500.12708/203902).
