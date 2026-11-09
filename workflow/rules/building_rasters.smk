@@ -60,7 +60,7 @@ else:
             plan=lambda wc: checkpoints.prepare_building_sources.get(
                 shapes=wc.shapes
             ).output.manifest,
-            stats=rules.download_eubucco_stats.output.file,
+            stats=rules.download_eubucco_stats.output.table,
         output:
             manifest="<resources>/automatic/{shapes}/heat_rasters/batches.json",
         log:

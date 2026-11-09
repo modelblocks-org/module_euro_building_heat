@@ -171,7 +171,7 @@ def eubucco_download_inputs(wildcards) -> list[str]:
         }
     )
     return [
-        str(rules.download_eubucco.output.file).format(region=region)
+        str(rules.download_eubucco.output.table).format(region=region)
         for region in regions
     ]
 
@@ -186,7 +186,7 @@ def microsoft_download_rows(wildcards) -> list[dict[str, str]]:
         for region in plan["regions"].values()
         for key in region["microsoft_quadkeys"]
     }
-    with open(rules.download_microsoft_index.output.file, newline="") as stream:
+    with open(rules.download_microsoft_index.output.table, newline="") as stream:
         rows = [row for row in csv.DictReader(stream) if row["QuadKey"] in quadkeys]
     return sorted(rows, key=lambda row: (row["QuadKey"], row["Url"]))
 
@@ -288,3 +288,14 @@ def selected_microsoft_totals_input(wildcards) -> str:
             shapes=wildcards.shapes
         )
     return outputs.empty_microsoft_totals
+
+
+def scenario_heat_multiplier(wildcards):
+    """Require an explicit multiplier for the requested scenario and year."""
+    values = config["scenarios"][wildcards.scenario]["heat_demand"]
+    values = {str(year): value for year, value in values.items()}
+    if wildcards.year not in values:
+        raise ValueError(
+            f"Scenario {wildcards.scenario!r} has no heat_demand value for {wildcards.year}."
+        )
+    return values[wildcards.year]

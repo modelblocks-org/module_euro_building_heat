@@ -9,26 +9,26 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import rasterio
-from _schemas import DH_COST_BANDS, DH_HEAT_BANDS
+from _schemas import DH_COST_BANDS, DH_HEAT_BANDS, DistrictHeatingSharesSchema
 from rasterio.features import geometry_mask
 from rasterio.windows import Window, bounds, transform
 
 
 def country_parameters(
-    country_table: pd.DataFrame,
+    shares: pd.DataFrame,
+    costs: pd.DataFrame,
     country: str,
-    p: dict[str, Any],
+    assessment_year: int,
     data_proxies: dict[str, list[str]],
 ) -> dict[str, Any]:
     """Return country parameters for district heating network sizing and costing.
 
     Use the assessment year to interpolate between the start and end years of the
-    country parameter table. If the country is missing, use country proxies.
+    scenario share table. Resolve internal costs independently using country proxies.
     """
-    table = country_table.set_index("country_id")
-    weight = (p["assessment_year"] - table.start_year) / (
-        table.end_year - table.start_year
-    )
+    table = shares.set_index("country_id")
+    cost_table = costs.set_index("country_id")
+    weight = (assessment_year - table.start_year) / (table.end_year - table.start_year)
     weight = weight.clip(0, 1)
     table["connection_fraction"] = table.share_start + weight * (
         table.share_end - table.share_start
@@ -36,13 +36,22 @@ def country_parameters(
     donors = data_proxies.get(country, [])
     result: dict[str, Any] = {"provenance": {}}
     for key in ("connection_fraction", "c1_eur_per_m", "c2_eur_per_m2"):
-        if country in table.index and pd.notna(table.at[country, key]):
-            result[key] = float(table.at[country, key])
-            result["provenance"][key] = {country: table.at[country, "source"]}
+        source = table if key == "connection_fraction" else cost_table
+        if country in source.index and pd.notna(source.at[country, key]):
+            result[key] = float(source.at[country, key])
+            selected = source.loc[[country]]
         else:
-            values = table.loc[donors, key]
+            values = source.reindex(donors)[key]
             result[key] = float(values.mean())
-            result["provenance"][key] = table.loc[donors, "source"].to_dict()
+            selected = source.reindex(donors)
+        # Scenario shares record contributing country values; costs retain citations.
+        result["provenance"][key] = selected[
+            key if key == "connection_fraction" else "source"
+        ].to_dict()
+        if not np.isfinite(result[key]):
+            raise ValueError(
+                f"No finite district-heating {key} for {country} or its proxies."
+            )
     return result
 
 
@@ -69,7 +78,6 @@ def service_trench_length(
 ) -> np.ndarray:
     """Return service trench metres from connected buildings per hectare.
 
-    L_u = c / (1 + a * exp(-b * MS * N / A_ha)); L = L_u * A_ha.
     Explicitly return zero for no connected buildings, overriding the nonzero
     logistic intercept.
     """
@@ -95,8 +103,6 @@ def service_pipe_diameter(
     density_gj_per_m: np.ndarray, p: dict[str, Any]
 ) -> np.ndarray:
     """Return service diameter in metres from annual linear heat density in GJ/m.
-
-    DN_mm = a * exp(b * Q/L). Convert mm to m for C2 in EUR/m².
     """
     curve = p["service_diameter_curve"]
     # Check in log space before exponentiation: extreme densities must yield
@@ -148,8 +154,6 @@ def network_costs(
         delivered_gj, lengths, out=np.zeros_like(lengths), where=lengths > 0
     )
     diameter = np.full_like(density, curve["small_pipe_diameter_m"])
-    # The small-pipe regime depends on linear heat density; branching on total
-    # heat is inconsistent with the regression domain and can give negative diameters.
     large_distribution = (lengths[0] > 0) & (
         density[0] >= curve["small_pipe_density_gj_per_m"]
     )
@@ -180,9 +184,11 @@ def calculate_district_heating(
     demand_path: str,
     hot_water_path: str,
     country_parameters_path: str,
+    shares_path: str,
     heat_output: str,
     costs_output: str,
     p: dict[str, Any],
+    assessment_year: int,
     data_proxies: dict[str, Any],
     grid_crs: str,
     building_count_path: str,
@@ -191,15 +197,19 @@ def calculate_district_heating(
     shapes = gpd.read_parquet(shapes_path).to_crs(grid_crs)
     countries = sorted(shapes.country_id.unique())
     country_table = pd.read_csv(country_parameters_path)
+    shares = DistrictHeatingSharesSchema.validate(pd.read_csv(shares_path))
     invalid_cells = 0
     invalid_heat = 0.0
     proxies = data_proxies["district_heating"]
-    parameters = {c: country_parameters(country_table, c, p, proxies) for c in countries}
+    parameters = {
+        c: country_parameters(shares, country_table, c, assessment_year, proxies)
+        for c in countries
+    }
     # These are file-format/provenance conventions, not configurable physical assumptions.
     tags = {
         "technology": "district_heating",
         "grid_crs": grid_crs,
-        "assessment_year": p["assessment_year"],
+        "assessment_year": assessment_year,
         "assumptions": json.dumps(p | {"data_proxies": proxies}, sort_keys=True),
         "country_parameters": json.dumps(parameters, sort_keys=True),
         "method": "Fallahnejad2024 adaptation; fixed horizon demand and connection fraction; unscreened",
@@ -317,9 +327,11 @@ if __name__ == "__main__":
         snakemake.input.space_heat,
         snakemake.input.hot_water,
         snakemake.input.country_parameters,
+        snakemake.input.shares,
         snakemake.output.heat,
         snakemake.output.costs,
         snakemake.params.assumptions,
+        snakemake.params.assessment_year,
         snakemake.params.data_proxies,
         snakemake.params.grid_crs,
         snakemake.input.building_count,

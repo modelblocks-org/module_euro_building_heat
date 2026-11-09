@@ -3,7 +3,7 @@
 
 rule download_when2heat_params:
     output:
-        table="<resources>/automatic/when2heat/{dataset}.csv",
+        "<resources>/automatic/when2heat/{dataset}.csv",
     log:
         "<logs>/automatic/download_when2heat_params_{dataset}.log",
     wildcard_constraints:
@@ -19,7 +19,7 @@ rule download_when2heat_params:
     message:
         "Download When2Heat demand profile parameters for {wildcards.dataset}."
     shell:
-        "curl {params.curl_args} --output {output.table:q} {params.url:q} 2> {log:q}"
+        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule download_timezone_boundaries:
@@ -64,7 +64,7 @@ rule extract_timezone_boundaries:
 
 rule download_stable_dataset:
     output:
-        file="<resources>/automatic/stable/{dataset}",
+        "<resources>/automatic/stable/{dataset}",
     log:
         "<logs>/automatic/download_stable_dataset_{dataset}.log",
     wildcard_constraints:
@@ -78,7 +78,7 @@ rule download_stable_dataset:
     message:
         "Download stable dataset {wildcards.dataset}."
     shell:
-        "curl {params.curl_args} --output {output.file:q} {params.url:q} 2> {log:q}"
+        "curl {params.curl_args} --output {output:q} {params.url:q} 2> {log:q}"
 
 
 rule download_era5_data:
@@ -102,7 +102,7 @@ rule download_era5_data:
 
 rule download_raw_population:
     output:
-        file=update("<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.zip"),
+        archive=update("<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.zip"),
     log:
         "<logs>/automatic/download_raw_population_{ghsl_epoch}_100.log",
     conda:
@@ -139,7 +139,7 @@ rule download_jrc_idees:
 
 rule download_nuts3:
     output:
-        file="<resources>/automatic/gisco/nuts3.geojson",
+        geojson="<resources>/automatic/gisco/nuts3.geojson",
     log:
         "<logs>/download_nuts3.log",
     conda:
@@ -154,7 +154,7 @@ rule download_nuts3:
 
 rule download_eurostat_floor_area:
     output:
-        file="<resources>/automatic/eurostat/cens_21dwbnr_r3.tsv.gz",
+        table="<resources>/automatic/eurostat/cens_21dwbnr_r3.tsv.gz",
     log:
         "<logs>/download_eurostat_floor_area.log",
     conda:
@@ -171,7 +171,7 @@ rule download_eurostat_floor_area:
 
 rule download_eubucco_nuts:
     output:
-        file=update(
+        table=update(
             "<resources>/automatic/eubucco-metadata/v0.2/NUTS-regions-2016.parquet"
         ),
     log:
@@ -188,7 +188,7 @@ rule download_eubucco_nuts:
 
 rule download_eubucco_stats:
     output:
-        file=update("<resources>/automatic/eubucco-metadata/v0.2/region-stats.parquet"),
+        table=update("<resources>/automatic/eubucco-metadata/v0.2/region-stats.parquet"),
     log:
         "<logs>/download_eubucco_stats.log",
     conda:
@@ -203,7 +203,7 @@ rule download_eubucco_stats:
 
 rule download_eurostat_building_age:
     output:
-        file="<resources>/automatic/eurostat/cens_21dwop_r3.tsv.gz",
+        table="<resources>/automatic/eurostat/cens_21dwop_r3.tsv.gz",
     log:
         "<logs>/download_eurostat_building_age.log",
     conda:

@@ -26,6 +26,8 @@ building floor area, population, and heating degree days (HDD).
 
 It additionally gives hourly electricity demand from heat pumps based on weather profiles, and identifies district heating areas and the heat that can theoretically be supplied through these. 
 
+The module also includes some scenario functionality to scale future energy demand. 
+
 Data processing steps:
 
 <p align="center">

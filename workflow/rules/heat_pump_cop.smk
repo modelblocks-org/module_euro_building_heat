@@ -51,17 +51,17 @@ rule heat_pump_electricity_demand_timeseries:
         cop="<heat_pump_cop>",
         electricity_demand="<heat_pump_electricity_demand>",
         cop_plot=report(
-            "<resources>/automatic/shapes/{shapes}/plots/heat_pump_cop_timeseries.pdf",
+            "<resources>/automatic/shapes/{shapes}/{scenario}/plots/heat_pump_cop_timeseries_{year}.pdf",
             category="European Building Heat",
             subcategory="Heat pumps",
         ),
         electricity_demand_plot=report(
-            "<resources>/automatic/shapes/{shapes}/plots/heat_pump_electricity_demand_timeseries.pdf",
+            "<resources>/automatic/shapes/{shapes}/{scenario}/plots/heat_pump_electricity_demand_timeseries_{year}.pdf",
             category="European Building Heat",
             subcategory="Heat pumps",
         ),
     log:
-        "<logs>/{shapes}/heat-pump/heat_pump_electricity_demand_timeseries.log",
+        "<logs>/{shapes}/{scenario}/heat-pump/heat_pump_electricity_demand_timeseries_{year}.log",
     conda:
         "../envs/module.yaml"
     params:

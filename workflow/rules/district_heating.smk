@@ -8,15 +8,17 @@ rule district_heating:
         hot_water="<hot_water_demand>",
         building_count="<building_count>",
         country_parameters=workflow.source_path("../internal/district_heating_country_parameters.csv"),
+        shares=lambda wc: f"<scenario_input>/{config['scenarios'][wc.scenario]['district_heating_shares']}",
     output:
-        heat="<resources>/automatic/{shapes}/district_heating/heat.tif",
-        costs="<resources>/automatic/{shapes}/district_heating/costs.tif",
+        heat="<resources>/automatic/{shapes}/{scenario}/district_heating/heat_{year}.tif",
+        costs="<resources>/automatic/{shapes}/{scenario}/district_heating/costs_{year}.tif",
     log:
-        "<logs>/{shapes}/district_heating.log",
+        "<logs>/{shapes}/{scenario}/district_heating_{year}.log",
     conda:
         "../envs/module.yaml"
     params:
         assumptions=config["district_heating"],
+        assessment_year=lambda wc: int(wc.year),
         data_proxies=config["data_proxies"],
         grid_crs=config["crs"]["projected"],
     message:
@@ -31,10 +33,10 @@ rule district_heating_areas:
         costs=rules.district_heating.output.costs,
         heat=rules.district_heating.output.heat,
     output:
-        ids="<resources>/automatic/{shapes}/district_heating/area_ids.tif",
+        ids="<resources>/automatic/{shapes}/{scenario}/district_heating/area_ids_{year}.tif",
         areas="<district_heating_areas>",
     log:
-        "<logs>/{shapes}/district_heating_areas.log",
+        "<logs>/{shapes}/{scenario}/district_heating_areas_{year}.log",
     conda:
         "../envs/module.yaml"
     message:

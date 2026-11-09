@@ -1,3 +1,19 @@
+scenarios:
+  decreasing_heat:
+    description: Uniform reduction in useful heat demand.
+    district_heating_shares: district_heating_shares.csv
+    heat_demand:
+      2030: 1
+      2040: 0.8
+      2050: 0.6
+  increasing_heat:
+    description: Uniform increase in useful heat demand.
+    district_heating_shares: district_heating_shares.csv
+    heat_demand:
+      2030: 1
+      2040: 1.2
+      2050: 1.4
+
 building_rasters:
   source: prebuilt
   # Building_raster settings below apply only to rebuild; prebuilt uses published grids.
@@ -192,11 +208,9 @@ heat_pump:
   correction_factor: 0.85
 
 district_heating:
-  assessment_year: 2050
   area_selection:
     minimum_heat_per_hectare: 20
     minimum_heat_per_district_heating_area: 5000
-    connectivity: 8
   distribution_length_curve:
     log_slope_m: 65.3
     intercept_m: -42.25

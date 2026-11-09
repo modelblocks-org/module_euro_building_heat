@@ -17,23 +17,33 @@ rule create_external_shapes:
         "curl --fail --silent --show-error --location --output {output.shapes:q} {params.url:q} 2> {log:q}"
 
 
+rule supply_scenario_input:
+    input:
+        "../../examples/district_heating_shares.csv",
+    output:
+        "resources/user/scenario_input/district_heating_shares.csv",
+    shell:
+        "cp {input:q} {output:q}"
+
+
 # Import the module and configure it.
 module module_euro_building_heat:
     pathvars:
         # Redirect specific user resources (inputs)
         shapes=rules.create_external_shapes.output.shapes,
+        scenario_input="resources/user/scenario_input",
         edh_api="resources/user/edh_api.txt",
         # Redirect specific module results (outputs)
         building_count="results/output/{shapes}/rasters/building_count.tif",
-        annual_heat_demand="results/output/{shapes}/annual/heat_demand_twh.parquet",
-        heat_pump_electricity_demand="results/output/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet",
-        heat_demand="results/output/{shapes}/hourly/heat_demand_mwh.parquet",
-        space_heat_demand="results/output/{shapes}/annual/space_heat_demand_mwh.tif",
-        hot_water_demand="results/output/{shapes}/annual/hot_water_demand_mwh.tif",
-        space_heat_profile="results/output/{shapes}/hourly/space_heat_profile.parquet",
-        hot_water_profile="results/output/{shapes}/hourly/hot_water_profile.parquet",
-        heat_pump_cop="results/output/{shapes}/hourly/heat_pump_cop_pu.parquet",
-        district_heating_areas="results/output/{shapes}/district_heating/areas.parquet",
+        annual_heat_demand="results/output/{shapes}/{scenario}/annual/heat_demand_twh_{year}.parquet",
+        heat_pump_electricity_demand="results/output/{shapes}/{scenario}/hourly/heat_pump_electricity_demand_mwh_{year}.parquet",
+        heat_demand="results/output/{shapes}/{scenario}/hourly/heat_demand_mwh_{year}.parquet",
+        space_heat_demand="results/output/{shapes}/{scenario}/annual/space_heat_demand_mwh_{year}.tif",
+        hot_water_demand="results/output/{shapes}/{scenario}/annual/hot_water_demand_mwh_{year}.tif",
+        space_heat_profile="results/output/{shapes}/{scenario}/hourly/space_heat_profile_{year}.parquet",
+        hot_water_profile="results/output/{shapes}/{scenario}/hourly/hot_water_profile_{year}.parquet",
+        heat_pump_cop="results/output/{shapes}/{scenario}/hourly/heat_pump_cop_pu_{year}.parquet",
+        district_heating_areas="results/output/{shapes}/{scenario}/district_heating/areas_{year}.parquet",
         # Redirect intermediate files that are internal to the module
         logs="resources/module/logs",
         resources="resources/module/resources",
@@ -53,14 +63,14 @@ rule all:
     default_target: True
     input:
         "results/output/test/rasters/building_count.tif",
-        "results/output/test/annual/heat_demand_twh.parquet",
-        "results/output/test/hourly/heat_pump_electricity_demand_mwh.parquet",
-        "results/output/test/hourly/heat_demand_mwh.parquet",
-        "results/output/test/annual/space_heat_demand_mwh.tif",
-        "results/output/test/annual/hot_water_demand_mwh.tif",
-        "results/output/test/hourly/space_heat_profile.parquet",
-        "results/output/test/hourly/hot_water_profile.parquet",
-        "results/output/test/hourly/heat_pump_cop_pu.parquet",
-        "results/output/test/district_heating/areas.parquet",
+        "results/output/test/decreasing_heat/annual/heat_demand_twh_2050.parquet",
+        "results/output/test/decreasing_heat/hourly/heat_pump_electricity_demand_mwh_2050.parquet",
+        "results/output/test/decreasing_heat/hourly/heat_demand_mwh_2050.parquet",
+        "results/output/test/decreasing_heat/annual/space_heat_demand_mwh_2050.tif",
+        "results/output/test/decreasing_heat/annual/hot_water_demand_mwh_2050.tif",
+        "results/output/test/decreasing_heat/hourly/space_heat_profile_2050.parquet",
+        "results/output/test/decreasing_heat/hourly/hot_water_profile_2050.parquet",
+        "results/output/test/decreasing_heat/hourly/heat_pump_cop_pu_2050.parquet",
+        "results/output/test/decreasing_heat/district_heating/areas_2050.parquet",
     message:
         "A generic dry-run test case for the heat demand module."

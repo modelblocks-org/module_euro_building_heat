@@ -11,18 +11,19 @@ min_version("9.19")
 pathvars:
     # User resources
     shapes="<resources>/user/{shapes}/shapes.parquet",
+    scenario_input="<resources>/user/{shapes}/scenario_input",
     edh_api="<resources>/user/edh_api.txt",
     # Module results
     building_count="<results>/{shapes}/rasters/building_count.tif",
-    annual_heat_demand="<results>/{shapes}/annual/heat_demand_twh.parquet",
-    heat_demand="<results>/{shapes}/hourly/heat_demand_mwh.parquet",
-    space_heat_demand="<results>/{shapes}/annual/space_heat_demand_mwh.tif",
-    hot_water_demand="<results>/{shapes}/annual/hot_water_demand_mwh.tif",
-    space_heat_profile="<results>/{shapes}/hourly/space_heat_profile.parquet",
-    hot_water_profile="<results>/{shapes}/hourly/hot_water_profile.parquet",
-    heat_pump_cop="<results>/{shapes}/hourly/heat_pump_cop_pu.parquet",
-    heat_pump_electricity_demand="<results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet",
-    district_heating_areas="<results>/{shapes}/district_heating/areas.parquet",
+    annual_heat_demand="<results>/{shapes}/{scenario}/annual/heat_demand_twh_{year}.parquet",
+    heat_demand="<results>/{shapes}/{scenario}/hourly/heat_demand_mwh_{year}.parquet",
+    space_heat_demand="<results>/{shapes}/{scenario}/annual/space_heat_demand_mwh_{year}.tif",
+    hot_water_demand="<results>/{shapes}/{scenario}/annual/hot_water_demand_mwh_{year}.tif",
+    space_heat_profile="<results>/{shapes}/{scenario}/hourly/space_heat_profile_{year}.parquet",
+    hot_water_profile="<results>/{shapes}/{scenario}/hourly/hot_water_profile_{year}.parquet",
+    heat_pump_cop="<results>/{shapes}/{scenario}/hourly/heat_pump_cop_pu_{year}.parquet",
+    heat_pump_electricity_demand="<results>/{shapes}/{scenario}/hourly/heat_pump_electricity_demand_mwh_{year}.parquet",
+    district_heating_areas="<results>/{shapes}/{scenario}/district_heating/areas_{year}.parquet",
 
 
 # Load the example configuration. This will be overridden by users.
@@ -58,6 +59,7 @@ include: "rules/annual_heat_demand.smk"
 include: "rules/heat_timeseries.smk"
 include: "rules/heat_pump_cop.smk"
 include: "rules/district_heating.smk"
+include: "rules/all_scenarios.smk"
 
 
 # Add additional files to be delivered alongside the workflow here.

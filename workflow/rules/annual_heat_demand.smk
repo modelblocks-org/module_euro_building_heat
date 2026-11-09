@@ -124,21 +124,22 @@ rule rescale_annual_heat_demand_to_shapes:
         space_heat="<space_heat_demand>",
         hot_water="<hot_water_demand>",
         density=report(
-            "<resources>/automatic/shapes/{shapes}/plots/space_heat_demand_density.png",
+            "<resources>/automatic/shapes/{shapes}/{scenario}/plots/space_heat_demand_density_{year}.png",
             category="European Building Heat",
             subcategory="Heat demand",
         ),
         choropleth=report(
-            "<resources>/automatic/shapes/{shapes}/plots/annual_heat_demand.png",
+            "<resources>/automatic/shapes/{shapes}/{scenario}/plots/annual_heat_demand_{year}.png",
             category="European Building Heat",
             subcategory="Heat demand",
         ),
     log:
-        "<logs>/{shapes}/annual/rescale_annual_heat_demand_to_shapes.log",
+        "<logs>/{shapes}/{scenario}/annual/rescale_annual_heat_demand_to_shapes_{year}.log",
     conda:
         "../envs/module.yaml"
     params:
         weather_demand_years=WEATHER_DEMAND_YEARS,
+        heat_demand_multiplier=scenario_heat_multiplier,
         hdd_elasticity=config["spatial_weights"]["hdd"]["elasticity"],
     message:
         "Scale national annual heat demand to '{wildcards.shapes}' shapes."

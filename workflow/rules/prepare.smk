@@ -23,9 +23,7 @@ rule unzip_jrc_idees:
     input:
         rules.download_jrc_idees.output.archive,
     output:
-        table=temp(
-            "<resources>/automatic/jrc-idees/{version}/{dataset}_{country_code}.xlsx"
-        ),
+        temp("<resources>/automatic/jrc-idees/{version}/{dataset}_{country_code}.xlsx"),
     log:
         "<logs>/automatic/unzip_jrc_idees_v{version}_{dataset}_{country_code}.log",
     wildcard_constraints:
@@ -45,7 +43,7 @@ rule unzip_ECUK_release:
     input:
         "<resources>/automatic/stable/GBR_End_Use_tables.zip",
     output:
-        table=temp("<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"),
+        temp("<resources>/automatic/GBR/ecuk-end-use-{release}.xlsx"),
     log:
         "<logs>/unzip_GBR_end_use_{release}.log",
     wildcard_constraints:
@@ -61,9 +59,9 @@ rule unzip_ECUK_release:
 
 rule unzip_raw_population:
     input:
-        rules.download_raw_population.output.file,
+        rules.download_raw_population.output.archive,
     output:
-        population="<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.tif",
+        "<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.tif",
     log:
         "<logs>/automatic/unzip_raw_population_{ghsl_epoch}_100.log",
     params:
@@ -116,7 +114,7 @@ if not USE_PREBUILT:
     rule prepare_nuts3:
         input:
             shapes=rules.prepare_shapes.output.shapes,
-            nuts3=rules.download_nuts3.output.file,
+            nuts3=rules.download_nuts3.output.geojson,
         output:
             regions="<resources>/automatic/{shapes}/nuts3.parquet",
         log:
@@ -134,8 +132,8 @@ if not USE_PREBUILT:
     rule prepare_building_population:
         input:
             regions=rules.prepare_nuts3.output.regions,
-            nuts3_source=rules.download_nuts3.output.file,
-            stats=rules.download_eubucco_stats.output.file,
+            nuts3_source=rules.download_nuts3.output.geojson,
+            stats=rules.download_eubucco_stats.output.table,
             population=POPULATION_FILE,
         output:
             table="<resources>/automatic/{shapes}/building_population.parquet",
@@ -157,10 +155,10 @@ if not USE_PREBUILT:
     rule prepare_floor_area_totals:
         input:
             nuts3=rules.prepare_nuts3.output.regions,
-            nuts3_source=rules.download_nuts3.output.file,
-            census=rules.download_eurostat_floor_area.output.file,
+            nuts3_source=rules.download_nuts3.output.geojson,
+            census=rules.download_eurostat_floor_area.output.table,
             population_summaries=rules.prepare_building_population.output.table,
-            eubucco_stats=rules.download_eubucco_stats.output.file,
+            eubucco_stats=rules.download_eubucco_stats.output.table,
             plan=lambda wc: checkpoints.prepare_building_sources.get(
                 shapes=wc.shapes
             ).output.manifest,
@@ -190,7 +188,7 @@ if not USE_PREBUILT:
                 shapes=wc.shapes
             ).output.manifest,
             regions=rules.prepare_nuts3.output.regions,
-            stats=rules.download_eubucco_stats.output.file,
+            stats=rules.download_eubucco_stats.output.table,
             population_summaries="<resources>/automatic/{shapes}/building_population.parquet",
         output:
             table="<resources>/automatic/{shapes}/building_count_proxies.parquet",
@@ -210,7 +208,7 @@ if not USE_PREBUILT:
         input:
             nuts3=rules.prepare_nuts3.output.regions,
             floor_area=rules.prepare_floor_area_totals.output.table,
-            census=rules.download_eurostat_building_age.output.file,
+            census=rules.download_eurostat_building_age.output.table,
         output:
             table="<resources>/automatic/{shapes}/nuts3_building_age.parquet",
         log:

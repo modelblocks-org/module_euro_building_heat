@@ -56,9 +56,7 @@ rule unscaled_heat_profiles:
         local_profiles=rules.local_unscaled_heat_profiles.output.local_profiles,
         shape_timezones=rules.prepare_shape_timezones.output.timezones,
     output:
-        profiles=temp(
-            "<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"
-        ),
+        profiles=temp("<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"),
     log:
         "<logs>/{shapes}/timeseries/unscaled_heat_profiles.log",
     conda:
@@ -111,12 +109,12 @@ rule heat_demand_final_timeseries:
         space_heat_profile="<space_heat_profile>",
         hot_water_profile="<hot_water_profile>",
         plot=report(
-            "<resources>/automatic/shapes/{shapes}/plots/heat_demand_timeseries.pdf",
+            "<resources>/automatic/shapes/{shapes}/{scenario}/plots/heat_demand_timeseries_{year}.pdf",
             category="European Building Heat",
             subcategory="Heat demand",
         ),
     log:
-        "<logs>/{shapes}/timeseries/heat_demand_final_timeseries.log",
+        "<logs>/{shapes}/{scenario}/timeseries/heat_demand_final_timeseries_{year}.log",
     conda:
         "../envs/module.yaml"
     params:

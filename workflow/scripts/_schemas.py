@@ -17,13 +17,32 @@ from pandera.typing.geopandas import GeoSeries
 from pandera.typing.pandas import Series
 from shapely.geometry import MultiPolygon, Polygon
 
+
+class DistrictHeatingSharesSchema(pa.DataFrameModel):
+    """User-supplied country connection-share trajectories."""
+
+    country_id: Series[str] = pa.Field(str_matches=r"^[A-Z]{3}$", unique=True)
+    start_year: Series[int] = pa.Field(ge=1900, le=9999)
+    end_year: Series[int] = pa.Field(ge=1900, le=9999)
+    share_start: Series[float] = pa.Field(ge=0, le=1, nullable=True)
+    share_end: Series[float] = pa.Field(ge=0, le=1, nullable=True)
+
+    @pa.dataframe_check
+    def ordered_years(cls, frame):
+        return frame.end_year > frame.start_year
+
+    @pa.dataframe_check
+    def paired_shares(cls, frame):
+        return frame.share_start.isna() == frame.share_end.isna()
+
+    class Config:
+        coerce = True
+        strict = True
+
+
 # Raster band order and empty-table dtypes define the district-heating outputs.
 DH_HEAT_BANDS = ("heat_demand", "connected_heat")
-DH_COST_BANDS = (
-    "distribution_investment",
-    "service_investment",
-    "total_investment",
-)
+DH_COST_BANDS = ("distribution_investment", "service_investment", "total_investment")
 DH_AREA_COLUMNS = {
     "area_id": "int64",
     "country_id": "object",

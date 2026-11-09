@@ -19,28 +19,14 @@ from scipy import ndimage
 def identify_areas(
     density: np.ndarray,
     connected_heat: np.ndarray,
-    eligible: np.ndarray,
     selection: dict[str, Any],
 ) -> np.ndarray:
-    """Select connected components after one density threshold and closing.
-
-    Density is total MWh/ha/year; the size test uses connected MWh/year.
-    Invalid cells remain barriers, including after morphological closing.
-    Padding retains seeds at the raster edge. No economic screening is applied.
+    """Selects connected areas of sufficient heat density and total connected heat.
     """
-    structure = ndimage.generate_binary_structure(2, selection["connectivity"] // 4)
-    eligible = (
-        eligible
-        & np.isfinite(density)
-        & np.isfinite(connected_heat)
-        & (connected_heat > 0)
-    )
-    mask = eligible & (density > selection["minimum_heat_per_hectare"])
+    structure = np.ones((3, 3), dtype=bool)
+    mask = (density > selection["minimum_heat_per_hectare"])
     mask = (
-        ndimage.binary_closing(np.pad(mask, 1), structure=np.ones((3, 3), dtype=bool))[
-            1:-1, 1:-1
-        ]
-        & eligible
+        ndimage.binary_closing(np.pad(mask, 1), structure=structure)[1:-1, 1:-1]
     )
     labels, count = ndimage.label(mask, structure)
     totals = np.bincount(
@@ -75,7 +61,7 @@ def calculate_areas(
             output.set_band_unit(1, "1")
             output.update_tags(
                 **(tags | {"area_selection": json.dumps(selection, sort_keys=True)}),
-                area_method="density, closing, connectivity and minimum connected annual heat; no economic screening",
+                area_method="density, closing, connectivity and minimum connected annual heat",
                 excluded_cells="zero delivery or undefined total network cost; ID 0",
             )
             for country_id, group in regions.groupby("country_id", sort=True):
@@ -135,7 +121,7 @@ def calculate_areas(
                         "country_id": country_id,
                         "cell_count": cells,
                         "area_ha": cells * cell_area_ha,
-                        "assessment_year": p["assessment_year"],
+                        "assessment_year": int(tags["assessment_year"]),
                         "connection_fraction": country["connection_fraction"],
                         "heat_demand_mwh_per_year": aggregate(demand),
                         "heat_potential_mwh_per_year": connected_totals,

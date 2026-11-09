@@ -1,4 +1,12 @@
 module_euro_building_heat:
+  scenarios:
+    decreasing_heat:
+      description: Uniform reduction in useful heat demand.
+      district_heating_shares: district_heating_shares.csv
+      # Multipliers of each configured historical demand year, not annual growth rates.
+      heat_demand:
+        2050: 0.6
+
   building_rasters:
     source: prebuilt
 
@@ -128,11 +136,9 @@ module_euro_building_heat:
     correction_factor: 0.85
 
   district_heating:
-    assessment_year: 2050
     area_selection:
       minimum_heat_per_hectare: 20
       minimum_heat_per_district_heating_area: 5000
-      connectivity: 8
     distribution_length_curve:
       log_slope_m: 65.3
       intercept_m: -42.25

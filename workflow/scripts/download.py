@@ -42,4 +42,4 @@ def download(url: str, destination: str | Path) -> None:
 
 if __name__ == "__main__":
     sys.stderr = open(snakemake.log[0], "w")
-    download(snakemake.params.url, snakemake.output.file)
+    download(snakemake.params.url, snakemake.output[0])
