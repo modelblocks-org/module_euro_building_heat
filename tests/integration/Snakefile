@@ -22,8 +22,12 @@ rule supply_scenario_input:
         "../../examples/district_heating_shares.csv",
     output:
         "resources/user/scenario_input/district_heating_shares.csv",
+    log:
+        "logs/supply_scenario_input.log",
+    conda:
+        "../../workflow/envs/module.yaml"
     shell:
-        "cp {input:q} {output:q}"
+        "cp {input:q} {output:q} > {log:q} 2>&1"
 
 
 # Import the module and configure it.
