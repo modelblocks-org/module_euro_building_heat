@@ -12,7 +12,7 @@ import pyarrow.parquet as pq
 import rasterio
 import shapely
 from _schemas import DH_AREA_COLUMNS
-from rasterio.features import geometry_mask, geometry_window, shapes
+from rasterio.features import geometry_window, shapes
 from scipy import ndimage
 
 
@@ -57,26 +57,18 @@ def calculate_areas(
             output.update_tags(
                 **(tags | {"area_selection": json.dumps(selection, sort_keys=True)}),
                 area_method="density, closing, connectivity and minimum connected annual heat",
-                excluded_cells="zero delivery or undefined total network cost; ID 0",
             )
             for country_id, group in regions.groupby("country_id", sort=True):
                 country = countries[country_id]
                 window = geometry_window(source, group.geometry)
                 transform = source.window_transform(window)
-                shape = (int(window.height), int(window.width))
-                domain = geometry_mask(
-                    group.geometry, out_shape=shape, transform=transform, invert=True
-                )
                 investment = source.read([1, 2, 3], window=window, masked=True).filled(
                     np.nan
                 )
                 demand, connected = heat.read(
                     [1, 2], window=window, masked=True
                 ).filled(np.nan)
-                eligible = domain & (demand > 0) & np.isfinite(investment[2])
-                labels = identify_areas(
-                    demand / cell_area_ha, connected, eligible, selection
-                )
+                labels = identify_areas(demand / cell_area_ha, connected, selection)
                 selected = labels > 0
                 count = int(labels.max())
                 if not count:
@@ -128,7 +120,7 @@ def calculate_areas(
                     crs=source.crs,
                 )
                 area_frames.append(areas)
-                # Country windows can overlap; update only this country's selected cells.
+                # Country windows can overlap; update only selected cells.
                 block = output.read(1, window=window)
                 block[selected] = labels[selected] + offset
                 output.write(block, 1, window=window)

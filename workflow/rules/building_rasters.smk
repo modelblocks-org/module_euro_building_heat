@@ -14,7 +14,7 @@ if USE_PREBUILT:
                 subcategory="Buildings",
             ),
         log:
-            "<logs>/{shapes}/merge_building_count.log",
+            "<logs>/{shapes}/rasters/merge_building_count.log",
         conda:
             "../envs/module.yaml"
         params:
@@ -43,7 +43,7 @@ if USE_PREBUILT:
                 subcategory="Buildings",
             ),
         log:
-            "<logs>/{shapes}/merge_structural_support.log",
+            "<logs>/{shapes}/rasters/merge_structural_support.log",
         conda:
             "../envs/module.yaml"
         params:
@@ -64,7 +64,7 @@ else:
         output:
             manifest="<resources>/automatic/{shapes}/heat_rasters/batches.json",
         log:
-            "<logs>/{shapes}/prepare_floor_area_batches.log",
+            "<logs>/{shapes}/rasters/prepare_floor_area_batches.log",
         conda:
             "../envs/module.yaml"
         params:
@@ -95,7 +95,7 @@ else:
                 "<resources>/automatic/{shapes}/heat_rasters/batches/{batch}"
             ),
         log:
-            "<logs>/{shapes}/create_floor_area_batch_{batch}.log",
+            "<logs>/{shapes}/rasters/create_floor_area_batch_{batch}.log",
         conda:
             "../envs/module.yaml"
         threads: 1
@@ -121,7 +121,7 @@ else:
         output:
             table="<resources>/automatic/{shapes}/heat_rasters/sv_statistics.parquet",
         log:
-            "<logs>/{shapes}/prepare_space_heat_sv_statistics.log",
+            "<logs>/{shapes}/rasters/prepare_space_heat_sv_statistics.log",
         conda:
             "../envs/module.yaml"
         params:
@@ -141,7 +141,7 @@ else:
                 "<resources>/automatic/{shapes}/heat_rasters/weights/{batch}"
             ),
         log:
-            "<logs>/{shapes}/create_space_heat_weight_batch_{batch}.log",
+            "<logs>/{shapes}/rasters/create_space_heat_weight_batch_{batch}.log",
         conda:
             "../envs/module.yaml"
         resources:
@@ -169,7 +169,7 @@ else:
                 subcategory="Buildings",
             ),
         log:
-            "<logs>/{shapes}/merge_building_count.log",
+            "<logs>/{shapes}/rasters/merge_building_count.log",
         conda:
             "../envs/module.yaml"
         resources:
@@ -207,7 +207,7 @@ else:
                 subcategory="Buildings",
             ),
         log:
-            "<logs>/{shapes}/merge_structural_support.log",
+            "<logs>/{shapes}/rasters/merge_structural_support.log",
         conda:
             "../envs/module.yaml"
         resources:

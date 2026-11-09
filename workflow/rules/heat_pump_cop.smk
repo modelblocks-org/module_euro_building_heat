@@ -9,7 +9,7 @@ rule heat_pump_cop:
     output:
         cop=temp("<resources>/automatic/shapes/{shapes}/gridded-heat-pump-cop.nc"),
     log:
-        "<logs>/{shapes}/heat-pump/heat_pump_cop.log",
+        "<logs>/{shapes}/hourly/heat_pump_cop.log",
     conda:
         "../envs/module.yaml"
     params:
@@ -31,7 +31,7 @@ rule group_gridded_timeseries_heat_pump_cop:
     output:
         cop=temp("<resources>/automatic/shapes/{shapes}/heat-pump-cop.nc"),
     log:
-        "<logs>/{shapes}/heat-pump/group_gridded_timeseries_heat_pump_cop.log",
+        "<logs>/{shapes}/hourly/group_gridded_timeseries_heat_pump_cop.log",
     conda:
         "../envs/module.yaml"
     threads: config["threads"]["aggregation"]
@@ -61,7 +61,7 @@ rule heat_pump_electricity_demand_timeseries:
             subcategory="Heat pumps",
         ),
     log:
-        "<logs>/{shapes}/{scenario}/heat-pump/heat_pump_electricity_demand_timeseries_{year}.log",
+        "<logs>/{shapes}/{scenario}/hourly/heat_pump_electricity_demand_timeseries_{year}.log",
     conda:
         "../envs/module.yaml"
     params:

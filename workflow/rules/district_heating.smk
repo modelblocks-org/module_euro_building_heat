@@ -15,7 +15,7 @@ rule district_heating:
         heat="<resources>/automatic/{shapes}/{scenario}/district_heating/heat_{year}.tif",
         costs="<resources>/automatic/{shapes}/{scenario}/district_heating/costs_{year}.tif",
     log:
-        "<logs>/{shapes}/{scenario}/district_heating_{year}.log",
+        "<logs>/{shapes}/{scenario}/district_heating/district_heating_{year}.log",
     conda:
         "../envs/module.yaml"
     params:
@@ -38,7 +38,7 @@ rule district_heating_areas:
         ids="<resources>/automatic/{shapes}/{scenario}/district_heating/area_ids_{year}.tif",
         areas="<district_heating_areas>",
     log:
-        "<logs>/{shapes}/{scenario}/district_heating_areas_{year}.log",
+        "<logs>/{shapes}/{scenario}/district_heating/district_heating_areas_{year}.log",
     conda:
         "../envs/module.yaml"
     message:

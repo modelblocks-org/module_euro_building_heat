@@ -13,7 +13,7 @@ rule process_gridded_weather_data:
         tsoil5=temp("<resources>/automatic/shapes/{shapes}/gridded_weather/tsoil5.nc"),
         hdd="<resources>/automatic/shapes/{shapes}/gridded_weather/hdd.nc",
     log:
-        "<logs>/{shapes}/timeseries/process_gridded_weather_data.log",
+        "<logs>/{shapes}/hourly/process_gridded_weather_data.log",
     conda:
         "../envs/module.yaml"
     params:
@@ -39,7 +39,7 @@ rule local_unscaled_heat_profiles:
     output:
         local_profiles=temp(LOCAL_UNSCALED_HEAT_PROFILES),
     log:
-        "<logs>/{shapes}/timeseries/local_unscaled_heat_profiles.log",
+        "<logs>/{shapes}/hourly/local_unscaled_heat_profiles.log",
     conda:
         "../envs/module.yaml"
     threads: config["threads"]["aggregation"]
@@ -60,7 +60,7 @@ rule unscaled_heat_profiles:
             "<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"
         ),
     log:
-        "<logs>/{shapes}/timeseries/unscaled_heat_profiles.log",
+        "<logs>/{shapes}/hourly/unscaled_heat_profiles.log",
     conda:
         "../envs/module.yaml"
     threads: config["threads"]["aggregation"]
@@ -87,7 +87,7 @@ rule prepare_spatial_weights:
         commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
         grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     log:
-        "<logs>/{shapes}/timeseries/prepare_spatial_weights.log",
+        "<logs>/{shapes}/hourly/prepare_spatial_weights.log",
     conda:
         "../envs/module.yaml"
     params:
@@ -116,7 +116,7 @@ rule heat_demand_final_timeseries:
             subcategory="Heat demand",
         ),
     log:
-        "<logs>/{shapes}/{scenario}/timeseries/heat_demand_final_timeseries_{year}.log",
+        "<logs>/{shapes}/{scenario}/hourly/heat_demand_final_timeseries_{year}.log",
     conda:
         "../envs/module.yaml"
     params:
