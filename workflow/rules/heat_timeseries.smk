@@ -56,7 +56,9 @@ rule unscaled_heat_profiles:
         local_profiles=rules.local_unscaled_heat_profiles.output.local_profiles,
         shape_timezones=rules.prepare_shape_timezones.output.timezones,
     output:
-        profiles=temp("<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"),
+        profiles=temp(
+            "<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"
+        ),
     log:
         "<logs>/{shapes}/timeseries/unscaled_heat_profiles.log",
     conda:

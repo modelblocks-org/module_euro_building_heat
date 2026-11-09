@@ -17,17 +17,12 @@ from scipy import ndimage
 
 
 def identify_areas(
-    density: np.ndarray,
-    connected_heat: np.ndarray,
-    selection: dict[str, Any],
+    density: np.ndarray, connected_heat: np.ndarray, selection: dict[str, Any]
 ) -> np.ndarray:
-    """Selects connected areas of sufficient heat density and total connected heat.
-    """
+    """Selects connected areas of sufficient heat density and total connected heat."""
     structure = np.ones((3, 3), dtype=bool)
-    mask = (density > selection["minimum_heat_per_hectare"])
-    mask = (
-        ndimage.binary_closing(np.pad(mask, 1), structure=structure)[1:-1, 1:-1]
-    )
+    mask = density > selection["minimum_heat_per_hectare"]
+    mask = ndimage.binary_closing(np.pad(mask, 1), structure=structure)[1:-1, 1:-1]
     labels, count = ndimage.label(mask, structure)
     totals = np.bincount(
         labels[mask], weights=connected_heat[mask], minlength=count + 1

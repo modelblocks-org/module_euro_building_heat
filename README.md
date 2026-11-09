@@ -24,9 +24,9 @@ This module combines national annual heat-demand statistics with weather-driven
 hourly profiles and scales them to user-provided European regions using
 building floor area, population, and heating degree days (HDD).
 
-It additionally gives hourly electricity demand from heat pumps based on weather profiles, and identifies district heating areas and the heat that can theoretically be supplied through these. 
+It additionally gives hourly electricity demand from heat pumps based on weather profiles, and identifies district heating areas and the heat that can theoretically be supplied through these.
 
-The module also includes some scenario functionality to scale future energy demand. 
+The module also includes some scenario functionality to scale future energy demand.
 
 Data processing steps:
 
@@ -54,7 +54,7 @@ Data processing steps:
 7. Calculate air-source and ground-source heat-pump COP and electricity demand.
 8. Export annual demand tables and rasters, hourly demand and normalized sink
    profiles, building counts, and diagnostic figures for Snakemake reports.
-9. Calculate district heating cost and potential and identify possible district heating networks. 
+9. Calculate district heating cost and potential and identify possible district heating networks.
 
 ### Timezone handling
 

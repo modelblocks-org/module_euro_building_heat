@@ -102,8 +102,7 @@ def service_trench_length(
 def service_pipe_diameter(
     density_gj_per_m: np.ndarray, p: dict[str, Any]
 ) -> np.ndarray:
-    """Return service diameter in metres from annual linear heat density in GJ/m.
-    """
+    """Return service diameter in metres from annual linear heat density in GJ/m."""
     curve = p["service_diameter_curve"]
     # Check in log space before exponentiation: extreme densities must yield
     # an invalid estimate, not overflow or a clipped (apparently valid) cost.

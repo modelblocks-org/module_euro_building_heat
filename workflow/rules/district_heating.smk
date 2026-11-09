@@ -7,7 +7,9 @@ rule district_heating:
         space_heat="<space_heat_demand>",
         hot_water="<hot_water_demand>",
         building_count="<building_count>",
-        country_parameters=workflow.source_path("../internal/district_heating_country_parameters.csv"),
+        country_parameters=workflow.source_path(
+            "../internal/district_heating_country_parameters.csv"
+        ),
         shares=lambda wc: f"<scenario_input>/{config['scenarios'][wc.scenario]['district_heating_shares']}",
     output:
         heat="<resources>/automatic/{shapes}/{scenario}/district_heating/heat_{year}.tif",
