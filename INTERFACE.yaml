@@ -12,6 +12,9 @@ pathvars:
       default: <results>
       description: location of module result (output) files.
   user_resources:
+    scenario_input:
+      default: <resources>/user/{shapes}/scenario_input
+      description: Directory containing the scenario CSV files named in config.scenarios.
     edh_api:
       default: <resources>/user/edh_api.txt
       description: |
@@ -29,7 +32,7 @@ pathvars:
         - `geometry`: polygon geometry.
   results:
     annual_heat_demand:
-      default: <results>/{shapes}/annual/heat_demand_twh.parquet
+      default: <results>/{shapes}/{scenario}/annual/heat_demand_twh_{year}.parquet
       description: |
         Annual useful heat demand in TWh, scaled from countries to shapes.
         Household and commercial space heating use their sector structural support
@@ -40,15 +43,15 @@ pathvars:
         This table contains the following columns:
         - `end_use`: cooking, hot_water or space_heat.
         - `category`: commercial or household
-        - `year`: year the demand applies to.
+        - `year`: historical demand year used as the scenario baseline.
         - `shape_id`: exact shape ID as seen in the input `shapes.parquet` case.
         - `heat_demand_twh`: annual demand in TWh.
     heat_demand:
-      default: <results>/{shapes}/hourly/heat_demand_mwh.parquet
+      default: <results>/{shapes}/{scenario}/hourly/heat_demand_mwh_{year}.parquet
       description: |
         Shape-aggregated heat demand in MWh with a harmonised UTC hourly index.
     space_heat_demand:
-      default: <results>/{shapes}/annual/space_heat_demand_mwh.tif
+      default: <results>/{shapes}/{scenario}/annual/space_heat_demand_mwh_{year}.tif
       description: |
         Annual useful space heat demand for households and commercial buildings in MWh per
         cell on the shared 100 m building grid. Each sector uses structural support times
@@ -56,7 +59,7 @@ pathvars:
         Cell sums preserve annual shape totals. One band per configured
         demand/weather year pair, recorded in descriptions and tags. Nodata is 0.
     hot_water_demand:
-      default: <results>/{shapes}/annual/hot_water_demand_mwh.tif
+      default: <results>/{shapes}/{scenario}/annual/hot_water_demand_mwh_{year}.tif
       description: |
         Annual useful hot water demand for households and commercial buildings in MWh per
         cell on the shared 100 m building grid. Allocates each sector separately with
@@ -64,7 +67,7 @@ pathvars:
         preserve annual shape totals. One band per demand/weather year pair, recorded in
         descriptions and tags. Nodata is 0.
     space_heat_profile:
-      default: <results>/{shapes}/hourly/space_heat_profile.parquet
+      default: <results>/{shapes}/{scenario}/hourly/space_heat_profile_{year}.parquet
       description: |
         Normalised hourly space heat shares (p.u.) for households and commercial
         buildings combined, weighted by their annual demand. UTC-aware hourly
@@ -72,7 +75,7 @@ pathvars:
         to 1; zero annual demand yields all zeros. Attributes include units,
         end use, normalisation, shape timezones, and weather-to-demand year mapping.
     hot_water_profile:
-      default: <results>/{shapes}/hourly/hot_water_profile.parquet
+      default: <results>/{shapes}/{scenario}/hourly/hot_water_profile_{year}.parquet
       description: |
         Normalised hourly hot water shares (p.u.) for households and commercial
         buildings combined, weighted by their annual demand. UTC-aware hourly
@@ -80,12 +83,12 @@ pathvars:
         to 1; zero annual demand yields all zeros. Attributes include units,
         end use, normalisation, shape timezones, and weather-to-demand year mapping.
     heat_pump_cop:
-      default: <results>/{shapes}/hourly/heat_pump_cop_pu.parquet
+      default: <results>/{shapes}/{scenario}/hourly/heat_pump_cop_pu_{year}.parquet
       description: |
         Shape-aggregated heat-pump coefficient of performance in p.u. with a harmonised
         UTC hourly index.
     heat_pump_electricity_demand:
-      default: <results>/{shapes}/hourly/heat_pump_electricity_demand_mwh.parquet
+      default: <results>/{shapes}/{scenario}/hourly/heat_pump_electricity_demand_mwh_{year}.parquet
       description: |
         Shape-aggregated electricity demand for heat pumps in MWh with a harmonised UTC
         hourly index.
@@ -94,7 +97,17 @@ pathvars:
       description: |
         Residential plus commercial/public buildings per hectare on the shared 100 m
         equal-area grid. One building_count band, units buildings/ha, nodata 0. Other
-        building uses are excluded and proxy counts may be fractional. This output does
-        not require weather, heat statistics or an ERA5 credential.
+        building uses are excluded and proxy counts may be fractional.
+    district_heating_areas:
+      default: <results>/{shapes}/{scenario}/district_heating/areas_{year}.parquet
+      description: |
+        GeoParquet with one row per connected district-heating area within a country.
+        Includes area ID, geometry, area in hectares, assessment year, connection
+        fraction, total heat demand and connected heat potential in MWh/year, and
+        undiscounted distribution, service, and total network investment in EUR.
+        Investments cover the distribution and service network at the assumed
+        connection fraction; generation, losses, pumping, and O&M are excluded.
 wildcards:
   shapes: name of the provided shapes case.
+  scenario: scenario name from config.scenarios.
+  year: projection year explicitly configured in the selected scenario heat_demand mapping.

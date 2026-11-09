@@ -119,7 +119,7 @@ rule download_raw_population:
 
 rule download_jrc_idees:
     output:
-        temp("<resources>/automatic/jrc-idees/{country_code}_v{version}.zip"),
+        archive=temp("<resources>/automatic/jrc-idees/{country_code}_v{version}.zip"),
     log:
         "<logs>/automatic/download_jrc_idees_{country_code}_v{version}.log",
     wildcard_constraints:
@@ -134,7 +134,7 @@ rule download_jrc_idees:
     message:
         "Download JRC-IDEES data for {wildcards.country_code}-{wildcards.version}."
     shell:
-        "curl {params.curl_args} --output {output:q} {params.dataset_url:q} 2> {log:q}"
+        "curl {params.curl_args} --output {output.archive:q} {params.dataset_url:q} 2> {log:q}"
 
 
 rule download_nuts3:

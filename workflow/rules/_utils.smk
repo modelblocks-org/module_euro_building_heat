@@ -288,3 +288,14 @@ def selected_microsoft_totals_input(wildcards) -> str:
             shapes=wildcards.shapes
         )
     return outputs.empty_microsoft_totals
+
+
+def scenario_heat_multiplier(wildcards):
+    """Require an explicit multiplier for the requested scenario and year."""
+    values = config["scenarios"][wildcards.scenario]["heat_demand"]
+    values = {str(year): value for year, value in values.items()}
+    if wildcards.year not in values:
+        raise ValueError(
+            f"Scenario {wildcards.scenario!r} has no heat_demand value for {wildcards.year}."
+        )
+    return values[wildcards.year]

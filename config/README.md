@@ -106,3 +106,36 @@ UK ECUK final demand is converted using these efficiencies in both modes.
 - `heat_pump_shares`: air-source (`ashp`) and ground-source (`gshp`) fractions,
   summing to one.
 - `correction_factor`: multiplier converting manufacturer COP to operating performance.
+
+## District heating
+
+`district_heating` configures the `district_heating_areas` output:
+
+Scenario CSV files supply country connection shares (see [Scenarios](#scenarios)).
+Construction-cost coefficients are in the internal
+[country parameter table](../workflow/internal/district_heating_country_parameters.csv).
+The example shares and internal cost assumptions come from
+Tables A-1 and A-2 of
+[Fallahnejad’s thesis](https://repositum.tuwien.at/handle/20.500.12708/203902).
+
+- `area_selection`: selects areas by total annual heat demand per hectare and minimum connected annual heat demand per area. These thresholds do not establish economic viability.
+- `distribution_length_curve`, `distribution_diameter_curve`,
+  `service_length_curve`, and `service_diameter_curve`: empirical
+  coefficients and thresholds for modelling the district heating network. Distribution curves are adapted from
+  [Fallahnejad et al. (2024), *District heating potential in the EU-27*](https://doi.org/10.1016/j.apenergy.2023.122154).
+  The logistic service-length and exponential service-diameter curves follow
+  [Sánchez-García et al. (2023), *Understanding effective width for district heating*](https://doi.org/10.1016/j.energy.2023.127427).
+- `pipe_diameter_range_m`: physical limit of pipe diameter size used to remove cells in which district heating would give unrealistic diameter values. The example range follows the
+  product range described by
+  [Hofmann et al. (2025), *How much district heating in a future sector-coupled energy system?*](https://doi.org/10.1016/j.energy.2025.136436).
+
+## Scenarios
+
+Define named scenarios in [`config.yaml`](config.yaml). Each scenario has a
+`description`, a `district_heating_shares` CSV filename relative to the
+`scenario_input` pathvar, and a `heat_demand` mapping from projection years to
+multipliers. Multipliers apply uniformly to useful space heat, hot water, and
+cooking across all countries and sectors.
+
+Copy [`district_heating_shares.csv`](../examples/district_heating_shares.csv)
+into `resources/user/{shapes}/scenario_input/` and edit the copy for your scenario.

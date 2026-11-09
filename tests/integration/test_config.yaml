@@ -1,4 +1,12 @@
 module_euro_building_heat:
+  scenarios:
+    decreasing_heat:
+      description: Uniform reduction in useful heat demand.
+      district_heating_shares: district_heating_shares.csv
+      # Multipliers of each configured historical demand year, not annual growth rates.
+      heat_demand:
+        2050: 0.6
+
   building_rasters:
     source: prebuilt
 
@@ -20,6 +28,25 @@ module_euro_building_heat:
     projected: EPSG:3035
 
   data_proxies:
+    district_heating:
+      GBR: [IRL]
+      ALB: [BGR, HRV, HUN, ROU, GRC]
+      AND: [ESP]
+      BIH: [BGR, HRV, HUN, ROU, GRC]
+      CHE: [AUT]
+      CYP: [GRC]
+      ISL: [SWE, DNK]
+      LIE: [AUT]
+      MKD: [BGR, HRV, HUN, ROU, GRC]
+      MLT: [ITA]
+      MCO: [FRA]
+      MNE: [BGR, HRV, HUN, ROU, GRC]
+      NOR: [SWE, DNK]
+      SMR: [ITA]
+      SRB: [BGR, HRV, HUN, ROU, GRC]
+      XKX: [BGR, HRV, HUN, ROU, GRC]
+      BRA: [PRT]
+      LBR: [PRT]
     sfh_mfh_shares:
       ALB: [BGR, HRV, HUN, ROU, GRC]
       AND: [ESP]
@@ -107,3 +134,25 @@ module_euro_building_heat:
       ashp: 0.9
       gshp: 0.1
     correction_factor: 0.85
+
+  district_heating:
+    area_selection:
+      minimum_heat_per_hectare: 20
+      minimum_heat_per_district_heating_area: 5000
+    distribution_length_curve:
+      log_slope_m: 65.3
+      intercept_m: -42.25
+      minimum_connected_buildings: 2
+    distribution_diameter_curve:
+      small_pipe_density_gj_per_m: 1.5
+      log_slope_m: 0.0486
+      intercept_m: 0.0007
+      small_pipe_diameter_m: 0.02
+    service_length_curve:
+      asymptote_m_per_ha: 135.8
+      logistic_a: 12.27
+      logistic_b_ha_per_building: 0.511
+    service_diameter_curve:
+      exponential_a_mm: 19.98
+      exponential_b_m_per_gj: 0.02119
+    pipe_diameter_range_m: [0.015, 0.4]

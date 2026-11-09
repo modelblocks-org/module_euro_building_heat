@@ -6,7 +6,7 @@ rule prepare_sfh_mfh_shares:
         census="<resources>/automatic/eurostat/cens_21dwbnr_r3.tsv.gz",
         shapes="<resources>/automatic/shapes/{shapes}/land_shapes.parquet",
     output:
-        temp("<resources>/automatic/shapes/{shapes}/sfh_mfh_shares.parquet"),
+        shares=temp("<resources>/automatic/shapes/{shapes}/sfh_mfh_shares.parquet"),
     log:
         "<logs>/{shapes}/prepare_sfh_mfh_shares.log",
     conda:
@@ -21,7 +21,7 @@ rule prepare_sfh_mfh_shares:
 
 rule unzip_jrc_idees:
     input:
-        rules.download_jrc_idees.output[0],
+        rules.download_jrc_idees.output.archive,
     output:
         temp("<resources>/automatic/jrc-idees/{version}/{dataset}_{country_code}.xlsx"),
     log:
@@ -59,7 +59,7 @@ rule unzip_ECUK_release:
 
 rule unzip_raw_population:
     input:
-        rules.download_raw_population.output[0],
+        rules.download_raw_population.output.archive,
     output:
         "<resources>/automatic/ghsl/pop_{ghsl_epoch}_100.tif",
     log:
@@ -93,10 +93,10 @@ rule prepare_shapes:
 
 rule prepare_shape_timezones:
     input:
-        shapes=rules.prepare_shapes.output[0],
+        shapes=rules.prepare_shapes.output.shapes,
         timezone_boundaries=rules.extract_timezone_boundaries.output.geojson,
     output:
-        temp("<resources>/automatic/shapes/{shapes}/shape_timezones.parquet"),
+        timezones=temp("<resources>/automatic/shapes/{shapes}/shape_timezones.parquet"),
     log:
         "<logs>/{shapes}/prepare_shape_timezones.log",
     conda:

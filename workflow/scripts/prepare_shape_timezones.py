@@ -112,5 +112,5 @@ if __name__ == "__main__":
         shapes_path=snakemake.input.shapes,
         timezone_boundaries_path=snakemake.input.timezone_boundaries,
         projected_crs=snakemake.params.projected_crs,
-        output_path=snakemake.output[0],
+        output_path=snakemake.output.timezones,
     )

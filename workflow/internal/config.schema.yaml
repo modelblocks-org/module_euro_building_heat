@@ -14,7 +14,137 @@ required:
 - useful_heat_demand
 - tech_efficiencies
 - heat_pump
+- district_heating
+- scenarios
 properties:
+  scenarios:
+    type: object
+    minProperties: 1
+    propertyNames:
+      pattern: ^[A-Za-z0-9_-]+$
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required: [description, district_heating_shares, heat_demand]
+      properties:
+        description:
+          type: string
+        district_heating_shares:
+          description: CSV path relative to the scenario_input pathvar.
+          type: string
+          pattern: '^(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+\.csv$'
+        heat_demand:
+          description: Nonnegative multipliers of historical useful heat demand by scenario year.
+          type: object
+          minProperties: 1
+          propertyNames:
+            anyOf:
+            - type: integer
+              minimum: 1900
+              maximum: 9999
+            - type: string
+              pattern: '^[0-9]{4}$'
+          additionalProperties:
+            type: number
+            minimum: 0
+  district_heating:
+    type: object
+    additionalProperties: false
+    required:
+    - area_selection
+    - distribution_length_curve
+    - distribution_diameter_curve
+    - service_length_curve
+    - service_diameter_curve
+    - pipe_diameter_range_m
+    properties:
+      area_selection:
+        description: Thresholds for selecting district-heating areas by heat density
+          and connected demand.
+        type: object
+        additionalProperties: false
+        required:
+        - minimum_heat_per_hectare
+        - minimum_heat_per_district_heating_area
+        properties:
+          minimum_heat_per_hectare:
+            description: Minimum heat demand per hectare cell to be considered for district heating in MWh per hectare per year.
+            type: number
+            exclusiveMinimum: 0
+          minimum_heat_per_district_heating_area:
+            description: Minimum connected heat demand per complete district heating area in MWh per year.
+            type: number
+            exclusiveMinimum: 0
+      distribution_length_curve:
+        description: "Parameters for the log-linear curve used to estimate district-heating distribution lengths."
+        type: object
+        additionalProperties: false
+        required: [log_slope_m, intercept_m, minimum_connected_buildings]
+        properties:
+          log_slope_m:
+            type: number
+            exclusiveMinimum: 0
+          intercept_m:
+            type: number
+          minimum_connected_buildings:
+            type: number
+            minimum: 2
+      distribution_diameter_curve:
+        description: "Parameters for the log-linear curve used to estimate district-heating distribution diameters."
+        type: object
+        additionalProperties: false
+        required: [small_pipe_density_gj_per_m, log_slope_m, intercept_m, small_pipe_diameter_m]
+        properties:
+          small_pipe_density_gj_per_m:
+            description: "Heat density in GJ per metre of distribution length below which the small pipe diameter is used."
+            type: number
+            exclusiveMinimum: 0
+          log_slope_m:
+            description: "Slope of the log-linear curve used to estimate distribution diameters."
+            type: number
+            exclusiveMinimum: 0
+          intercept_m:
+            description: "Intercept of the log-linear curve used to estimate distribution diameters."
+            type: number
+          small_pipe_diameter_m:
+            description: "Smallest distribution pipe diameter in metres."
+            type: number
+            exclusiveMinimum: 0
+      service_length_curve:
+        description: "Parameters for the logistic curve used to estimate district-heating service lengths."
+        type: object
+        additionalProperties: false
+        required: [asymptote_m_per_ha, logistic_a, logistic_b_ha_per_building]
+        properties:
+          asymptote_m_per_ha:
+            type: number
+            exclusiveMinimum: 0
+          logistic_a:
+            type: number
+            exclusiveMinimum: 0
+          logistic_b_ha_per_building:
+            type: number
+            exclusiveMinimum: 0
+      service_diameter_curve:
+        description: "Parameters for the exponential curve used to estimate district-heating service diameters."
+        type: object
+        additionalProperties: false
+        required: [exponential_a_mm, exponential_b_m_per_gj]
+        properties:
+          exponential_a_mm:
+            type: number
+            exclusiveMinimum: 0
+          exponential_b_m_per_gj:
+            type: number
+            exclusiveMinimum: 0
+      pipe_diameter_range_m:
+        description: Allowed pipe diameter [minimum, maximum] in metres.
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: number
+          exclusiveMinimum: 0
   building_rasters:
     description: "Settings controlling whether building grids are downloaded or rebuilt."
     type: object
@@ -346,6 +476,9 @@ properties:
     type: object
     additionalProperties: false
     properties:
+      district_heating:
+        description: Countries supplying missing connection fractions and network construction-cost coefficients.
+        $ref: '#/$defs/country_proxy_map'
       sfh_mfh_shares:
         description: |
           Maps countries missing dwelling-type data to countries whose single-family homes
@@ -381,6 +514,7 @@ properties:
     - annual_energy_balance
     - household_end_use
     - jrc_idees
+    - district_heating
   spatial_weights:
     description: "Settings for spatial allocation of annual space-heating demand."
     type: object

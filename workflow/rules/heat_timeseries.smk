@@ -13,7 +13,7 @@ rule process_gridded_weather_data:
         tsoil5=temp("<resources>/automatic/shapes/{shapes}/gridded_weather/tsoil5.nc"),
         hdd="<resources>/automatic/shapes/{shapes}/gridded_weather/hdd.nc",
     log:
-        "<logs>/{shapes}/timeseries/process_gridded_weather_data.log",
+        "<logs>/{shapes}/hourly/process_gridded_weather_data.log",
     conda:
         "../envs/module.yaml"
     params:
@@ -39,7 +39,7 @@ rule local_unscaled_heat_profiles:
     output:
         local_profiles=temp(LOCAL_UNSCALED_HEAT_PROFILES),
     log:
-        "<logs>/{shapes}/timeseries/local_unscaled_heat_profiles.log",
+        "<logs>/{shapes}/hourly/local_unscaled_heat_profiles.log",
     conda:
         "../envs/module.yaml"
     threads: config["threads"]["aggregation"]
@@ -54,11 +54,13 @@ rule local_unscaled_heat_profiles:
 rule unscaled_heat_profiles:
     input:
         local_profiles=rules.local_unscaled_heat_profiles.output.local_profiles,
-        shape_timezones=rules.prepare_shape_timezones.output[0],
+        shape_timezones=rules.prepare_shape_timezones.output.timezones,
     output:
-        temp("<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"),
+        profiles=temp(
+            "<resources>/automatic/shapes/{shapes}/hourly_unscaled_heat_demand.nc"
+        ),
     log:
-        "<logs>/{shapes}/timeseries/unscaled_heat_profiles.log",
+        "<logs>/{shapes}/hourly/unscaled_heat_profiles.log",
     conda:
         "../envs/module.yaml"
     threads: config["threads"]["aggregation"]
@@ -75,7 +77,7 @@ rule prepare_spatial_weights:
         weather_grid=rules.process_gridded_weather_data.output.grid,
         hdd=rules.process_gridded_weather_data.output.hdd,
         population=POPULATION_FILE,
-        locations=rules.prepare_shapes.output[0],
+        locations=rules.prepare_shapes.output.shapes,
         residential_raster=rules.merge_structural_support.output.residential_space_heat_weight,
         commercial_raster=rules.merge_structural_support.output.commercial_space_heat_weight,
     output:
@@ -85,14 +87,12 @@ rule prepare_spatial_weights:
         commercial_weights="<resources>/automatic/shapes/{shapes}/commercial_space_heat_weight.nc",
         grid_shapes="<resources>/automatic/shapes/{shapes}/weather_shape_intersections.parquet",
     log:
-        "<logs>/{shapes}/timeseries/prepare_spatial_weights.log",
+        "<logs>/{shapes}/hourly/prepare_spatial_weights.log",
     conda:
         "../envs/module.yaml"
     params:
         weather_demand_years=WEATHER_DEMAND_YEARS,
         hdd_elasticity=config["spatial_weights"]["hdd"]["elasticity"],
-        lat_name="lat",
-        lon_name="lon",
     message:
         "Calculate population and building-support weights per weather gridbox for '{wildcards.shapes}'."
     script:
@@ -101,22 +101,22 @@ rule prepare_spatial_weights:
 
 rule heat_demand_final_timeseries:
     input:
-        timeseries_data=rules.unscaled_heat_profiles.output[0],
+        timeseries_data=rules.unscaled_heat_profiles.output.profiles,
         annual_demand=rules.rescale_annual_heat_demand_to_shapes.output.annual_demand,
-        sfh_mfh_shares=rules.prepare_sfh_mfh_shares.output[0],
-        shapes=rules.prepare_shapes.output[0],
-        shape_timezones=rules.prepare_shape_timezones.output[0],
+        sfh_mfh_shares=rules.prepare_sfh_mfh_shares.output.shares,
+        shapes=rules.prepare_shapes.output.shapes,
+        shape_timezones=rules.prepare_shape_timezones.output.timezones,
     output:
         timeseries="<heat_demand>",
         space_heat_profile="<space_heat_profile>",
         hot_water_profile="<hot_water_profile>",
         plot=report(
-            "<resources>/automatic/shapes/{shapes}/plots/heat_demand_timeseries.pdf",
+            "<resources>/automatic/shapes/{shapes}/{scenario}/plots/heat_demand_timeseries_{year}.pdf",
             category="European Building Heat",
             subcategory="Heat demand",
         ),
     log:
-        "<logs>/{shapes}/timeseries/heat_demand_final_timeseries.log",
+        "<logs>/{shapes}/{scenario}/hourly/heat_demand_final_timeseries_{year}.log",
     conda:
         "../envs/module.yaml"
     params:

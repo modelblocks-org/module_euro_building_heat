@@ -18,13 +18,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def read_national_demand(path: str) -> pd.DataFrame:
-    """Read national annual heat demand from Parquet."""
+def read_national_demand(path: str, multiplier: float) -> pd.DataFrame:
+    """Read historical national demand and apply the scenario-year multiplier."""
     return (
         pd.read_parquet(path)
         .squeeze("columns")
         .unstack("country_code")
         .rename(columns=str.upper)
+        .mul(multiplier)
     )
 
 
@@ -272,7 +273,9 @@ def country_allocation_factors(
 
 def main() -> None:
     """Main Snakemake process."""
-    demand = read_national_demand(snakemake.input.annual_demand)
+    demand = read_national_demand(
+        snakemake.input.annual_demand, snakemake.params.heat_demand_multiplier
+    )
     mapping = country_map(snakemake.input.shapes)
     population = shape_population(snakemake.input.population)
     weather_demand_years = {
@@ -304,6 +307,8 @@ def main() -> None:
     tidy = tidy_annual_heat_demand(scaled)
     validated = _schemas.AnnualHeatDemandSchema.validate(tidy)
     validated.attrs["units"] = "TWh"
+    validated.attrs["scenario"] = snakemake.wildcards.scenario
+    validated.attrs["scenario_year"] = int(snakemake.wildcards.year)
     validated.to_parquet(snakemake.output.annual_demand, index=False)
     grid_shapes = gpd.read_parquet(snakemake.input.grid_shapes)
     factors = {
